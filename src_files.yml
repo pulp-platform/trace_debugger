@@ -1,0 +1,5 @@
+udma_trace_debugger_adapter:
+  files: [
+    rtl/tracer_adapter_if.sv,
+    rtl/tracer_adapter_reg_if.sv,
+  ]
