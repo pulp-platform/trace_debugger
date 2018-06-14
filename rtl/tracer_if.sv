@@ -11,7 +11,7 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: Peripheral module that pushes tracer data to the udma
 
-module tracer_adapter_if
+module tracer_if
     #(parameter L2_AWIDTH_NOAL = 12, // L2 address bus
       parameter TRANS_SIZE     = 16) // buffer size in L2 / transfer length
     (input logic 		       clk_i,
@@ -48,10 +48,10 @@ module tracer_adapter_if
     logic                              data_rx_valid_q;
 
     // We are in the same clockdomain as the SoC, so no DC stuff needed
-    tracer_adapter_reg_if
+    tracer_reg_if
         #(.L2_AWIDTH_NOAL(L2_AWIDTH_NOAL),
           .TRANS_SIZE(TRANS_SIZE))
-    i_tracer_adapter_reg_if // TODO: maybe do auto port assignment?
+    i_tracer_reg_if // TODO: maybe do auto port assignment?
         (.clk_i              (clk_i),
          .rst_ni             (rst_ni),
 
@@ -88,4 +88,4 @@ module tracer_adapter_if
             data_rx_valid_q <= 'h1;
         end
     end
-endmodule // tracer_adapter_if
+endmodule // tracer_if

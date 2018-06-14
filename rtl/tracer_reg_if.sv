@@ -16,7 +16,7 @@
 `define REG_RX_CFG    5'h8
 `define REG_RX_INTCFG 5'hC
 
-module tracer_adapter_reg_if
+module tracer_reg_if
   #(parameter L2_AWIDTH_NOAL = 12,
     parameter TRANS_SIZE = 16)
    (input logic                       clk_i,
@@ -118,4 +118,4 @@ module tracer_adapter_reg_if
             end
         end
     end
-endmodule // tracer_adapter_reg_if
+endmodule // tracer_reg_if
