@@ -28,7 +28,6 @@ module tracer_if
      // Configuration state for the udma
      output logic [L2_AWIDTH_NOAL-1:0] cfg_rx_startaddr_o,
      output logic [TRANS_SIZE-1:0]     cfg_rx_size_o,
-     output logic [1:0] 	       cfg_rx_datasize_o,
      output logic 		       cfg_rx_continuous_o,
      output logic 		       cfg_rx_en_o,
      output logic 		       cfg_rx_filter_o,
@@ -40,11 +39,11 @@ module tracer_if
 
      // Data from the tracer that goes to the udma
      output logic [1:0] 	       data_rx_datasize_o,
-     output logic [15:0] 	       data_rx_data_o,
+     output logic [31:0] 	       data_rx_data_o,
      output logic 		       data_rx_valid_o,
      input logic 		       data_rx_ready_i);
 
-    logic [15:0] 		       data_rx_data_q;
+    logic [31:0] 		       data_rx_data_q;
     logic                              data_rx_valid_q;
 
     // We are in the same clockdomain as the SoC, so no DC stuff needed
