@@ -14,10 +14,20 @@
 verilator ?= verilator
 
 LINTER = $(verilator) --lint-only
+MAKE = make
 
 srcfiles := $(wildcard rtl/*.sv)
 
-.Phony: lint verilate
+.Phony: lint verilate driver driver-run driver-clean
 
 lint: $(srcfiles)
 	$(LINTER) $(srcfiles)
+
+driver-all:
+	$(MAKE) -C driver/ all
+
+driver-run:
+	$(MAKE) -C driver/ run
+
+driver-clean:
+	$(MAKE) -C driver/ clean
