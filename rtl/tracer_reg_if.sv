@@ -11,10 +11,10 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: Manages peripheral state, i.e. the memory mapped registers
 
-`define REG_RX_SADDR  5'h0
-`define REG_RX_SIZE   5'h4
-`define REG_RX_CFG    5'h8
-`define REG_RX_INTCFG 5'hC
+`define REG_RX_SADDR  5'h0 //BASEADDR+0x00
+`define REG_RX_SIZE   5'h1 //BASEADDR+0x04
+`define REG_RX_CFG    5'h2 //BASEADDR+0x08
+`define REG_RX_INTCFG 5'h3 //BASEADDR+0x0C
 
 module tracer_reg_if
   #(parameter L2_AWIDTH_NOAL = 12,
