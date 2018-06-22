@@ -15,19 +15,46 @@ verilator ?= verilator
 
 LINTER = $(verilator) --lint-only
 MAKE = make
+CTAGS = ctags
 
-srcfiles := $(wildcard rtl/*.sv)
+rtlsrcfiles := $(wildcard rtl/*.sv)
 
-.Phony: lint verilate driver driver-run driver-clean
+# rtl related targets
+.PHONY: lint
+lint: $(rtlsrcfiles)
+	$(LINTER) $(rtlsrcfiles)
 
-lint: $(srcfiles)
-	$(LINTER) $(srcfiles)
-
+# driver related targets
+.PHONY: driver-all
 driver-all:
-	$(MAKE) -C driver/ all
+	$(MAKE) -C driver/lowlevel all
+	$(MAKE) -C driver/rt all
 
+.PHONY: driver-run
 driver-run:
-	$(MAKE) -C driver/ run
+	$(MAKE) -C driver/lowlevel run
 
+.PHONY: driver-clean
 driver-clean:
-	$(MAKE) -C driver/ clean
+	$(MAKE) -C driver/lowlevel clean
+	$(MAKE) -C driver/rt clean
+
+# check if environment is setup properly
+check-env:
+ifndef PULP_SDK_HOME
+  $(error PULP_SDK_HOME is undefined)
+endif
+
+# general targets
+TAGS: check-env
+	$(CTAGS) -R -e . $(PULP_SDK_HOME)
+
+.PHONY: all
+all: driver-all
+
+.PHONY: clean
+clean: driver-clean
+
+.PHONY: distclean
+distclean: clean
+	rm -f TAGS
