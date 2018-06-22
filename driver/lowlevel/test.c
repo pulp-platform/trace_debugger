@@ -29,9 +29,8 @@
 #define UDMA_TRACER_RX_ADDR(id)                                                \
     (ARCHI_UDMA_ADDR + UDMA_TRACER_OFFSET(id) + UDMA_CHANNEL_RX_OFFSET)
 #define UDMA_TRACER_OFFSET(id) UDMA_PERIPH_OFFSET(ARCHI_UDMA_TRACER_ID(id))
-/* TODO: determined in udma_subsyste.v and soc_peripherals.v */
-#define ARCHI_SOC_EVENT_TRACER_RX(id) 30
-
+#define ARCHI_SOC_EVENT_TRACER_RX(id)                                          \
+    ARCHI_SOC_EVENT_UDMA_RX(ARCHI_UDMA_TRACER_ID(id))
 
 unsigned int write_and_read_l2(unsigned int *, unsigned int);
 
