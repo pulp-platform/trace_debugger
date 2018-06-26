@@ -117,13 +117,14 @@ void rt_trace_debugger_close(rt_trace_dbg_t *handle, rt_event_t *event)
     __rt_trace_debugger_cleanup();
     soc_eu_fcEventMask_clearEvent(ARCHI_SOC_EVENT_TRACER_RX(0));
     plp_udma_cg_set(plp_udma_cg_get() & ~(1 << ARCHI_UDMA_TRACER_ID(0)));
+    rt_trace(RT_TRACE_DEV_CTRL, "[TRACE_DBG] Closed trace debugger device.\n");
     return;
 }
 
 /* ensure continous transfer */
 void __rt_trace_debugger_eot(void *arg)
 {
-    rt_trace(RT_TRACE_DEV_CTRL, "[Trace_DBG] end of transfer, re-enqueue...\n");
+    rt_trace(RT_TRACE_DEV_CTRL, "[TRACE_DBG] End of transfer, re-enqueue...\n");
     int index = (int)arg;
 
     /* TODO: remove this quick and dirty debugging stuff*/
