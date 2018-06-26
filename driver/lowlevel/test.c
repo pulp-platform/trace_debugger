@@ -24,13 +24,14 @@
 /* #define ARCHI_NB_PERIPH 8 */
 
 /* TODO: put them in the right place */
-#define ARCHI_UDMA_TRACER_ID(id) 7 /* TODO: collides with TGEN id*/
-#define UDMA_TRACER_OFFSET(id) UDMA_PERIPH_OFFSET(ARCHI_UDMA_TRACER_ID(id))
-#define UDMA_TRACER_RX_ADDR(id)                                                \
-    (ARCHI_UDMA_ADDR + UDMA_TRACER_OFFSET(id) + UDMA_CHANNEL_RX_OFFSET)
-#define UDMA_TRACER_OFFSET(id) UDMA_PERIPH_OFFSET(ARCHI_UDMA_TRACER_ID(id))
-#define ARCHI_SOC_EVENT_TRACER_RX(id)                                          \
-    ARCHI_SOC_EVENT_UDMA_RX(ARCHI_UDMA_TRACER_ID(id))
+/* #define ARCHI_UDMA_TRACER_ID(id) 7 /\* TODO: collides with TGEN id*\/ */
+/* #define UDMA_TRACER_OFFSET(id) UDMA_PERIPH_OFFSET(ARCHI_UDMA_TRACER_ID(id)) */
+/* #define UDMA_TRACER_RX_ADDR(id)                                                \ */
+/*     (ARCHI_UDMA_ADDR + UDMA_TRACER_OFFSET(id) + UDMA_CHANNEL_RX_OFFSET) */
+/* #define UDMA_TRACER_OFFSET(id) UDMA_PERIPH_OFFSET(ARCHI_UDMA_TRACER_ID(id)) */
+/* UDMA_CAM_OFFSET */
+/* #define ARCHI_SOC_EVENT_TRACER_RX(id)                                          \ */
+/*     ARCHI_SOC_EVENT_UDMA_RX(ARCHI_UDMA_TRACER_ID(id)) */
 
 unsigned int write_and_read_l2(unsigned int *, unsigned int);
 
