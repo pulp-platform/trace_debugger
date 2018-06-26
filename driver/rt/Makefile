@@ -1,6 +1,6 @@
-PULP_APP = rt_test
-PULP_APP_FC_SRCS = rt_test.c
-PULP_APP_HOST_SRCS = rt_test.c
+PULP_APP = rt_test2
+PULP_APP_FC_SRCS = rt_test2.c trace_debugger.c
+PULP_APP_HOST_SRCS = rt_test2.c
 PULP_CFLAGS = -O1 -g
 
 include $(PULP_SDK_HOME)/install/rules/pulp_rt.mk
