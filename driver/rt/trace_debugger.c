@@ -20,4 +20,7 @@
 
 #include "rt/rt_api.h"
 
-
+void rt_trace_debugger_conf_init(rt_trace_debugger_conf_t *conf);
+rt_trace_debugger_t* rt_trace_debugger_open();
+void rt_trace_debugger_control(rt_trace_debugger_t *handle);
+void rt_trace_debugger_close(rt_trace_debugger_t *handle, rt_event_t *event);
