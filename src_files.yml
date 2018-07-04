@@ -2,4 +2,5 @@ trace_debugger:
   files: [
     rtl/tracer_if.sv,
     rtl/tracer_reg_if.sv,
+    rtl/trace_debugger.sv,
   ]
