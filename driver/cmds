@@ -1,0 +1,3 @@
+make conf gui=1 CONFIG_OPT=rt/trace=1 gdb=1
+make conf gui=1 CONFIG_OPT="rt/trace=1 vsim/args=-debugdb" gdb=1
+make conf gui=1 CONFIG_OPT="rt/trace=1 vsim/args=-debugdb vsim/tcl_args=-fsmdebug" clean all run
