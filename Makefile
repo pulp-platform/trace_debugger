@@ -11,18 +11,18 @@
 # Author: Robert Balas (balasr@student.ethz.ch)
 # Description: All in one
 
-verilator ?= verilator
+VERILATOR ?= verilator
 
-LINTER = $(verilator) --lint-only
+LINTER = $(VERILATOR) --lint-only
 MAKE = make
 CTAGS = ctags
 
-rtlsrcfiles := $(wildcard rtl/*.sv)
+RTLSRC := $(wildcard rtl/*.sv)
 
 # rtl related targets
 .PHONY: lint
 lint: $(rtlsrcfiles)
-	$(LINTER) $(rtlsrcfiles)
+	$(LINTER) $(RTLSRC)
 
 # driver related targets
 .PHONY: driver-all
