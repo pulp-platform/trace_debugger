@@ -1,4 +1,6 @@
 driver/build*
 /change-author.sh
 build
-/TAGS
+TAGS
+gmon.out
+*.o
