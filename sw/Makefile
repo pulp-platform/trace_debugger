@@ -1,7 +1,7 @@
 CC 		= gcc
 CPPFLAGS	=
-CFLAGS		= -std=c11 -Wall -O2 -fno-strict-aliasing -Wno-unused-function
-CFLAGS_DEBUG	= -std=c11 -Wall -g -fno-strict-aliasing -Wno-unused-function
+CFLAGS		= -std=gnu11 -Wall -O2 -fno-strict-aliasing -Wno-unused-function
+CFLAGS_DEBUG	= -std=gnu11 -Wall -g -fno-strict-aliasing -Wno-unused-function
 
 #LIB_PATHS       = /scratch/balasr/pulp-riscv-binutils-gdb/opcodes /scratch/balasr/pulp-riscv-binutils-gdb/bfd
 #INCLUDE_PATHS   = /scratch/balasr/pulp-riscv-binutils-gdb/include
