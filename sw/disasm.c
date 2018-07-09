@@ -103,7 +103,8 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 }
 
 
-int main(void)
+
+int main(int argc, char* argv[])
 {
     bfd_init();
 
