@@ -18,8 +18,9 @@
  */
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
-#include <bfd.h>
-#include <dis-asm.h>
+#include "bfd.h"
+#include "dis-asm.h"
+#include "libiberty.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,27 @@ void dump_section_header(bfd *abfd, asection *section, void *ignored)
 {
     bfd_printf_vma(abfd, bfd_get_section_vma(abfd, section));
     printf("%s\n", bfd_get_section_name(abfd, section));
+}
+
+
+void dump_bin_info(bfd *abfd)
+{
+    printf("Information about binary:\n");
+    printf("flavour: %u\n", bfd_get_flavour(abfd));
+    printf("name   : %s\n", bfd_printable_name(abfd));
+    printf("size   : %d\n", bfd_get_arch_size(abfd));
+    printf("mach   : %s\n", bfd_printable_arch_mach(bfd_get_arch(abfd), 0));
+    printf("endian : %d\n", abfd->xvec->byteorder);
+}
+
+
+void dump_target_list()
+{
+    printf("Available target list:\n");
+    const char **list = bfd_target_list();
+    for (unsigned int i = 0; list[i]; i++) {
+	printf("%s\n", list[i]);
+    }
 }
 
 
@@ -124,12 +146,15 @@ int main(int argc, char* argv[])
     dinfo.endian = abfd->xvec->byteorder;
     disassemble_init_for_target(&dinfo);
 
+    dump_target_list();
+    dump_bin_info(abfd);
+
     disassemble_fn = disassembler(abfd);
     if (!disassemble_fn) {
-	fprintf(stderr, "No suitable disassembler found");
+	fprintf(stderr, "No suitable disassembler found\n");
 	return EXIT_FAILURE;
     }
-
+    /* TODO: bfd_count_sections */
     dump_section_names(abfd);
 
     bfd_map_over_sections(abfd, disassemble_section, &dinfo);

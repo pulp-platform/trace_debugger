@@ -3,12 +3,15 @@ CPPFLAGS	=
 CFLAGS		= -std=gnu11 -Wall -O2 -fno-strict-aliasing -Wno-unused-function
 CFLAGS_DEBUG	= -std=gnu11 -Wall -g -fno-strict-aliasing -Wno-unused-function
 
-#LIB_PATHS       = /scratch/balasr/pulp-riscv-binutils-gdb/opcodes /scratch/balasr/pulp-riscv-binutils-gdb/bfd
-#INCLUDE_PATHS   = /scratch/balasr/pulp-riscv-binutils-gdb/include
+LIB_PATHS       = /scratch/balasr/pulp-riscv-binutils-gdb/opcodes \
+		/scratch/balasr/pulp-riscv-binutils-gdb/bfd \
+		/scratch/balasr/pulp-riscv-binutils-gdb/libiberty \
+		/scratch/balasr/pulp-riscv-binutils-gdb/zlib \
+INCLUDE_PATHS   = /scratch/balasr/pulp-riscv-binutils-gdb/include
 MORE_TAG_PATHS  = /scratch/balasr/pulp-riscv-binutils-gdb/bfd
 
 LDFLAGS 	= $(addprefix -L, $(LIB_PATHS))
-LDLIBS		= -lopcodes -lbfd
+LDLIBS		= -l:libbfd.a -l:libopcodes.a -l:libiberty.a -l:libz.a -ldl
 
 SRCS		= $(wildcard *.c)
 OBJS		= $(SRCS:.c=.o)
