@@ -116,7 +116,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 	addr_offset += size;
 	printf("\n");
 	if (size <= 0) {
-	    printf("Encountered zero in size, stopping...");
+	    fprintf(stderr, "Encountered zero in size, stopping...");
 	    break;
 	}
     }
@@ -125,12 +125,49 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 }
 
 
+void disassemble_single_instruction(uint32_t instr,
+				    struct disassemble_info *dinfo)
+{
+    size_t len = 8;
+    size_t pc = 0;
+    bfd_byte *data = malloc(len);
+    if (!data) {
+	perror("disassemble_single_instruction:");
+	return;
+    }
+    memset(data, 0, len);
 
-int main(int argc, char* argv[])
+    if (dinfo->endian == BFD_ENDIAN_BIG) {
+	data[3] = (bfd_byte)(instr & 0xff);
+	data[2] = (bfd_byte)((instr >> 8) & 0xff);
+	data[1] = (bfd_byte)((instr >> 16) & 0xff);
+	data[0] = (bfd_byte)((instr >> 24) & 0xff);
+    } else {
+	/* Assume unknown is also little endian */
+	data[0] = (bfd_byte)(instr & 0xff);
+	data[1] = (bfd_byte)((instr >> 8) & 0xff);
+	data[2] = (bfd_byte)((instr >> 16) & 0xff);
+	data[3] = (bfd_byte)((instr >> 24) & 0xff);
+    }
+    dinfo->buffer = data;
+    dinfo->buffer_vma = pc;
+    dinfo->buffer_length = len;
+
+    int size = (*disassemble_fn)(pc, dinfo);
+    printf("\n");
+    if (size <= 0) {
+	fprintf(stderr, "Encountered zero in size");
+    }
+
+    free(data);
+}
+
+
+int main(int argc, char *argv[])
 {
     bfd_init();
 
-    abfd = bfd_openr("disasm", NULL);
+    abfd = bfd_openr("interrupt", NULL);
 
     if (!(abfd && bfd_check_format(abfd, bfd_object)))
 	return EXIT_FAILURE;
