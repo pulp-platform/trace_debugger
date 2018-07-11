@@ -6,7 +6,7 @@ CFLAGS_DEBUG	= -std=gnu11 -Wall -g -fno-strict-aliasing -Wno-unused-function
 LIB_PATHS       = /scratch/balasr/pulp-riscv-binutils-gdb/opcodes \
 		/scratch/balasr/pulp-riscv-binutils-gdb/bfd \
 		/scratch/balasr/pulp-riscv-binutils-gdb/libiberty \
-		/scratch/balasr/pulp-riscv-binutils-gdb/zlib \
+		/scratch/balasr/pulp-riscv-binutils-gdb/zlib
 INCLUDE_PATHS   = /scratch/balasr/pulp-riscv-binutils-gdb/include
 MORE_TAG_PATHS  = /scratch/balasr/pulp-riscv-binutils-gdb/bfd
 
@@ -41,7 +41,8 @@ run:
 	./$(BIN)
 
 TAGS:
-	$(CTAGS) -R -e -h=".c.h" . $(LIB_PATHS) $(INCLUDE_PATHS) $(MORE_TAG_PATHS)
+	$(CTAGS) -R -e -h=".c.h" --tag-relative=always . $(LIB_PATHS) \
+	$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
 
 .PHONY: clean
 clean:
