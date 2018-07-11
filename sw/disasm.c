@@ -49,9 +49,9 @@ void override_print_address(bfd_vma addr, struct disassemble_info *dinfo)
 }
 
 
-asymbol *find_symbol_at_address(bfd_vma addr, struct, disassemble_info *dinfo)
+asymbol *find_symbol_at_address(bfd_vma addr, struct disassemble_info *dinfo)
 {
-    asymbol *sym;
+    return NULL;
 }
 
 
