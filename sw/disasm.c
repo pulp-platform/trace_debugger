@@ -43,6 +43,18 @@ disassembler_ftype disassemble_fn;
 void dump_section_header(bfd *, asection *, void *);
 
 
+void override_print_address(bfd_vma addr, struct disassemble_info *dinfo)
+{
+    (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx", (uintmax_t)addr);
+}
+
+
+asymbol *find_symbol_at_address(bfd_vma addr, struct, disassemble_info *dinfo)
+{
+    asymbol *sym;
+}
+
+
 void dump_section_names(bfd *abfd)
 {
     bfd_map_over_sections(abfd, dump_section_header, NULL);
@@ -79,7 +91,7 @@ void dump_target_list()
 
 void disassemble_section(bfd *abfd, asection *section, void *inf)
 {
-    /* Do not disassemble sections withouth machine code*/
+    /* Do not disassemble sections without machine code*/
     if ((section->flags & (SEC_CODE | SEC_HAS_CONTENTS))
 	!= (SEC_CODE | SEC_HAS_CONTENTS)) {
 	return;
@@ -121,7 +133,8 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 	addr_offset += size;
 	printf("\n");
 	if (size <= 0) {
-	    fprintf(stderr, "Encountered zero in size, stopping...");
+	    fprintf(stderr, "Encountered instruction with %d bytes, stopping",
+		    size);
 	    break;
 	}
     }
@@ -182,7 +195,8 @@ void disassemble_single_instruction(uint32_t instr,
     int size = (*disassemble_fn)(pc, dinfo);
     printf("\n");
     if (size <= 0) {
-	fprintf(stderr, "Encountered zero in size");
+	fprintf(stderr, "Encountered instruction with %d bytes, stopping",
+		size);
     }
 
     free(data);
@@ -199,9 +213,9 @@ int main(int argc, char *argv[])
 	return EXIT_FAILURE;
 
     /* Override the stream the disassembler outputs to */
-    init_disassemble_info(&dinfo, NULL, (fprintf_ftype)fprintf);
+    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
     dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.stream = stdout;
+    dinfo.print_address_func = override_print_address;
 
     dinfo.flavour = bfd_get_flavour(abfd);
     dinfo.arch = bfd_get_arch(abfd);
@@ -219,7 +233,8 @@ int main(int argc, char *argv[])
     }
     /* TODO: bfd_count_sections */
     dump_section_names(abfd);
-
+    printf("num_sections: %d\n", bfd_count_sections(abfd));
+    disassemble_single_instruction(0x10, &dinfo);
     bfd_map_over_sections(abfd, disassemble_section, &dinfo);
 
     bfd_close(abfd);
