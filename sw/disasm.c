@@ -130,6 +130,27 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 }
 
 
+void disassemble_block(bfd_byte *data, size_t len,
+		       struct disassemble_info *dinfo)
+{
+    size_t pc = 0;
+    dinfo->buffer = data;
+    dinfo->buffer_vma = pc;
+    dinfo->buffer_length = len;
+
+    while (pc < len) {
+	int size = (*disassemble_fn)(pc, dinfo);
+	pc += size;
+	printf("\n");
+	if (size <= 0) {
+	    fprintf(stderr, "Encountered instruction with %d bytes, stopping",
+		    size);
+	    break;
+	}
+    }
+}
+
+
 void disassemble_single_instruction(uint32_t instr,
 				    struct disassemble_info *dinfo)
 {
