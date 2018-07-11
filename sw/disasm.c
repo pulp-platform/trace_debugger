@@ -23,6 +23,7 @@
  */
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
+#include "disasm.h"
 #include "bfd.h"
 #include "dis-asm.h"
 #include "libiberty.h"
@@ -35,13 +36,8 @@
 #include <limits.h>
 #include <inttypes.h>
 
-
-bfd *abfd = NULL;
-disassemble_info dinfo = {0};
+/* TODO: make this global or pass it via args */
 disassembler_ftype disassemble_fn;
-
-void dump_section_header(bfd *, asection *, void *);
-
 
 void override_print_address(bfd_vma addr, struct disassemble_info *dinfo)
 {
@@ -84,7 +80,7 @@ void dump_target_list()
     printf("Available target list:\n");
     const char **list = bfd_target_list();
     for (unsigned int i = 0; list[i]; i++) {
-	printf("%s\n", list[i]);
+        printf("%s\n", list[i]);
     }
 }
 
@@ -93,32 +89,32 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 {
     /* Do not disassemble sections without machine code*/
     if ((section->flags & (SEC_CODE | SEC_HAS_CONTENTS))
-	!= (SEC_CODE | SEC_HAS_CONTENTS)) {
-	return;
+        != (SEC_CODE | SEC_HAS_CONTENTS)) {
+        return;
     }
 
     struct disassemble_info *dinfo = inf;
 
     bfd_size_type datasize = bfd_get_section_size(section);
     if (datasize == 0)
-	return;
+        return;
 
     bfd_vma addr_offset = 0;
     bfd_vma stop_offset = datasize / dinfo->octets_per_byte;
 
     if (addr_offset >= stop_offset)
-	return;
+        return;
 
     bfd_byte *data = malloc(datasize);
     if (!data) {
-	perror("disassemble_section:");
-	return;
+        perror("disassemble_section:");
+        return;
     }
 
     if (!bfd_get_section_contents(abfd, section, data, 0, datasize)) {
-	bfd_perror("disassemble_section:");
-	free(data);
-	return;
+        bfd_perror("disassemble_section:");
+        free(data);
+        return;
     }
 
     dinfo->buffer = data;
@@ -128,15 +124,15 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 
     printf("Disassembly of section %s:\n", section->name);
     while (addr_offset < stop_offset) {
-	printf("0x%016jx  ", (uintmax_t)addr_offset); /* pc */
-	int size = (*disassemble_fn)(section->vma + addr_offset, dinfo);
-	addr_offset += size;
-	printf("\n");
-	if (size <= 0) {
-	    fprintf(stderr, "Encountered instruction with %d bytes, stopping",
-		    size);
-	    break;
-	}
+        printf("0x%016jx  ", (uintmax_t)addr_offset); /* pc */
+        int size = (*disassemble_fn)(section->vma + addr_offset, dinfo);
+        addr_offset += size;
+        printf("\n");
+        if (size <= 0) {
+            fprintf(stderr, "Encountered instruction with %d bytes, stopping",
+                    size);
+            break;
+        }
     }
 
     free(data);
@@ -144,7 +140,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 
 
 void disassemble_block(bfd_byte *data, size_t len,
-		       struct disassemble_info *dinfo)
+                       struct disassemble_info *dinfo)
 {
     size_t pc = 0;
     dinfo->buffer = data;
@@ -152,41 +148,41 @@ void disassemble_block(bfd_byte *data, size_t len,
     dinfo->buffer_length = len;
 
     while (pc < len) {
-	int size = (*disassemble_fn)(pc, dinfo);
-	pc += size;
-	printf("\n");
-	if (size <= 0) {
-	    fprintf(stderr, "Encountered instruction with %d bytes, stopping",
-		    size);
-	    break;
-	}
+        int size = (*disassemble_fn)(pc, dinfo);
+        pc += size;
+        printf("\n");
+        if (size <= 0) {
+            fprintf(stderr, "Encountered instruction with %d bytes, stopping",
+                    size);
+            break;
+        }
     }
 }
 
 
 void disassemble_single_instruction(uint32_t instr,
-				    struct disassemble_info *dinfo)
+                                    struct disassemble_info *dinfo)
 {
     size_t len = 8;
     size_t pc = 0;
     bfd_byte *data = malloc(len);
     if (!data) {
-	perror("disassemble_single_instruction:");
-	return;
+        perror("disassemble_single_instruction:");
+        return;
     }
     memset(data, 0, len);
 
     if (dinfo->endian == BFD_ENDIAN_BIG) {
-	data[3] = (bfd_byte)(instr & 0xff);
-	data[2] = (bfd_byte)((instr >> 8) & 0xff);
-	data[1] = (bfd_byte)((instr >> 16) & 0xff);
-	data[0] = (bfd_byte)((instr >> 24) & 0xff);
+        data[3] = (bfd_byte)(instr & 0xff);
+        data[2] = (bfd_byte)((instr >> 8) & 0xff);
+        data[1] = (bfd_byte)((instr >> 16) & 0xff);
+        data[0] = (bfd_byte)((instr >> 24) & 0xff);
     } else {
-	/* Assume unknown is also little endian */
-	data[0] = (bfd_byte)(instr & 0xff);
-	data[1] = (bfd_byte)((instr >> 8) & 0xff);
-	data[2] = (bfd_byte)((instr >> 16) & 0xff);
-	data[3] = (bfd_byte)((instr >> 24) & 0xff);
+        /* Assume unknown is also little endian */
+        data[0] = (bfd_byte)(instr & 0xff);
+        data[1] = (bfd_byte)((instr >> 8) & 0xff);
+        data[2] = (bfd_byte)((instr >> 16) & 0xff);
+        data[3] = (bfd_byte)((instr >> 24) & 0xff);
     }
     dinfo->buffer = data;
     dinfo->buffer_vma = pc;
@@ -195,49 +191,9 @@ void disassemble_single_instruction(uint32_t instr,
     int size = (*disassemble_fn)(pc, dinfo);
     printf("\n");
     if (size <= 0) {
-	fprintf(stderr, "Encountered instruction with %d bytes, stopping",
-		size);
+        fprintf(stderr, "Encountered instruction with %d bytes, stopping",
+                size);
     }
 
     free(data);
-}
-
-
-int main(int argc, char *argv[])
-{
-    bfd_init();
-
-    abfd = bfd_openr("interrupt", NULL);
-
-    if (!(abfd && bfd_check_format(abfd, bfd_object)))
-	return EXIT_FAILURE;
-
-    /* Override the stream the disassembler outputs to */
-    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
-    dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.print_address_func = override_print_address;
-
-    dinfo.flavour = bfd_get_flavour(abfd);
-    dinfo.arch = bfd_get_arch(abfd);
-    dinfo.mach = bfd_get_mach(abfd);
-    dinfo.endian = abfd->xvec->byteorder;
-    disassemble_init_for_target(&dinfo);
-
-    dump_target_list();
-    dump_bin_info(abfd);
-
-    disassemble_fn = disassembler(abfd);
-    if (!disassemble_fn) {
-	fprintf(stderr, "No suitable disassembler found\n");
-	return EXIT_FAILURE;
-    }
-    /* TODO: bfd_count_sections */
-    dump_section_names(abfd);
-    printf("num_sections: %d\n", bfd_count_sections(abfd));
-    disassemble_single_instruction(0x10, &dinfo);
-    bfd_map_over_sections(abfd, disassemble_section, &dinfo);
-
-    bfd_close(abfd);
-
-    return EXIT_SUCCESS;
 }

@@ -22,16 +22,41 @@
  * Description: Collection of disassembler routines using libopcodes and libbfd
  */
 
-#include <stdint.h>
-#include <stdbool.h>
+/* #define DECLARE_INSN(code, match, mask) \ */
+/*     static const uint32_t match_##code = match; \ */
+/*     static const uint32_t mask_##code = mask; \ */
+/*     static bool is_ ## code ## _insn (long insn) \ */
+/*     {                                                 \ */
+/*              return (insn & mask) == match;           \ */
+/*     }                                                 \ */
 
-#define DECLARE_INSN(code, match, mask) \
-    static const uint32_t match_##code = match; \
-    static const uint32_t mask_##code = mask; \
-    static bool is_ ## code ## _insn (long insn) \
-    {						 \
-    	return (insn & mask) == match;		 \
-    }						 \
+/* #include "inst.h" */
+/* #undef DECLARE_INSN */
 
-#include "inst.h"
-#undef DECLARE_INSN
+#ifndef __DISASM_H__
+#define __DISASM_H__
+
+#define PACKAGE "foo" /* quick hack for bfd if not using autotools */
+#include <inttypes.h>
+#include "bfd.h"
+#include "dis-asm.h"
+
+void dump_section_header(bfd *, asection *, void *);
+
+void dump_bin_info(bfd *);
+
+void override_print_address(bfd_vma, struct disassemble_info *);
+
+asymbol *find_symbol_at_address(bfd_vma, struct disassemble_info *);
+
+void dump_section_names(bfd *);
+
+void dump_target_list();
+
+void disassemble_section(bfd *, asection *, void *);
+
+void disassemble_block(bfd_byte *, size_t, struct disassemble_info *);
+
+void disassemble_single_instruction(uint32_t, struct disassemble_info *);
+
+#endif
