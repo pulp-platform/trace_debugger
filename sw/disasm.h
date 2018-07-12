@@ -22,24 +22,28 @@
  * Description: Collection of disassembler routines using libopcodes and libbfd
  */
 
-/* #define DECLARE_INSN(code, match, mask) \ */
-/*     static const uint32_t match_##code = match; \ */
-/*     static const uint32_t mask_##code = mask; \ */
-/*     static bool is_ ## code ## _insn (long insn) \ */
-/*     {                                                 \ */
-/*              return (insn & mask) == match;           \ */
-/*     }                                                 \ */
-
-/* #include "inst.h" */
-/* #undef DECLARE_INSN */
 
 #ifndef __DISASM_H__
 #define __DISASM_H__
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
+#include <stdbool.h>
 #include <inttypes.h>
 #include "bfd.h"
 #include "dis-asm.h"
+
+/* TODO: berkley */
+#define DECLARE_INSN(code, match, mask)                                        \
+    static const uint32_t match_##code = match;                                \
+    static const uint32_t mask_##code = mask;                                  \
+    static bool is_##code##_instr(long instr)                                  \
+    {                                                                          \
+        return (instr & mask) == match;                                        \
+    }
+
+#include "riscv_encoding.h"
+#undef DECLARE_INSN
+
 
 void dump_section_header(bfd *, asection *, void *);
 
