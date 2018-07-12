@@ -124,10 +124,11 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 
     printf("Disassembly of section %s:\n", section->name);
     while (addr_offset < stop_offset) {
-        printf("0x%016jx  ", (uintmax_t)addr_offset); /* pc */
+        (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
+                               (uintmax_t)addr_offset); /* pc */
         int size = (*disassemble_fn)(section->vma + addr_offset, dinfo);
         addr_offset += size;
-        printf("\n");
+        (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
             fprintf(stderr, "Encountered instruction with %d bytes, stopping",
                     size);
@@ -150,7 +151,7 @@ void disassemble_block(bfd_byte *data, size_t len,
     while (pc < len) {
         int size = (*disassemble_fn)(pc, dinfo);
         pc += size;
-        printf("\n");
+        (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
             fprintf(stderr, "Encountered instruction with %d bytes, stopping",
                     size);
@@ -189,7 +190,7 @@ void disassemble_single_instruction(uint32_t instr,
     dinfo->buffer_length = len;
 
     int size = (*disassemble_fn)(pc, dinfo);
-    printf("\n");
+    (*dinfo->fprintf_func)(dinfo->stream, "\n");
     if (size <= 0) {
         fprintf(stderr, "Encountered instruction with %d bytes, stopping",
                 size);
