@@ -55,7 +55,8 @@ int main(int argc, char *argv[argc + 1])
     struct instr_sample sample = {0};
     struct instr_sample sample_arr[1];
     sample_arr[0] = sample;
-    trdb_compress_trace(sample_arr, 1);
+    LIST_HEAD(packet_list);
+    trdb_compress_trace(&packet_list, sample_arr, 1);
 
     /* Tests for disassembly functions */
     dump_target_list();

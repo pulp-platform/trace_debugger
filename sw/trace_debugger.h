@@ -27,6 +27,7 @@
 
 #include <stdbool.h>
 #include <inttypes.h>
+#include "list.h"
 
 #define XLEN 32
 #define CAUSELEN 5
@@ -39,11 +40,54 @@ struct instr_sample {
     bool exception;
     bool interrupt;
     uint32_t cause : CAUSELEN; /* CAUSELEN */
-    uint32_t tval ; /* XLEN */
-    uint32_t priv : PRIVLEN ; /* PRIVLEN */
-    uint32_t iaddr; /* XLEN */
-    uint32_t instr; /* ILEN */
+    uint32_t tval : XLEN;      /* XLEN */
+    uint32_t priv : PRIVLEN;   /* PRIVLEN */
+    uint32_t iaddr : XLEN;     /* XLEN */
+    uint32_t instr : ILEN;     /* ILEN */
 };
+
+
+struct tr_packet {
+    uint32_t msg_type : 2;
+    uint32_t format : 2;
+
+    uint32_t branches : 5;
+    uint32_t branch_map;
+
+    uint32_t subformat : 2;
+    uint32_t context;
+    uint32_t privilege : PRIVLEN;
+    bool branch;
+    uint32_t address : XLEN;
+    uint32_t ecause : CAUSELEN;
+    bool interrupt;
+    uint32_t tval : XLEN;
+
+    struct list_head list;
+};
+
+/* Turns out zero initializing a dynamically allocated struct is not that easy
+ */
+#define INIT_PACKET(p)                                                         \
+    do {                                                                       \
+        p->msg_type = 0x2;                                                     \
+        p->format = 0;                                                         \
+        p->branches = 0;                                                       \
+        p->branch_map = 0;                                                     \
+        p->subformat = 0;                                                      \
+        p->context = 0;                                                        \
+        p->privilege = 0;                                                      \
+        p->branch = false;                                                     \
+        p->address = 0;                                                        \
+        p->ecause = 0;                                                         \
+        p->interrupt = false;                                                  \
+        p->tval = 0;                                                           \
+    } while (false)
+
+struct list_head *trdb_compress_trace(struct list_head *packet_list,
+                                      struct instr_sample[1], size_t len);
+
+char *trdb_decompress_trace(struct list_head *packet_list);
 
 
 /* inline uint32_t cause(struct instr_sample *instr) */
@@ -71,35 +115,40 @@ struct instr_sample {
 /*     return instr->instr & 0xffffffff; */
 /* } */
 
-struct packet01 {
-    uint32_t msg_type : 2;
-    uint32_t format : 2;
-    uint32_t branches : 5;
-    uint32_t branch_map;
-    uint32_t address;
-};
-
-struct packet2 {
-    uint32_t msg_type : 2;
-    uint32_t format : 2;
-    uint32_t address;
-};
-
-struct packet3 {
-    uint32_t msg_type : 2;
-    uint32_t format : 2;
-    uint32_t subformat : 2;
-    uint32_t context;
-    uint32_t privilege : PRIVLEN;
-    bool branch : 1;
-    uint32_t address : XLEN;
-    uint32_t ecause : CAUSELEN;
-    bool interrupt: 1;
-    uint32_t tval: XLEN;
-};
-
-char *trdb_compress_trace(struct instr_sample[1], size_t len);
-
-char *trdb_decompress_trace(char *);
+/* struct packet0 {
+ *     uint32_t msg_type : 2;
+ *     uint32_t format : 2;   // 00
+ *     uint32_t branches : 5;
+ *     uint32_t branch_map;
+ *     uint32_t address;
+ * };
+ *
+ * struct packet1 {
+ *     uint32_t msg_type : 2;
+ *     uint32_t format : 2;   // 01
+ *     uint32_t branches : 5;
+ *     uint32_t branch_map;
+ *     uint32_t address;
+ * };
+ *
+ * struct packet2 {
+ *     uint32_t msg_type : 2;
+ *     uint32_t format : 2;
+ *     uint32_t address;
+ * };
+ *
+ * struct packet3 {
+ *     uint32_t msg_type : 2;
+ *     uint32_t format : 2;
+ *     uint32_t subformat : 2;
+ *     uint32_t context;
+ *     uint32_t privilege : PRIVLEN;
+ *     bool branch : 1;
+ *     uint32_t address : XLEN;
+ *     uint32_t ecause : CAUSELEN;
+ *     bool interrupt : 1;
+ *     uint32_t tval : XLEN;
+ * };
+ */
 
 #endif
