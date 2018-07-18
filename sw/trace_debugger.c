@@ -66,7 +66,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
     bool nextc_unqualified = false;
 
     bool thisc_exception = false;
-    /* bool lastc_exception = false; */
+    bool lastc_exception = false;
     bool nextc_exception = false;
 
     bool thisc_unpred_disc = false;
