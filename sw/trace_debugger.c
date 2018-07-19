@@ -29,7 +29,7 @@
 #include "disasm.h"
 #include "list.h"
 
-bool is_branch(uint32_t instr)
+static bool is_branch(uint32_t instr)
 {
     /* static bool is_##code##_instr(long insn) */
     return is_beq_instr(instr) || is_bne_instr(instr) || is_blt_instr(instr)
@@ -39,11 +39,19 @@ bool is_branch(uint32_t instr)
     /* auipc */
 }
 
+
+static bool branch_taken(instr_sample before, instr_sample after)
+{
+    /* TODO: can this cause issues with RVC + degenerate jump (+2) ?*/
+    return !(before.iaddr + 4 == after.iaddr
+             || before.iaddr + 2 == after.iaddr);
+}
+
 struct list_head *trdb_compress_trace(struct list_head *packet_list,
                                       struct instr_sample instrs[], size_t len)
 {
     /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
-    bool full_address = false;
+    bool full_address = true;
     /* bool iaddress_lsb_p = false; */
     /* bool implicit_except = false; */
     /* bool set_trace = false; */
@@ -70,12 +78,14 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
     bool nextc_exception = false;
 
     bool thisc_unpred_disc = false;
-    bool lastc_unpred_disc = false; /* last cylce unpredicted discontinuity*/
+    bool lastc_unpred_disc = false; /* last cycle unpredicted discontinuity*/
 
     uint32_t thisc_privilege = 0;
     uint32_t lastc_privilege = 0;
     uint32_t nextc_privilege = 0;
+
     bool thisc_privilege_change = false;
+    bool lastc_privilege_change = false;
     bool nextc_privilege_change = false;
 
     bool nextc_halt = false; /* TODO: update this */
@@ -94,29 +104,38 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
         /* Update state TODO: maybe just ignore last sample instead?*/
         thisc_exception = instrs[i].exception;
         nextc_exception = i < len ? instrs[i + 1].exception : thisc_exception;
+
         thisc_unpred_disc = false; /* TODO: implement this logic */
+
         thisc_privilege = instrs[i].priv;
         nextc_privilege = i < len ? instrs[i + 1].priv : thisc_privilege;
+
+        thisc_privilege_change = (thisc_privilege != lastc_privilege);
+        nextc_privilege_change = (thisc_privilege != nextc_privilege);
 
         firstc_qualified = !lastc_qualified && thisc_qualified;
         thisc_unqualified = !thisc_qualified;
         nextc_unqualified = !nextc_qualified;
-        thisc_privilege_change = (thisc_privilege != lastc_privilege);
-        nextc_privilege_change = (thisc_privilege != nextc_privilege);
+
 
         /* Start of one cycle */
         if (!thisc_qualified) {
-            /* update last cycle state */
+            /* check if we even need to record anything */
             lastc_qualified = thisc_qualified;
             lastc_exception = thisc_exception;
             lastc_unpred_disc = thisc_unpred_disc;
             lastc_privilege = thisc_privilege;
+            lastc_privilege_change = thisc_privilege_change;
             continue; /* end of cycle */
         }
 
         if (is_branch(instrs[i].instr)) {
             /* update branch map */
-            branch_map = branch_map | (1u << branches);
+            /* in hardware maybe mask and compare is better ? */
+            if (i + 1 < len
+                && branch_taken(instrs[i].instr, instrs[i + 1].instr)) {
+                branch_map = branch_map | (1u << branches);
+            }
             branches++;
             if (branches == 31) {
                 branch_map_full = true;
@@ -140,8 +159,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->ecause = instrs[i].cause;
             tr->interrupt = instrs[i].interrupt;
             tr->tval = instrs[i].tval;
-            resync_pend = 0; /* TODO: how to handle this */
             list_add(&tr->list, packet_list);
+
+            resync_pend = 0; /* TODO: how to handle this */
             /* end of cycle */
 
         } else if (firstc_qualified || unhalted || thisc_privilege_change
@@ -161,8 +181,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->privilege = instrs[i].priv;
             tr->branch = 0; /* TODO: figure if taken or not */
             tr->address = instrs[i].iaddr;
-            resync_pend = 0;
             list_add(&tr->list, packet_list);
+
+            resync_pend = 0;
             /* end of cycle */
 
         } else if (lastc_unpred_disc) {
@@ -176,6 +197,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->branch_map = branch_map;
             tr->address = instrs[i].iaddr;
             list_add(&tr->list, packet_list);
+
             branches = 0;
             branch_map = 0;
             /* end of cycle */
@@ -192,6 +214,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->address =
                 instrs[i].iaddr; /* TODO: this should be differential address */
             list_add(&tr->list, packet_list);
+
             branches = 0;
             branch_map = 0;
             /* end of cycle */
@@ -205,7 +228,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             tr->format = 2;
             if (!full_address) {
+                fprintf(stderr, "full_addres: Not implemented yet");
                 tr->address = 0; /* TODO: set address */
+                goto fail;
             } else {
                 tr->address = instrs[i].iaddr;
             }
@@ -226,6 +251,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->branch_map = branch_map;
             /* tr->address  TODO: no address, study explanation */
             list_add(&tr->list, packet_list);
+
             branches = 0;
             branch_map = 0;
             /* end of cycle */
@@ -257,7 +283,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
         lastc_privilege = thisc_privilege;
     }
     return packet_list;
-
+fail:
 fail_malloc:
     free_packet_list(packet_list);
     return NULL;

@@ -102,6 +102,8 @@ void dump_packet_list(struct list_head *packet_list);
 
 void free_packet_list(struct list_head *packet_list);
 
+/* TODO: encoder and decoder state structs */
+
 /* inline uint32_t cause(struct instr_sample *instr) */
 /* { */
 /*     return instr->cause & MASK_FROM(CAUSELEN); */
