@@ -66,11 +66,20 @@ struct tr_packet {
     struct list_head list;
 };
 
+#define ALLOC_INIT_PACKET(name)                                                \
+    struct tr_packet *name = malloc(sizeof(*name));                            \
+    if (!name) {                                                               \
+        perror("malloc");                                                      \
+        goto fail_malloc;                                                      \
+    }                                                                          \
+    INIT_PACKET(name);
+
+
 /* Turns out zero initializing a dynamically allocated struct is not that easy
  */
 #define INIT_PACKET(p)                                                         \
     do {                                                                       \
-        p->msg_type = 0x2;                                                     \
+        p->msg_type = 0x2; /* TODO: better set this 0 to prevent confutions */ \
         p->format = 0;                                                         \
         p->branches = 0;                                                       \
         p->branch_map = 0;                                                     \
@@ -89,6 +98,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
 
 char *trdb_decompress_trace(struct list_head *packet_list);
 
+void dump_packet_list(struct list_head *packet_list);
+
+void free_packet_list(struct list_head *packet_list);
 
 /* inline uint32_t cause(struct instr_sample *instr) */
 /* { */
