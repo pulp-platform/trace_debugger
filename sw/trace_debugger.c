@@ -31,6 +31,8 @@
 
 struct trdb_config {
     /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
+    uint64_t resync_cnt;
+    uint64_t resync_max;
     bool full_address;
     bool iaddress_lsb_p;
     bool implicit_except;
@@ -65,6 +67,8 @@ static bool is_unpred_discontinuity(uint32_t instr)
 
 void trdb_init()
 {
+    conf resync_cnt = 0;
+    conf.resync_max = UINT64_MAX; /* aka never */
     conf.full_address = true;
     conf.iaddress_lsb_p = false;
     conf.implicit_except = false;
@@ -83,7 +87,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
     bool full_address = conf.full_address;
 
     /* TODO: look at those variables */
-    uint32_t resync_pend = 0;
+    bool resync_pend = false;
     /* uint32_t resync_nh = 0;  */
     bool unhalted = false;       /* TODO: handle halt? */
     bool context_change = false; /* TODO: ?? */
@@ -123,8 +127,6 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
         thisc_qualified = true; /* TODO: implement filtering logic */
         nextc_qualified = true;
 
-        /* TODO: resync counter */
-
         /* Update state TODO: maybe just ignore last sample instead?*/
         thisc_exception = instrs[i].exception;
         nextc_exception = i < len ? instrs[i + 1].exception : thisc_exception;
@@ -150,6 +152,11 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             lastc_privilege = thisc_privilege;
             lastc_privilege_change = thisc_privilege_change;
             continue; /* end of cycle */
+        }
+
+        if (conf.resync_cnt++ == conf.resync_max) {
+            resync_pend = true;
+            conf.resync_cnt = 0;
         }
 
         if (is_branch(instrs[i].instr)) {
@@ -182,7 +189,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->tval = instrs[i].tval;
             list_add(&tr->list, packet_list);
 
-            resync_pend = 0; /* TODO: how to handle this */
+            resync_pend = false; /* TODO: how to handle this */
             /* end of cycle */
 
         } else if (firstc_qualified || unhalted || thisc_privilege_change
@@ -204,7 +211,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->address = instrs[i].iaddr;
             list_add(&tr->list, packet_list);
 
-            resync_pend = 0;
+            resync_pend = false;
             /* end of cycle */
 
         } else if (lastc_unpred_disc) {
