@@ -46,6 +46,10 @@ struct instr_sample {
     uint32_t instr : ILEN;     /* ILEN */
 };
 
+#define F_BRANCH_FULL 0
+#define F_BRANCH_DIFF 1
+#define F_ADDR_ONLY 2
+#define F_SYNC 3
 
 struct tr_packet {
     uint32_t msg_type : 2;
@@ -57,6 +61,9 @@ struct tr_packet {
     uint32_t subformat : 2;
     uint32_t context;
     uint32_t privilege : PRIVLEN;
+    /* we need this if the first instruction of an exception is a branch, since
+     * that won't be reorcded into the branch map
+     */
     bool branch;
     uint32_t address : XLEN;
     uint32_t ecause : CAUSELEN;
@@ -95,6 +102,9 @@ struct tr_packet {
 
 struct list_head *trdb_compress_trace(struct list_head *packet_list,
                                       struct instr_sample[1], size_t len);
+
+/* packet from bitstream where parse single packet */
+/* packet from bitstream whole decode function */
 
 char *trdb_decompress_trace(struct list_head *packet_list);
 

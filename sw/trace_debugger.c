@@ -29,6 +29,15 @@
 #include "disasm.h"
 #include "list.h"
 
+struct trdb_config {
+    /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
+    bool full_address;
+    bool iaddress_lsb_p;
+    bool implicit_except;
+    bool set_trace;
+};
+static struct trdb_config conf = {0};
+
 static bool is_branch(uint32_t instr)
 {
     /* static bool is_##code##_instr(long insn) */
@@ -40,28 +49,43 @@ static bool is_branch(uint32_t instr)
 }
 
 
-static bool branch_taken(instr_sample before, instr_sample after)
+static bool branch_taken(struct instr_sample before, struct instr_sample after)
 {
     /* TODO: can this cause issues with RVC + degenerate jump (+2) ?*/
     return !(before.iaddr + 4 == after.iaddr
              || before.iaddr + 2 == after.iaddr);
 }
 
+
+static bool is_unpred_discontinuity(uint32_t instr)
+{
+    return is_jalr_instr(instr);
+}
+
+
+void trdb_init()
+{
+    conf.full_address = true;
+    conf.iaddress_lsb_p = false;
+    conf.implicit_except = false;
+    conf.set_trace = false;
+}
+
+
+void trdb_close()
+{
+}
+
+
 struct list_head *trdb_compress_trace(struct list_head *packet_list,
                                       struct instr_sample instrs[], size_t len)
 {
-    /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
-    bool full_address = true;
-    /* bool iaddress_lsb_p = false; */
-    /* bool implicit_except = false; */
-    /* bool set_trace = false; */
+    bool full_address = conf.full_address;
 
     /* TODO: look at those variables */
     uint32_t resync_pend = 0;
-    uint32_t resync_nh = 0; /* resync pending and branch map holds no history
-                             * from previous instr
-                             */
-    bool unhalted = false;  /* TODO: handle halt? */
+    /* uint32_t resync_nh = 0;  */
+    bool unhalted = false;       /* TODO: handle halt? */
     bool context_change = false; /* TODO: ?? */
 
     bool branch_map_full = false;
@@ -105,8 +129,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
         thisc_exception = instrs[i].exception;
         nextc_exception = i < len ? instrs[i + 1].exception : thisc_exception;
 
-        thisc_unpred_disc = false; /* TODO: implement this logic */
-
+        thisc_unpred_disc = is_unpred_discontinuity(instrs[i].instr);
         thisc_privilege = instrs[i].priv;
         nextc_privilege = i < len ? instrs[i + 1].priv : thisc_privilege;
 
@@ -132,10 +155,8 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
         if (is_branch(instrs[i].instr)) {
             /* update branch map */
             /* in hardware maybe mask and compare is better ? */
-            if (i + 1 < len
-                && branch_taken(instrs[i].instr, instrs[i + 1].instr)) {
+            if ((i + 1 < len) && branch_taken(instrs[i], instrs[i + 1]))
                 branch_map = branch_map | (1u << branches);
-            }
             branches++;
             if (branches == 31) {
                 branch_map_full = true;
@@ -150,9 +171,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
              * resync_pend = 0
              */
             ALLOC_INIT_PACKET(tr);
-            tr->format = 3;    /* sync */
-            tr->subformat = 1; /* exception */
-            tr->context = 0;   /* TODO: what comes here? */
+            tr->format = F_SYNC; /* sync */
+            tr->subformat = 1;   /* exception */
+            tr->context = 0;     /* TODO: what comes here? */
             tr->privilege = instrs[i].priv;
             tr->branch = 0; /* TODO: figure if taken or not */
             tr->address = instrs[i].iaddr;
@@ -165,7 +186,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             /* end of cycle */
 
         } else if (firstc_qualified || unhalted || thisc_privilege_change
-                   || resync_nh) {
+                   || (resync_pend && branches == 0)) {
 
             /* Start packet */
             /*
@@ -175,9 +196,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
              * resync_pend = 0
              */
             ALLOC_INIT_PACKET(tr);
-            tr->format = 3;    /* sync */
-            tr->subformat = 0; /* start */
-            tr->context = 0;   /* TODO: what comes here? */
+            tr->format = F_SYNC; /* sync */
+            tr->subformat = 0;   /* start */
+            tr->context = 0;     /* TODO: what comes here? */
             tr->privilege = instrs[i].priv;
             tr->branch = 0; /* TODO: figure if taken or not */
             tr->address = instrs[i].iaddr;
@@ -192,27 +213,45 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
              * format 0/1/2
              */
             ALLOC_INIT_PACKET(tr);
-            tr->format = 0;
-            tr->branches = branches;
-            tr->branch_map = branch_map;
-            tr->address = instrs[i].iaddr;
+            /* TODO: for now only full address */
+            if (!full_address) {
+                fprintf(stderr, "full_address false: Not implemented yet");
+                goto fail;
+            }
+            if (branches == 0) {
+                tr->format = F_ADDR_ONLY;
+                tr->address = full_address ? instrs[i].iaddr : 0;
+
+                assert(branch_map == 0);
+            } else {
+                tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
+                tr->branches = branches;
+                tr->branch_map = branch_map;
+                tr->address = instrs[i].iaddr;
+
+                branches = 0;
+                branch_map = 0;
+            }
             list_add(&tr->list, packet_list);
 
-            branches = 0;
-            branch_map = 0;
             /* end of cycle */
 
         } else if (resync_pend && branches > 0) {
+            /* we treat resync_pend && branches == 0 before */
             /*
              * Send te_inst:
              * format 0/1/2
              */
             ALLOC_INIT_PACKET(tr);
-            tr->format = 1;
+            /* TODO: for now only full address */
+            if (!full_address) {
+                fprintf(stderr, "full_address false: Not implemented yet");
+                goto fail;
+            }
+            tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
             tr->branches = branches;
             tr->branch_map = branch_map;
-            tr->address =
-                instrs[i].iaddr; /* TODO: this should be differential address */
+            tr->address = full_address ? instrs[i].iaddr : 0;
             list_add(&tr->list, packet_list);
 
             branches = 0;
@@ -226,15 +265,27 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
              * format 0/1/2
              */
             ALLOC_INIT_PACKET(tr);
-            tr->format = 2;
+            /* TODO: for now only full address */
             if (!full_address) {
-                fprintf(stderr, "full_addres: Not implemented yet");
-                tr->address = 0; /* TODO: set address */
+                fprintf(stderr, "full_address false: Not implemented yet");
                 goto fail;
+            }
+            if (branches == 0) {
+                tr->format = F_ADDR_ONLY;
+                tr->address = full_address ? instrs[i].iaddr : 0;
+
+                assert(branch_map == 0);
             } else {
-                tr->address = instrs[i].iaddr;
+                tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
+                tr->branches = branches;
+                tr->branch_map = branch_map;
+                tr->address = full_address ? instrs[i].iaddr : 0;
+
+                branches = 0;
+                branch_map = 0;
             }
             list_add(&tr->list, packet_list);
+
             /* end of cycle */
 
         } else if (branch_map_full) {
@@ -245,9 +296,8 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
              */
             assert(branches == 31);
             ALLOC_INIT_PACKET(tr);
-            tr->format = 0;
-            tr->branches =
-                branches; /*branch_map_full indiciates full addr map*/
+            tr->format = F_BRANCH_FULL;
+            tr->branches = branches;
             tr->branch_map = branch_map;
             /* tr->address  TODO: no address, study explanation */
             list_add(&tr->list, packet_list);
@@ -264,7 +314,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
              * subformat 2
              */
             ALLOC_INIT_PACKET(tr);
-            tr->format = 3;
+            tr->format = F_SYNC;
             tr->subformat = 2;
             tr->context = 0; /* TODO: what comes here? */
             tr->privilege = instrs[i].priv;
