@@ -67,12 +67,7 @@ static bool is_unpred_discontinuity(uint32_t instr)
 
 void trdb_init()
 {
-    conf resync_cnt = 0;
-    conf.resync_max = UINT64_MAX; /* aka never */
-    conf.full_address = true;
-    conf.iaddress_lsb_p = false;
-    conf.implicit_except = false;
-    conf.set_trace = false;
+    conf = (struct trdb_config){.resync_max = UINT64_MAX, .full_address = true};
 }
 
 

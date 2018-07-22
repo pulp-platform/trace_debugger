@@ -79,25 +79,12 @@ struct tr_packet {
         perror("malloc");                                                      \
         goto fail_malloc;                                                      \
     }                                                                          \
-    INIT_PACKET(name);
+    *name = (struct tr_packet){.msg_type = 2};
 
 
-/* Turns out zero initializing a dynamically allocated struct is not that easy
- */
 #define INIT_PACKET(p)                                                         \
     do {                                                                       \
-        p->msg_type = 0x2; /* TODO: better set this 0 to prevent confutions */ \
-        p->format = 0;                                                         \
-        p->branches = 0;                                                       \
-        p->branch_map = 0;                                                     \
-        p->subformat = 0;                                                      \
-        p->context = 0;                                                        \
-        p->privilege = 0;                                                      \
-        p->branch = false;                                                     \
-        p->address = 0;                                                        \
-        p->ecause = 0;                                                         \
-        p->interrupt = false;                                                  \
-        p->tval = 0;                                                           \
+        *p = (struct tr_packet){0};                                            \
     } while (false)
 
 struct list_head *trdb_compress_trace(struct list_head *packet_list,
