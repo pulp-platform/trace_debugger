@@ -165,9 +165,11 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             }
         }
 
-        if (thisc_exception) {
-            /*
-             * Send te_inst:
+        /* We trace the packet before the trapped instruction and the
+         * first one of the exception handler
+         */
+        if (lastc_exception) {
+            /* Send te_inst:
              * format 3
              * subformat 1 (exception -> all fields present)
              * resync_pend = 0
@@ -179,9 +181,15 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->privilege = instrs[i].priv;
             tr->branch = 0; /* TODO: figure if taken or not */
             tr->address = instrs[i].iaddr;
-            tr->ecause = instrs[i].cause;
-            tr->interrupt = instrs[i].interrupt;
-            tr->tval = instrs[i].tval;
+            /* With this packet we record last cycles exception
+             * information. It's not possible for (i==0 &&
+             * lastc_exception) to be true since it takes one cycle
+             * for lastc_exception to change
+             */
+            assert(i != 0);
+            tr->ecause = instrs[i - 1].cause;
+            tr->interrupt = instrs[i - 1].interrupt;
+            tr->tval = instrs[i - 1].tval;
             list_add(&tr->list, packet_list);
 
             resync_pend = false; /* TODO: how to handle this */
@@ -191,8 +199,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
                    || (resync_pend && branches == 0)) {
 
             /* Start packet */
-            /*
-             * Send te_inst:
+            /* Send te_inst:
              * format 3
              * subformat 0 (start, no ecause, interrupt and tval)
              * resync_pend = 0
@@ -210,8 +217,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             /* end of cycle */
 
         } else if (lastc_unpred_disc) {
-            /*
-             * Send te_inst:
+            /* Send te_inst:
              * format 0/1/2
              */
             ALLOC_INIT_PACKET(tr);
@@ -240,8 +246,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
 
         } else if (resync_pend && branches > 0) {
             /* we treat resync_pend && branches == 0 before */
-            /*
-             * Send te_inst:
+            /* Send te_inst:
              * format 0/1/2
              */
             ALLOC_INIT_PACKET(tr);
@@ -262,8 +267,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
 
         } else if (nextc_halt || nextc_exception || nextc_privilege_change
                    || nextc_unqualified) {
-            /*
-             * Send te_inst:
+            /* Send te_inst:
              * format 0/1/2
              */
             ALLOC_INIT_PACKET(tr);
@@ -291,8 +295,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             /* end of cycle */
 
         } else if (branch_map_full) {
-            /*
-             * Send te_inst:
+            /* Send te_inst:
              * format 0
              * no address
              */
@@ -310,8 +313,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
 
         } else if (context_change) {
             /* TODO: don't understand how to detect context change */
-            /*
-             * Send te_inst:
+            /* Send te_inst:
              * format 3
              * subformat 2
              */
