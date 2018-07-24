@@ -95,9 +95,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
 
 char *trdb_decompress_trace(struct list_head *packet_list);
 
-void dump_packet_list(struct list_head *packet_list);
+void *trdb_dump_packet_list(struct list_head *packet_list);
 
-void free_packet_list(struct list_head *packet_list);
+void *trdb_free_packet_list(struct list_head *packet_list);
 
 /* TODO: encoder and decoder state structs */
 

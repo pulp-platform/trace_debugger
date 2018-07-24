@@ -344,8 +344,13 @@ fail_malloc:
 }
 
 
-char *trdb_decompress_trace(struct list_head *packet_list)
+char *trdb_decompress_trace(bfd *abfd, struct list_head *packet_list)
 {
+    /* We assume our hw block in the pulp generated little endian
+     * addresses, thus we should make sure that before we interact
+     * with bfd addresses to convert this foreign format to the local
+     * host format
+     */
     return (char *)0;
 }
 
@@ -360,7 +365,7 @@ void dump_packet_list(struct list_head *packet_list)
 }
 
 
-void free_packet_list(struct list_head *packet_list)
+void trdb_free_packet_list(struct list_head *packet_list)
 {
     struct tr_packet *packet;
     list_for_each_entry(packet, packet_list, list)
