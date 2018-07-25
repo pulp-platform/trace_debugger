@@ -53,6 +53,10 @@ struct instr_sample {
 #define F_ADDR_ONLY 2
 #define F_SYNC 3
 
+#define SF_START 0
+#define SF_EXCEPTION 1
+#define SF_CONTEXT 2
+
 struct tr_packet {
     uint32_t msg_type : 2;
     uint32_t format : 2;

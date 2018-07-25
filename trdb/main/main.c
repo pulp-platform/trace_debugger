@@ -22,8 +22,8 @@
  * Description: Running a few tests
  */
 
-#include "disasm.h"
-#include "trace_debugger.h"
+#include "../disasm.h"
+#include "../trace_debugger.h"
 #include <stdio.h>
 #include <stdlib.h>
 

@@ -27,6 +27,8 @@
 #include <assert.h>
 #include <endian.h> /* Non-standard (posix), use <arpa/inet.h> instead? */
 #include <stdbool.h>
+#include <inttypes.h>
+#include <string.h>
 #include "trace_debugger.h"
 #include "disasm.h"
 #include "list.h"
@@ -357,7 +359,173 @@ char *trdb_decompress_trace(bfd *abfd, struct list_head *packet_list)
 }
 
 
-void dump_packet_list(struct list_head *packet_list)
+static uint32_t branch_map_len(uint32_t branches)
+{
+    if (branches <= 1) {
+        return 1;
+    } else if (branches <= 9) {
+        return 9;
+    } else if (branches <= 25) {
+        return 25;
+    } else if (branches <= 31) {
+        return 31;
+    }
+    return -1;
+}
+
+
+union pack {
+    __uint128_t bits; /* non-portable gcc stuff. TODO: fix */
+    uint8_t bin[16];  /* since uint8_t =/= char strict aliasing might
+                       * mess your shit up. Careful this is also
+                       * endian dependent
+                       */
+} data = {0};
+
+
+/* bin must be an all zeros array */
+static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
+                          uint8_t bin[])
+{
+    if (packet->msg_type != 0x2) {
+        fprintf(stderr, "trace packet message type not supported: %d\n",
+                packet->msg_type);
+        return -1;
+    }
+    if (!conf.full_address) {
+        fprintf(stderr, "full_address false: not implemented yet\n");
+        return -1;
+    }
+    switch (packet->format) {
+    case F_BRANCH_FULL: {
+        uint64_t tmp = (packet->msg_type) | (packet->format << 2)
+                       | (packet->branches << 4);
+        /* TODO: assert branch map to overfull */
+        uint32_t len = branch_map_len(packet->branches);
+        tmp |= (packet->branch_map & MASK_FROM(len)) << 9;
+        uint32_t offset = 9 + len;
+        uint32_t num = offset / 8;
+        uint32_t rest = offset % 8;
+        for (size_t i = 0; i < num; i++) {
+            bin[i] = (tmp >> i * 8) & 0xff;
+        }
+        /* intersection step */
+        bin[num] = (tmp >> (num * 8)) & MASK_FROM(rest);
+        bin[num] |= (packet->address << rest) & 0xff;
+        /* TODO: branch map full logic handling */
+        /* TODO: for now we put the address always */
+        for (size_t i = 1; i < XLEN / 8 + 1; i++) {
+            /* by shifting left we cut off part of the address if int32_t*/
+            bin[num + i] =
+                (((uint64_t)packet->address << rest) >> i * 8) & 0xff;
+        }
+        *bitcnt = 9 + len + XLEN;
+
+        /* different non-portable way to calculate same packed bits.
+         * For some additional assurance. Machine must be little
+         * endian (or add the htole128 function)
+         */
+        assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
+        /* we need enough space to do the packing it in uint128 */
+        assert(128 > XLEN + 9 + 31);
+
+        data.bits = 0;
+        data.bits = (packet->msg_type) | (packet->format << 2)
+                    | (packet->branches << 4);
+        data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len)) << 9;
+        data.bits |= ((__uint128_t)packet->address << (9 + len));
+        for (size_t j = 0; j < (*bitcnt / 8 + 1); j++) {
+            /* printf("0x%" PRIx8 ", 0x%" PRIx8 "\n", data.bin[j], bin[j]); */
+            if (data.bin[j] != bin[j]) {
+                fprintf(stderr,
+                        "Packed packet does not match: 0x%" PRIx8 ", 0x%" PRIx8
+                        " index:%zu\n",
+                        data.bin[j], bin[j], j);
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    case F_BRANCH_DIFF:
+        fprintf(stderr, "F_BRANCH_DIFF packet_to_char not implemented yet\n");
+        *bitcnt = 0;
+        return -1;
+        break;
+
+    case F_ADDR_ONLY:
+        bin[0] = packet->msg_type | (packet->format << 2);
+        /* We don't need to touch the endiannes of addresses since it
+         * is in the pulp native format already
+         */
+        bin[0] |= (packet->address & 0xf) << 4;
+        bin[1] = ((packet->address >> 4) & 0xff);
+        bin[2] = ((packet->address >> 12) & 0xff);
+        bin[3] = ((packet->address >> 20) & 0xff);
+        bin[4] = ((packet->address >> 28) & 0xf);
+        *bitcnt = XLEN + 4;
+        return 0;
+
+    case F_SYNC:
+        assert(PRIVLEN == 5);
+        /* check for enough space to the packing */
+        assert(128 > 2 + 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN);
+        /* TODO: for now we ignore the context field since we have
+         *  only one hart
+         */
+
+        data.bits = 0;
+        /* common part to all sub formats */
+        data.bits = packet->msg_type | (packet->format << 2)
+                    | (packet->subformat << 4) | (packet->privilege << 6);
+        *bitcnt = 6 + PRIVLEN;
+
+        switch (packet->subformat) {
+        case SF_START:
+            data.bits |= (packet->branch << (6 + PRIVLEN))
+                         | ((__uint128_t)packet->address << (7 + PRIVLEN));
+            *bitcnt += 1 + XLEN;
+            break;
+
+        case SF_EXCEPTION:
+            data.bits |= (packet->branch << (6 + PRIVLEN))
+                         | ((__uint128_t)packet->address << (7 + PRIVLEN))
+                         | ((__uint128_t)packet->ecause << (7 + PRIVLEN + XLEN))
+                         | ((__uint128_t)packet->interrupt
+                            << (7 + PRIVLEN + XLEN + CAUSELEN))
+                         | ((__uint128_t)packet->tval
+                            << (8 + PRIVLEN + XLEN + CAUSELEN));
+            *bitcnt += 1 + XLEN + CAUSELEN + 1 + XLEN;
+            break;
+
+        case SF_CONTEXT:
+            /* TODO: we still ignore the context field */
+            break;
+        }
+
+        memcpy(bin, data.bin, *bitcnt / 8 + 1);
+        return 0;
+    }
+    return -1;
+}
+
+
+int trdb_write_trace(struct list_head *packet_list)
+{
+    FILE *fp = fopen("path", "wb");
+    if (!fp) {
+        perror("trdb_write_trace");
+        return -1;
+    }
+
+    struct tr_packet *packet;
+    list_for_each_entry(packet, packet_list, list)
+    {
+    }
+    return -1;
+}
+
+void trdb_dump_packet_list(struct list_head *packet_list)
 {
     struct tr_packet *packet;
     list_for_each_entry(packet, packet_list, list)
