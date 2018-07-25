@@ -38,7 +38,11 @@
             printf("fail\n");                                                  \
     } while (false)
 
-/* TODO: add line and file log macro for better error reporting */
+#define LOG_ERR(format, ...)                                                   \
+    do {                                                                       \
+        fprintf(stderr, "%s:%d:%s(): " format, __FILE__, __LINE__, __func__,   \
+                ##__VA_ARGS__);                                                \
+    } while (false)
 
 bool test_packet_to_char()
 {
@@ -66,11 +70,11 @@ bool test_packet_to_char()
     if (packet_to_char(&packet, &bitcnt, bin))
         goto fail;
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
-        fprintf(stderr, "Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         goto fail;
     }
     if (memcmp(bin, expected0, sizeof(expected0) / sizeof(expected0[0]))) {
-        fprintf(stderr, "Packet bits don't match\n");
+        LOG_ERR("Packet bits don't match\n");
         goto fail;
     }
 
@@ -89,11 +93,11 @@ bool test_packet_to_char()
     if (packet_to_char(&packet, &bitcnt, bin))
         goto fail;
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
-        fprintf(stderr, "Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         goto fail;
     }
     if (memcmp(bin, expected1, sizeof(expected1) / sizeof(expected1[0]))) {
-        fprintf(stderr, "Packet bits don't match\n");
+        LOG_ERR("Packet bits don't match\n");
         goto fail;
     }
 
@@ -109,11 +113,11 @@ bool test_packet_to_char()
     if (packet_to_char(&packet, &bitcnt, bin))
         goto fail;
     if (bitcnt != (2 + 2 + XLEN)) {
-        fprintf(stderr, "Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         goto fail;
     }
     if (memcmp(bin, expected2, sizeof(expected2) / sizeof(expected2[0]))) {
-        fprintf(stderr, "Packet bits don't match\n");
+        LOG_ERR("Packet bits don't match\n");
         goto fail;
     }
 
@@ -134,11 +138,11 @@ bool test_packet_to_char()
     if (packet_to_char(&packet, &bitcnt, bin))
         goto fail;
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN)) {
-        fprintf(stderr, "Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         goto fail;
     }
     if (memcmp(bin, expected3, sizeof(expected3) / sizeof(expected3[0]))) {
-        fprintf(stderr, "Packet bits don't match\n");
+        LOG_ERR("Packet bits don't match\n");
         goto fail;
     }
 
@@ -163,11 +167,11 @@ bool test_packet_to_char()
     if (packet_to_char(&packet, &bitcnt, bin))
         goto fail;
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN)) {
-        fprintf(stderr, "Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         goto fail;
     }
     if (memcmp(bin, expected4, sizeof(expected4) / sizeof(expected4[0]))) {
-        fprintf(stderr, "Packet bits don't match\n");
+        LOG_ERR("Packet bits don't match\n");
         goto fail;
     }
 
