@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <endian.h> /* Non-standard (posix), use <arpa/inet.h> instead? */
+#include <stdbool.h>
 #include "trace_debugger.h"
 #include "disasm.h"
 #include "list.h"
@@ -223,7 +225,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                fprintf(stderr, "full_address false: Not implemented yet");
+                fprintf(stderr, "full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branches == 0) {
@@ -252,7 +254,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                fprintf(stderr, "full_address false: Not implemented yet");
+                fprintf(stderr, "full_address false: Not implemented yet\n");
                 goto fail;
             }
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
@@ -273,7 +275,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                fprintf(stderr, "full_address false: Not implemented yet");
+                fprintf(stderr, "full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branches == 0) {
@@ -339,7 +341,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
     return packet_list;
 fail:
 fail_malloc:
-    free_packet_list(packet_list);
+    trdb_free_packet_list(packet_list);
     return NULL;
 }
 

@@ -25,8 +25,10 @@
 #ifndef __TRACE_DEBUGGER_H__
 #define __TRACE_DEBUGGER_H__
 
+#define PACKAGE "foo" /* quick hack for bfd if not using autotools */
 #include <stdbool.h>
 #include <inttypes.h>
+#include "bfd.h"
 #include "list.h"
 
 #define XLEN 32
@@ -93,11 +95,11 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
 /* packet from bitstream where parse single packet */
 /* packet from bitstream whole decode function */
 
-char *trdb_decompress_trace(struct list_head *packet_list);
+char *trdb_decompress_trace(bfd *abfd, struct list_head *packet_list);
 
-void *trdb_dump_packet_list(struct list_head *packet_list);
+void trdb_dump_packet_list(struct list_head *packet_list);
 
-void *trdb_free_packet_list(struct list_head *packet_list);
+void trdb_free_packet_list(struct list_head *packet_list);
 
 /* TODO: encoder and decoder state structs */
 
