@@ -227,7 +227,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                fprintf(stderr, "full_address false: Not implemented yet\n");
+                LOG_ERR("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branches == 0) {
@@ -256,7 +256,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                fprintf(stderr, "full_address false: Not implemented yet\n");
+                LOG_ERR("full_address false: Not implemented yet\n");
                 goto fail;
             }
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
@@ -277,7 +277,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                fprintf(stderr, "full_address false: Not implemented yet\n");
+                LOG_ERR("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branches == 0) {
@@ -388,16 +388,16 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
                           uint8_t align, uint8_t bin[])
 {
     if (packet->msg_type != 0x2) {
-        fprintf(stderr, "trace packet message type not supported: %d\n",
+        LOG_ERR("trace packet message type not supported: %d\n",
                 packet->msg_type);
         return -1;
     }
     if (!conf.full_address) {
-        fprintf(stderr, "full_address false: not implemented yet\n");
+        LOG_ERR("full_address false: not implemented yet\n");
         return -1;
     }
     if (align >= 8) {
-        fprintf(stderr, "bad alignment value: %" PRId8 "\n", align);
+        LOG_ERR("bad alignment value: %" PRId8 "\n", align);
         return -1;
     }
     switch (packet->format) {
@@ -431,7 +431,7 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
     }
 
     case F_BRANCH_DIFF:
-        fprintf(stderr, "F_BRANCH_DIFF packet_to_char not implemented yet\n");
+        LOG_ERR("F_BRANCH_DIFF packet_to_char not implemented yet\n");
         *bitcnt = 0;
         return -1;
 
@@ -524,7 +524,7 @@ void trdb_dump_packet_list(struct list_head *packet_list)
     struct tr_packet *packet;
     list_for_each_entry(packet, packet_list, list)
     {
-        printf("not implemented yet.\n");
+        LOG_ERR("not implemented yet.\n");
     }
 }
 
