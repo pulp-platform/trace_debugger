@@ -38,14 +38,9 @@
             printf("fail\n");                                                  \
     } while (false)
 
-#define LOG_ERR(format, ...)                                                   \
-    do {                                                                       \
-        fprintf(stderr, "%s:%d:%s(): " format, __FILE__, __LINE__, __func__,   \
-                ##__VA_ARGS__);                                                \
-    } while (false)
-
 bool test_packet_to_char()
 {
+    bool status = true;
     trdb_init();
 
     /* Testing F_BRANCH_FULL packet with full branch map */
@@ -63,20 +58,24 @@ bool test_packet_to_char()
 
     if (!bin) {
         perror("malloc");
+        status = false;
         goto fail;
     }
 
     size_t bitcnt = 0;
-    if (packet_to_char(&packet, &bitcnt, bin))
-        goto fail;
+    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+        LOG_ERR("Packet conversion failed");
+        status = false;
+    }
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
-        goto fail;
+        status = false;
     }
     if (memcmp(bin, expected0, sizeof(expected0) / sizeof(expected0[0]))) {
         LOG_ERR("Packet bits don't match\n");
-        goto fail;
+        status = false;
     }
+
 
     /* Testing F_BRANCH_FULL packet with non-full branch map */
     packet = (struct tr_packet){.msg_type = 2,
@@ -90,15 +89,17 @@ bool test_packet_to_char()
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, bin))
-        goto fail;
+    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+        LOG_ERR("Packet conversion failed");
+        status = false;
+    }
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
-        goto fail;
+        status = false;
     }
     if (memcmp(bin, expected1, sizeof(expected1) / sizeof(expected1[0]))) {
         LOG_ERR("Packet bits don't match\n");
-        goto fail;
+        status = false;
     }
 
     /* Testing F_ADDR_ONLY packet */
@@ -110,15 +111,17 @@ bool test_packet_to_char()
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, bin))
-        goto fail;
+    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+        LOG_ERR("Packet conversion failed");
+        status = false;
+    }
     if (bitcnt != (2 + 2 + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
-        goto fail;
+        status = false;
     }
     if (memcmp(bin, expected2, sizeof(expected2) / sizeof(expected2[0]))) {
         LOG_ERR("Packet bits don't match\n");
-        goto fail;
+        status = false;
     }
 
 
@@ -135,15 +138,17 @@ bool test_packet_to_char()
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, bin))
-        goto fail;
+    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+        LOG_ERR("Packet conversion failed");
+        status = false;
+    }
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
-        goto fail;
+        status = false;
     }
     if (memcmp(bin, expected3, sizeof(expected3) / sizeof(expected3[0]))) {
         LOG_ERR("Packet bits don't match\n");
-        goto fail;
+        status = false;
     }
 
 
@@ -164,23 +169,22 @@ bool test_packet_to_char()
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, bin))
-        goto fail;
+    if (packet_to_char(&packet, &bitcnt, 0, bin)){
+        LOG_ERR("Packet conversion failed");
+        status = false;
+    }
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
-        goto fail;
+	status = false;
     }
     if (memcmp(bin, expected4, sizeof(expected4) / sizeof(expected4[0]))) {
         LOG_ERR("Packet bits don't match\n");
-        goto fail;
+	status = false;
     }
-
-    free(bin);
-    return true;
 
 fail:
     free(bin);
-    return false;
+    return status;
 }
 
 int main(int argc, char *argv[argc + 1])

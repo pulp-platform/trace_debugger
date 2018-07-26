@@ -31,6 +31,13 @@
 #include "bfd.h"
 #include "list.h"
 
+#define LOG_ERR(format, ...)                                                   \
+    do {                                                                       \
+        fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,          \
+                __func__, ##__VA_ARGS__);                                      \
+    } while (false)
+/* ## is gcc extension */
+
 #define XLEN 32
 #define CAUSELEN 5
 #define PRIVLEN 5
