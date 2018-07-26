@@ -31,21 +31,10 @@
 #include "bfd.h"
 #include "list.h"
 
-#define LOG_ERR(format, ...)                                                   \
-    do {                                                                       \
-        fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,          \
-                __func__, ##__VA_ARGS__);                                      \
-    } while (false)
-/* ## is gcc extension */
-
-/* TODO: make this typesafer */
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-
 #define XLEN 32
 #define CAUSELEN 5
 #define PRIVLEN 5
 #define ILEN 32
-#define MASK_FROM(len) ((1ull << len) - 1)
 
 struct instr_sample {
     /* bool valid; */

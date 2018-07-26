@@ -32,6 +32,7 @@
 #include "trace_debugger.h"
 #include "disasm.h"
 #include "list.h"
+#include "util.h"
 
 struct trdb_config {
     /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
@@ -490,29 +491,55 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
 }
 
 
-int trdb_write_trace(struct list_head *packet_list)
+int trdb_write_trace(char *path, struct list_head *packet_list)
 {
     int status = 0;
-    FILE *fp = fopen("path", "wb");
+    FILE *fp = fopen(path, "wb");
     if (!fp) {
         perror("trdb_write_trace");
         status = -1;
         goto fail;
     }
-    /* uint8_t bin[sizeof(struct tr_packet)] = {0}; */
-    /* size_t bitcnt = 0; */
+
+    uint8_t bin[sizeof(struct tr_packet)] = {0};
+    size_t bitcnt = 0;
+    uint32_t alignment = 0;
+    uint8_t carry = 0;
+    size_t good = 0;
+    size_t rest = 0;
 
     struct tr_packet *packet;
     list_for_each_entry(packet, packet_list, list)
     {
-        /* if (packet_to_char(pack, &bitcnt, bin)) { */
-        /*     status = -1; */
-        /*     goto fail; */
-        /* } */
-        /* size_t good = bitcnt / 8; */
-        /* size_t rest = bitcnt % 8; */
+        if (packet_to_char(packet, &bitcnt, alignment, bin)) {
+            status = -1;
+            goto fail;
+        }
+        for (size_t i = 0; i < (bitcnt + alignment) / 8 + 1; i++) {
+            /* printf("DUMP: %" PRIx8 "\n", bin[i]); */
+        }
+        /* stitch two consecutive packets together */
+        bin[0] |= carry;
+        rest = (bitcnt + alignment) % 8;
+        /* printf("REST: %zu\n", rest); */
+        good = (bitcnt + alignment) / 8;
+        /* write as many bytes as we can i.e. withouth the potentially
+         * intersecting ones
+         */
+        if (fwrite(bin, 1, good, fp) != good) {
+            perror("fwrite");
+            status = -1;
+            goto fail;
+        }
+        /* we keep that for the next packet */
+        carry = bin[good] & MASK_FROM(rest);
+        alignment = rest;
     }
-
+    /* done, write remaining carry */
+    if (!fwrite(&bin[good], 1, 1, fp)) {
+        perror("fwrite");
+        status = -1;
+    }
 fail:
     if (fp)
         fclose(fp);

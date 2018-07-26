@@ -28,10 +28,12 @@
 #include <string.h>
 #include "../trace_debugger.h"
 #include "../trace_debugger.c"
+#include "../util.h"
+#include "../util.c"
 
 #define RUN_TEST(fun, ...)                                                     \
     do {                                                                       \
-        printf("Running %s: ", #fun);                             \
+        printf("Running %s: ", #fun);                                          \
         if (fun(__VA_ARGS__))                                                  \
             printf("success\n");                                               \
         else                                                                   \
@@ -216,8 +218,82 @@ fail:
     return status;
 }
 
+static bool test_trdb_write_trace()
+{
+    bool status = true;
+    trdb_init();
+
+    struct tr_packet packet0 = {0};
+    struct tr_packet packet1 = {0};
+    struct tr_packet packet2 = {0};
+
+    packet0 = (struct tr_packet){.msg_type = 2,
+                                 .format = F_BRANCH_FULL,
+                                 .branches = 31,
+                                 .branch_map = 0x7fffffff,
+                                 .address = 0xaadeadbe};
+
+    packet1 = (struct tr_packet){.msg_type = 2,
+                                 .format = F_SYNC,
+                                 .subformat = SF_START,
+                                 .privilege = 3,
+                                 .branch = 1,
+                                 .address = 0xdeadbeef};
+
+    packet2 = (struct tr_packet){.msg_type = 2,
+                                 .format = F_SYNC,
+                                 .subformat = SF_EXCEPTION,
+                                 .privilege = 3,
+                                 .branch = 1,
+                                 .address = 0xdeadbeef,
+                                 .ecause = 0x1a,
+                                 .interrupt = 1,
+                                 .tval = 0xfeebdeed};
+    LIST_HEAD(head);
+    list_add(&packet2.list, &head);
+    list_add(&packet1.list, &head);
+    list_add(&packet0.list, &head);
+
+    if (trdb_write_trace("tmp_for_test", &head)) {
+        LOG_ERR("trdb_write_trace failed\n");
+        status = false;
+    }
+
+    /* Read back the file and compare to expected value */
+    FILE *fp = fopen("tmp_for_test", "rb");
+    if (!fp) {
+        perror("fopen");
+        status = -1;
+        goto fail;
+    }
+
+    long len = 0;
+    uint8_t *buf = NULL;
+    if (!(buf = file_to_char(fp, &len))) {
+        LOG_ERR("file_to_char failed\n");
+        status = -1;
+        goto fail;
+    }
+    /* compare values */
+    uint8_t expected[] = {0xf2, 0xff, 0xff, 0xff, 0xff, 0xbe, 0xad, 0xde, 0xaa,
+                          0xce, 0xf8, 0xee, 0xdb, 0xea, 0xed, 0x8d, 0xef, 0xbe,
+                          0xad, 0xde, 0x7a, 0xbb, 0xf7, 0xba, 0x3f};
+    if (memcmp(buf, expected, len)) {
+        LOG_ERR("Binary data mismatch\n");
+        status = -1;
+    }
+
+fail:
+    if (fp)
+        fclose(fp);
+    free(buf);
+    return status;
+}
+
 int main(int argc, char *argv[argc + 1])
 {
     for (size_t i = 0; i < 8; i++)
         RUN_TEST(test_packet_to_char, i);
+
+    RUN_TEST(test_trdb_write_trace);
 }
