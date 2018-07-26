@@ -385,7 +385,7 @@ union pack {
 
 /* bin must be an all zeros array */
 static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
-                          uint8_t bin[])
+                          uint8_t align, uint8_t bin[])
 {
     if (packet->msg_type != 0x2) {
         fprintf(stderr, "trace packet message type not supported: %d\n",
@@ -396,30 +396,13 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
         fprintf(stderr, "full_address false: not implemented yet\n");
         return -1;
     }
+    if (align >= 8) {
+        fprintf(stderr, "bad alignment value: %" PRId8 "\n", align);
+        return -1;
+    }
     switch (packet->format) {
     case F_BRANCH_FULL: {
-        uint64_t tmp = (packet->msg_type) | (packet->format << 2)
-                       | (packet->branches << 4);
-        /* TODO: assert branch map to overfull */
         uint32_t len = branch_map_len(packet->branches);
-        tmp |= (packet->branch_map & MASK_FROM(len)) << 9;
-        uint32_t offset = 9 + len;
-        uint32_t num = offset / 8;
-        uint32_t rest = offset % 8;
-        for (size_t i = 0; i < num; i++) {
-            bin[i] = (tmp >> i * 8) & 0xff;
-        }
-        /* intersection step */
-        bin[num] = (tmp >> (num * 8)) & MASK_FROM(rest);
-        bin[num] |= (packet->address << rest) & 0xff;
-        /* TODO: branch map full logic handling */
-        /* TODO: for now we put the address always */
-        for (size_t i = 1; i < XLEN / 8 + 1; i++) {
-            /* by shifting left we cut off part of the address if int32_t*/
-            bin[num + i] =
-                (((uint64_t)packet->address << rest) >> i * 8) & 0xff;
-        }
-        *bitcnt = 9 + len + XLEN;
 
         /* different non-portable way to calculate same packed bits.
          * For some additional assurance. Machine must be little
@@ -427,22 +410,22 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
          */
         assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
         /* we need enough space to do the packing it in uint128 */
-        assert(128 > XLEN + 9 + 31);
-
+        assert(128 > XLEN + 9 + 31 + 8);
+        /* TODO: assert branch map to overfull */
+        /* TODO: branch map full logic handling */
+        /* TODO: for now we put the address always */
         data.bits = 0;
         data.bits = (packet->msg_type) | (packet->format << 2)
                     | (packet->branches << 4);
         data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len)) << 9;
         data.bits |= ((__uint128_t)packet->address << (9 + len));
+        data.bits <<= align;
+
+        *bitcnt = 9 + len + XLEN;
+        memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
+
         for (size_t j = 0; j < (*bitcnt / 8 + 1); j++) {
             /* printf("0x%" PRIx8 ", 0x%" PRIx8 "\n", data.bin[j], bin[j]); */
-            if (data.bin[j] != bin[j]) {
-                fprintf(stderr,
-                        "Packed packet does not match: 0x%" PRIx8 ", 0x%" PRIx8
-                        " index:%zu\n",
-                        data.bin[j], bin[j], j);
-                return -1;
-            }
         }
         return 0;
     }
@@ -451,19 +434,15 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
         fprintf(stderr, "F_BRANCH_DIFF packet_to_char not implemented yet\n");
         *bitcnt = 0;
         return -1;
-        break;
 
     case F_ADDR_ONLY:
-        bin[0] = packet->msg_type | (packet->format << 2);
-        /* We don't need to touch the endiannes of addresses since it
-         * is in the pulp native format already
-         */
-        bin[0] |= (packet->address & 0xf) << 4;
-        bin[1] = ((packet->address >> 4) & 0xff);
-        bin[2] = ((packet->address >> 12) & 0xff);
-        bin[3] = ((packet->address >> 20) & 0xff);
-        bin[4] = ((packet->address >> 28) & 0xf);
+        assert(128 > XLEN + 4 + 8);
+        data.bits = packet->msg_type | (packet->format << 2)
+                    | ((__uint128_t)packet->address << 4);
+        data.bits <<= align;
+
         *bitcnt = XLEN + 4;
+        memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
         return 0;
 
     case F_SYNC:
@@ -503,7 +482,8 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
             break;
         }
 
-        memcpy(bin, data.bin, *bitcnt / 8 + 1);
+        data.bits <<= align;
+        memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
         return 0;
     }
     return -1;
@@ -512,17 +492,31 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
 
 int trdb_write_trace(struct list_head *packet_list)
 {
+    int status = 0;
     FILE *fp = fopen("path", "wb");
     if (!fp) {
         perror("trdb_write_trace");
-        return -1;
+        status = -1;
+        goto fail;
     }
+    /* uint8_t bin[sizeof(struct tr_packet)] = {0}; */
+    /* size_t bitcnt = 0; */
 
     struct tr_packet *packet;
     list_for_each_entry(packet, packet_list, list)
     {
+        /* if (packet_to_char(pack, &bitcnt, bin)) { */
+        /*     status = -1; */
+        /*     goto fail; */
+        /* } */
+        /* size_t good = bitcnt / 8; */
+        /* size_t rest = bitcnt % 8; */
     }
-    return -1;
+
+fail:
+    if (fp)
+        fclose(fp);
+    return status;
 }
 
 void trdb_dump_packet_list(struct list_head *packet_list)
