@@ -424,8 +424,8 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
         *bitcnt = 9 + len + XLEN;
         memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
 
-        for (size_t j = 0; j < (*bitcnt / 8 + 1); j++) {
-            /* printf("0x%" PRIx8 ", 0x%" PRIx8 "\n", data.bin[j], bin[j]); */
+        for (size_t j = 0; j < ((*bitcnt + align) / 8 + 1); j++) {
+            /* printf("0x%" PRIx8 "\n", data.bin[j]); */
         }
         return 0;
     }

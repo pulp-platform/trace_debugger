@@ -38,6 +38,9 @@
     } while (false)
 /* ## is gcc extension */
 
+/* TODO: make this typesafer */
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 #define XLEN 32
 #define CAUSELEN 5
 #define PRIVLEN 5

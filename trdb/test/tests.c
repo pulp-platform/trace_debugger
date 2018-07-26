@@ -29,29 +29,57 @@
 #include "../trace_debugger.h"
 #include "../trace_debugger.c"
 
-#define RUN_TEST(fun)                                                          \
+#define RUN_TEST(fun, ...)                                                     \
     do {                                                                       \
-        printf("Running %s: ", #fun);                                          \
-        if (fun())                                                             \
+        printf("Running %s: ", #fun);                             \
+        if (fun(__VA_ARGS__))                                                  \
             printf("success\n");                                               \
         else                                                                   \
             printf("fail\n");                                                  \
     } while (false)
 
-bool test_packet_to_char()
+
+static void shiftl_array(uint8_t arr[], size_t len, uint32_t shift)
+{
+    if (shift >= 8) {
+        LOG_ERR("Shift value too large\n");
+        return;
+    }
+    uint32_t carry_in = 0;
+    uint32_t carry_out = 0;
+    for (size_t i = 0; i < len; i++) {
+        /* carry_out = arr[i] & ~((1ull << (8 - shift)) - 1); */
+        carry_out = (arr[i] >> (8 - shift)) & MASK_FROM(shift);
+        arr[i] <<= shift;
+        arr[i] |= carry_in;
+        carry_in = carry_out;
+    }
+    if (carry_out)
+        LOG_ERR("Non-zero carry after array shifting\n");
+    return;
+}
+
+
+bool test_packet_to_char(uint32_t shift)
 {
     bool status = true;
     trdb_init();
+    struct tr_packet packet = {0};
 
     /* Testing F_BRANCH_FULL packet with full branch map */
-    struct tr_packet packet = {.msg_type = 2,
-                               .format = F_BRANCH_FULL,
-                               .branches = 31,
-                               .branch_map = 0x7fffffff,
-                               .address = 0xaadeadbe};
+    packet = (struct tr_packet){.msg_type = 2,
+                                .format = F_BRANCH_FULL,
+                                .branches = 31,
+                                .branch_map = 0x7fffffff,
+                                .address = 0xaadeadbe};
     /*                    0xf2,7 + 1, 31-7-8, 31-7-8-8, 31-7-8-8-8*/
     uint8_t expected0[] = {0xf2, 0xff, 0xff, 0xff, 0xff,
-                           0xbe, 0xad, 0xde, 0xaa};
+                           0xbe, 0xad, 0xde, 0xaa, 0x00};
+    shiftl_array(expected0, ARRAY_SIZE(expected0), shift);
+
+    for (size_t i; i < sizeof(expected0); i++) {
+        /* printf("test: %" PRIx8 "\n", expected0[i]); */
+    }
     /* this is surely enough space */
     uint8_t *bin = malloc(sizeof(struct tr_packet));
     memset(bin, 0, sizeof(struct tr_packet));
@@ -63,15 +91,15 @@ bool test_packet_to_char()
     }
 
     size_t bitcnt = 0;
-    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed");
+    if (packet_to_char(&packet, &bitcnt, shift, bin)) {
+        LOG_ERR("Packet conversion failed\n");
         status = false;
     }
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected0, sizeof(expected0) / sizeof(expected0[0]))) {
+    if (memcmp(bin, expected0, ARRAY_SIZE(expected0))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -85,19 +113,20 @@ bool test_packet_to_char()
                                 .address = 0xaadeadbe};
 
     /*                           7     8     8      2 */
-    uint8_t expected1[] = {0x92, 0xff, 0xff, 0xff, 0xfb, 0xb6, 0x7a, 0xab, 0x2};
+    uint8_t expected1[] = {0x92, 0xff, 0xff, 0xff, 0xfb,
+                           0xb6, 0x7a, 0xab, 0x2,  0x00};
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
     if (packet_to_char(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed");
+        LOG_ERR("Packet conversion failed\n");
         status = false;
     }
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected1, sizeof(expected1) / sizeof(expected1[0]))) {
+    if (memcmp(bin, expected1, ARRAY_SIZE(expected1))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -107,19 +136,19 @@ bool test_packet_to_char()
         .msg_type = 2, .format = F_ADDR_ONLY, .address = 0xdeadbeef};
 
     /*                           7     8     8      2 */
-    uint8_t expected2[] = {0xfa, 0xee, 0xdb, 0xea, 0x0d};
+    uint8_t expected2[] = {0xfa, 0xee, 0xdb, 0xea, 0x0d, 0x00};
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
     if (packet_to_char(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed");
+        LOG_ERR("Packet conversion failed\n");
         status = false;
     }
     if (bitcnt != (2 + 2 + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected2, sizeof(expected2) / sizeof(expected2[0]))) {
+    if (memcmp(bin, expected2, ARRAY_SIZE(expected2))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -134,19 +163,19 @@ bool test_packet_to_char()
                                 .address = 0xdeadbeef};
 
     /*                           7     8     8      2 */
-    uint8_t expected3[] = {0xce, 0xf8, 0xee, 0xdb, 0xea, 0x0d};
+    uint8_t expected3[] = {0xce, 0xf8, 0xee, 0xdb, 0xea, 0x0d, 0x00};
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
     if (packet_to_char(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed");
+        LOG_ERR("Packet conversion failed\n");
         status = false;
     }
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected3, sizeof(expected3) / sizeof(expected3[0]))) {
+    if (memcmp(bin, expected3, ARRAY_SIZE(expected3))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -165,21 +194,21 @@ bool test_packet_to_char()
 
     /* 0x3fbaf7bb7adeadbeef8de */
     uint8_t expected4[] = {0xde, 0xf8, 0xee, 0xdb, 0xea, 0xad,
-                           0xb7, 0x7b, 0xaf, 0xfb, 0x3};
+                           0xb7, 0x7b, 0xaf, 0xfb, 0x3,  0x00};
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, 0, bin)){
-        LOG_ERR("Packet conversion failed");
+    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+        LOG_ERR("Packet conversion failed\n");
         status = false;
     }
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN)) {
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
-	status = false;
+        status = false;
     }
-    if (memcmp(bin, expected4, sizeof(expected4) / sizeof(expected4[0]))) {
+    if (memcmp(bin, expected4, ARRAY_SIZE(expected4))) {
         LOG_ERR("Packet bits don't match\n");
-	status = false;
+        status = false;
     }
 
 fail:
@@ -189,5 +218,6 @@ fail:
 
 int main(int argc, char *argv[argc + 1])
 {
-    RUN_TEST(test_packet_to_char);
+    for (size_t i = 0; i < 8; i++)
+        RUN_TEST(test_packet_to_char, i);
 }
