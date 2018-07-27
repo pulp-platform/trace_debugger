@@ -22,6 +22,7 @@
  * Description: Small utility functions
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include "util.h"
 
 uint8_t *file_to_char(FILE *fp, long *length)
