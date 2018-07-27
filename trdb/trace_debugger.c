@@ -36,7 +36,6 @@
 
 struct trdb_config {
     /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
-    uint64_t resync_cnt;
     uint64_t resync_max;
     bool full_address;
     bool iaddress_lsb_p;
@@ -44,6 +43,41 @@ struct trdb_config {
     bool set_trace;
 };
 static struct trdb_config conf = {0};
+
+struct trdb_state {
+
+    bool halt;           /* TODO: update this */
+    bool unhalted;       /* TODO: handle halt? */
+    bool context_change; /* TODO: ?? */
+
+    bool qualified;
+    bool unqualified;
+    bool exception;
+    bool unpred_disc; /* unpredicted discontinuity*/
+    uint32_t privilege;
+    bool privilege_change;
+};
+
+static struct trdb_state lastc = {0};
+static struct trdb_state thisc = {0};
+static struct trdb_state nextc = {0};
+
+struct branch_map_state {
+    bool full;
+    uint32_t bits;
+    uint32_t cnt;
+};
+
+static struct branch_map_state branch_map = {0};
+
+struct filter_state {
+    /* TODO: look at those variables */
+    uint64_t resync_cnt;
+    bool resync_pend;
+    /* uint32_t resync_nh = 0;  */
+};
+
+static struct filter_state filter = {0};
 
 static bool is_branch(uint32_t instr)
 {
@@ -73,6 +107,11 @@ static bool is_unpred_discontinuity(uint32_t instr)
 void trdb_init()
 {
     conf = (struct trdb_config){.resync_max = UINT64_MAX, .full_address = true};
+    lastc = (struct trdb_state){0};
+    thisc = (struct trdb_state){0};
+    nextc = (struct trdb_state){0};
+    branch_map = (struct branch_map_state){0};
+    filter = (struct filter_state){0};
 }
 
 
@@ -86,94 +125,59 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
 {
     bool full_address = conf.full_address;
 
-    /* TODO: look at those variables */
-    bool resync_pend = false;
-    /* uint32_t resync_nh = 0;  */
-    bool unhalted = false;       /* TODO: handle halt? */
-    bool context_change = false; /* TODO: ?? */
-
-    bool branch_map_full = false;
-
-    bool thisc_qualified = false;
-    bool lastc_qualified = false;
-    bool firstc_qualified = false;
-    bool nextc_qualified = false;
-    bool thisc_unqualified = false;
-    bool nextc_unqualified = false;
-
-    bool thisc_exception = false;
-    bool lastc_exception = false;
-    bool nextc_exception = false;
-
-    bool thisc_unpred_disc = false;
-    bool lastc_unpred_disc = false; /* last cycle unpredicted discontinuity*/
-
-    uint32_t thisc_privilege = 0;
-    uint32_t lastc_privilege = 0;
-    uint32_t nextc_privilege = 0;
-
-    bool thisc_privilege_change = false;
-    bool lastc_privilege_change = false;
-    bool nextc_privilege_change = false;
-
-    bool nextc_halt = false; /* TODO: update this */
-
-    uint32_t branch_map = 0;
-    uint32_t branches = 0;
-
     /* for each cycle */
     for (size_t i = 0; i < len; i++) {
+        thisc.halt = false;
         /* test for qualification by filtering */
-        thisc_qualified = true; /* TODO: implement filtering logic */
-        nextc_qualified = true;
+        thisc.qualified = true; /* TODO: implement filtering logic */
+        nextc.qualified = true;
+
+        thisc.unqualified = !thisc.qualified;
+        nextc.unqualified = !nextc.qualified;
 
         /* Update state TODO: maybe just ignore last sample instead?*/
-        thisc_exception = instrs[i].exception;
-        nextc_exception = i < len ? instrs[i + 1].exception : thisc_exception;
+        thisc.exception = instrs[i].exception;
+        nextc.exception = i < len ? instrs[i + 1].exception : thisc.exception;
 
-        thisc_unpred_disc = is_unpred_discontinuity(instrs[i].instr);
-        thisc_privilege = instrs[i].priv;
-        nextc_privilege = i < len ? instrs[i + 1].priv : thisc_privilege;
+        thisc.unpred_disc = is_unpred_discontinuity(instrs[i].instr);
+        nextc.unpred_disc =
+            i < len ? is_unpred_discontinuity(instrs[i + 1].instr) : false;
 
-        thisc_privilege_change = (thisc_privilege != lastc_privilege);
-        nextc_privilege_change = (thisc_privilege != nextc_privilege);
+        thisc.privilege = instrs[i].priv;
+        nextc.privilege = i < len ? instrs[i + 1].priv : thisc.privilege;
 
-        firstc_qualified = !lastc_qualified && thisc_qualified;
-        thisc_unqualified = !thisc_qualified;
-        nextc_unqualified = !nextc_qualified;
+        thisc.privilege_change = (thisc.privilege != lastc.privilege);
+        nextc.privilege_change = (thisc.privilege != nextc.privilege);
 
+        bool firstc_qualified = !lastc.qualified && thisc.qualified;
 
         /* Start of one cycle */
-        if (!thisc_qualified) {
+        if (!thisc.qualified) {
             /* check if we even need to record anything */
-            lastc_qualified = thisc_qualified;
-            lastc_exception = thisc_exception;
-            lastc_unpred_disc = thisc_unpred_disc;
-            lastc_privilege = thisc_privilege;
-            lastc_privilege_change = thisc_privilege_change;
+            lastc = thisc;
             continue; /* end of cycle */
         }
 
-        if (conf.resync_cnt++ == conf.resync_max) {
-            resync_pend = true;
-            conf.resync_cnt = 0;
+        if (filter.resync_cnt++ == conf.resync_max) {
+            filter.resync_pend = true;
+            filter.resync_cnt = 0;
         }
 
         if (is_branch(instrs[i].instr)) {
             /* update branch map */
             /* in hardware maybe mask and compare is better ? */
             if ((i + 1 < len) && branch_taken(instrs[i], instrs[i + 1]))
-                branch_map = branch_map | (1u << branches);
-            branches++;
-            if (branches == 31) {
-                branch_map_full = true;
+                branch_map.bits = branch_map.bits | (1u << branch_map.cnt);
+            branch_map.cnt++;
+            if (branch_map.cnt == 31) {
+                branch_map.full = true;
             }
         }
 
         /* We trace the packet before the trapped instruction and the
          * first one of the exception handler
          */
-        if (lastc_exception) {
+        if (lastc.exception) {
             /* Send te_inst:
              * format 3
              * subformat 1 (exception -> all fields present)
@@ -197,11 +201,11 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->tval = instrs[i - 1].tval;
             list_add(&tr->list, packet_list);
 
-            resync_pend = false; /* TODO: how to handle this */
+            filter.resync_pend = false; /* TODO: how to handle this */
             /* end of cycle */
 
-        } else if (firstc_qualified || unhalted || thisc_privilege_change
-                   || (resync_pend && branches == 0)) {
+        } else if (firstc_qualified || thisc.unhalted || thisc.privilege_change
+                   || (filter.resync_pend && branch_map.cnt == 0)) {
 
             /* Start packet */
             /* Send te_inst:
@@ -218,10 +222,10 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->address = instrs[i].iaddr;
             list_add(&tr->list, packet_list);
 
-            resync_pend = false;
+            filter.resync_pend = false;
             /* end of cycle */
 
-        } else if (lastc_unpred_disc) {
+        } else if (lastc.unpred_disc) {
             /* Send te_inst:
              * format 0/1/2
              */
@@ -231,25 +235,24 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
                 LOG_ERR("full_address false: Not implemented yet\n");
                 goto fail;
             }
-            if (branches == 0) {
+            if (branch_map.cnt == 0) {
                 tr->format = F_ADDR_ONLY;
                 tr->address = full_address ? instrs[i].iaddr : 0;
 
-                assert(branch_map == 0);
+                assert(branch_map.bits == 0);
             } else {
                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
-                tr->branches = branches;
-                tr->branch_map = branch_map;
+                tr->branches = branch_map.cnt;
+                tr->branch_map = branch_map.bits;
                 tr->address = instrs[i].iaddr;
 
-                branches = 0;
-                branch_map = 0;
+                branch_map = (struct branch_map_state){0};
             }
             list_add(&tr->list, packet_list);
 
             /* end of cycle */
 
-        } else if (resync_pend && branches > 0) {
+        } else if (filter.resync_pend && branch_map.cnt > 0) {
             /* we treat resync_pend && branches == 0 before */
             /* Send te_inst:
              * format 0/1/2
@@ -261,17 +264,16 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
                 goto fail;
             }
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
-            tr->branches = branches;
-            tr->branch_map = branch_map;
+            tr->branches = branch_map.cnt;
+            tr->branch_map = branch_map.bits;
             tr->address = full_address ? instrs[i].iaddr : 0;
             list_add(&tr->list, packet_list);
 
-            branches = 0;
-            branch_map = 0;
+            branch_map = (struct branch_map_state){0};
             /* end of cycle */
 
-        } else if (nextc_halt || nextc_exception || nextc_privilege_change
-                   || nextc_unqualified) {
+        } else if (nextc.halt || nextc.exception || nextc.privilege_change
+                   || nextc.unqualified) {
             /* Send te_inst:
              * format 0/1/2
              */
@@ -281,42 +283,40 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
                 LOG_ERR("full_address false: Not implemented yet\n");
                 goto fail;
             }
-            if (branches == 0) {
+            if (branch_map.cnt == 0) {
                 tr->format = F_ADDR_ONLY;
                 tr->address = full_address ? instrs[i].iaddr : 0;
 
-                assert(branch_map == 0);
+                assert(branch_map.bits == 0);
             } else {
                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
-                tr->branches = branches;
-                tr->branch_map = branch_map;
+                tr->branches = branch_map.cnt;
+                tr->branch_map = branch_map.bits;
                 tr->address = full_address ? instrs[i].iaddr : 0;
 
-                branches = 0;
-                branch_map = 0;
+                branch_map = (struct branch_map_state){0};
             }
             list_add(&tr->list, packet_list);
 
             /* end of cycle */
 
-        } else if (branch_map_full) {
+        } else if (branch_map.full) {
             /* Send te_inst:
              * format 0
              * no address
              */
-            assert(branches == 31);
+            assert(branch_map.cnt == 31);
             ALLOC_INIT_PACKET(tr);
             tr->format = F_BRANCH_FULL;
-            tr->branches = branches;
-            tr->branch_map = branch_map;
+            tr->branches = branch_map.cnt;
+            tr->branch_map = branch_map.bits;
             /* tr->address  TODO: no address, study explanation */
             list_add(&tr->list, packet_list);
 
-            branches = 0;
-            branch_map = 0;
+            branch_map = (struct branch_map_state){0};
             /* end of cycle */
 
-        } else if (context_change) {
+        } else if (thisc.context_change) {
             /* TODO: don't understand how to detect context change */
             /* Send te_inst:
              * format 3
@@ -336,10 +336,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
         }
 
         /* update last cycle state */
-        lastc_qualified = thisc_qualified;
-        lastc_exception = thisc_exception;
-        lastc_unpred_disc = thisc_unpred_disc;
-        lastc_privilege = thisc_privilege;
+        lastc = thisc;
     }
     return packet_list;
 fail:
