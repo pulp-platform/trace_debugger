@@ -36,6 +36,7 @@
 #define PRIVLEN 5
 #define ILEN 32
 
+/* Sample captured by the interface to the RISC-V CPU.*/
 struct instr_sample {
     /* bool valid; */
     bool exception;
@@ -56,6 +57,9 @@ struct instr_sample {
 #define SF_EXCEPTION 1
 #define SF_CONTEXT 2
 
+/* Canonical trace packet representation. There are four possible
+ * packet types. See riscv-trace-spec.pdf for details.
+ */
 struct tr_packet {
     uint32_t msg_type : 2;
     uint32_t format : 2;
@@ -92,44 +96,38 @@ struct tr_packet {
         *p = (struct tr_packet){0};                                            \
     } while (false)
 
+/* Given a instr_sample array of length len and a list_head
+ * trdb_compress_trace returns the list_head with a number of packets
+ * added to it. These packets should allow trdb_decompress_trace to
+ * reconstruct the original sequence of instr_sample. Since the
+ * function allocates new entries for list_head, the caller has to
+ * deallocate them by calling trdb_free_packet_list. Use the functions
+ * provided by list.h to handle list_head entries.
+ */
 struct list_head *trdb_compress_trace(struct list_head *packet_list,
                                       struct instr_sample[1], size_t len);
 
 /* packet from bitstream where parse single packet */
 /* packet from bitstream whole decode function */
 
+/* Generate the original instruction sequence from a list of
+ * tr_packets, given the binary from which the instruction sequence
+ * was produced.
+ */
 char *trdb_decompress_trace(bfd *abfd, struct list_head *packet_list);
 
+/* Prints a list of tr_packets in a formatted manner to stdout. */
 void trdb_dump_packet_list(struct list_head *packet_list);
 
+/* Free the entries of a list of tr_packets. Used to dealloacte the
+ * list returned by trdb_compress_trace.
+ */
 void trdb_free_packet_list(struct list_head *packet_list);
 
-/* TODO: encoder and decoder state structs */
-
-/* inline uint32_t cause(struct instr_sample *instr) */
-/* { */
-/*     return instr->cause & MASK_FROM(CAUSELEN); */
-/* } */
-
-/* inline uint32_t tval(struct instr_sample *instr) */
-/* { */
-/*     return instr->tval & MASK_FROM(XLEN); */
-/* } */
-
-/* inline uint32_t priv(struct instr_sample *instr) */
-/* { */
-/*     return instr->priv & MASK_FROM(PRIVLEN); */
-/* } */
-
-/* inline uint32_t iaddr(struct instr_sample *instr) */
-/* { */
-/*     return instr->iaddr & 0xffffffff; */
-/* } */
-
-/* inline uint32_t instr(struct instr_sample *instr) */
-/* { */
-/*     return instr->instr & 0xffffffff; */
-/* } */
+/* Write a list of tr_packets to a file located at path. Overwrites old file.
+ * Return -1 on failure and 0 on success.
+ */
+int trdb_write_trace(char *path, struct list_head *packet_list)
 
 /* struct packet0 {
  *     uint32_t msg_type : 2;

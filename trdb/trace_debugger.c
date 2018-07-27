@@ -34,6 +34,9 @@
 #include "list.h"
 #include "util.h"
 
+/* Configuration state of the trace debugger, used to guide the compression and
+ * decompression routine
+ */
 struct trdb_config {
     /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
     uint64_t resync_max;
@@ -44,6 +47,10 @@ struct trdb_config {
 };
 static struct trdb_config conf = {0};
 
+/* Records the state of the CPU. The compression routine looks at a sequence of
+ * recorded or streamed instructions (struct instr_sample) to figure out the
+ * entries of this struct. Based on those it decides when to emit packets.
+ */
 struct trdb_state {
 
     bool halt;           /* TODO: update this */
@@ -62,6 +69,12 @@ static struct trdb_state lastc = {0};
 static struct trdb_state thisc = {0};
 static struct trdb_state nextc = {0};
 
+/* Responsible to hold current branch state, that is the sequence of taken/not
+ * taken branches so far. The bits field keeps track of that by setting the
+ * cnt'th bit to 1 or 0 for a taken or not taken branch respectively. There can
+ * be at most 31 entries in the branch map. A full branch map has the full flag
+ * set.
+ */
 struct branch_map_state {
     bool full;
     uint32_t bits;
@@ -70,6 +83,9 @@ struct branch_map_state {
 
 static struct branch_map_state branch_map = {0};
 
+/* We don't want to record all the time and this struct is used to indicate when
+ * we do.
+ */
 struct filter_state {
     /* TODO: look at those variables */
     uint64_t resync_cnt;
@@ -78,6 +94,7 @@ struct filter_state {
 };
 
 static struct filter_state filter = {0};
+
 
 static bool is_branch(uint32_t instr)
 {
@@ -98,6 +115,11 @@ static bool branch_taken(struct instr_sample before, struct instr_sample after)
 }
 
 
+/* Some jumps can't be predicted i.e. the jump address can only be figured out
+ * at runtime. That happens e.g. if the target address depends on some register
+ * entries. For plain RISC-V I this is just the jalr instruction. For the PULP
+ * extensions, the hardware loop instruction have to be considered too.
+ */
 static bool is_unpred_discontinuity(uint32_t instr)
 {
     return is_jalr_instr(instr);
@@ -371,7 +393,13 @@ static uint32_t branch_map_len(uint32_t branches)
     return -1;
 }
 
-
+/* It's pretty annoying to pack our packets tightly, since our packet members
+ * are not 8 bit aligned. We assure that each packet is smaller that 128 bits,
+ * pack all packet members into a 128 bit integer and read it out to bytes
+ * through the union. Since uint8_t doesn't count as a char the compiler assumes
+ * a uint8_t pointer can't alias a __uint128_t, thus the union. Or we could use
+ * -fno-strict-aliasing.
+ */
 union pack {
     __uint128_t bits; /* non-portable gcc stuff. TODO: fix */
     uint8_t bin[16];  /* since uint8_t =/= char strict aliasing might
