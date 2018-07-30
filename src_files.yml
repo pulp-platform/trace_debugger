@@ -3,4 +3,5 @@ trace_debugger:
     rtl/tracer_if.sv,
     rtl/tracer_reg_if.sv,
     rtl/trace_debugger.sv,
+    rtl/trace_debugger_stimuli_gen.sv,
   ]
