@@ -30,6 +30,8 @@
 #include "../list.h"
 #include "../trace_debugger.h"
 #include "../trace_debugger.c"
+#include "../disasm.h"
+#include "../disasm.c"
 #include "../util.h"
 #include "../util.c"
 
@@ -79,7 +81,7 @@ bool test_packet_to_char(uint32_t shift)
     /*                    0xf2,7 + 1, 31-7-8, 31-7-8-8, 31-7-8-8-8*/
     uint8_t expected0[] = {0xf2, 0xff, 0xff, 0xff, 0xff,
                            0xbe, 0xad, 0xde, 0xaa, 0x00};
-    shiftl_array(expected0, ARRAY_SIZE(expected0), shift);
+    shiftl_array(expected0, TRDB_ARRAY_SIZE(expected0), shift);
 
     for (size_t i; i < sizeof(expected0); i++) {
         /* printf("test: %" PRIx8 "\n", expected0[i]); */
@@ -103,7 +105,7 @@ bool test_packet_to_char(uint32_t shift)
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected0, ARRAY_SIZE(expected0))) {
+    if (memcmp(bin, expected0, TRDB_ARRAY_SIZE(expected0))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -130,7 +132,7 @@ bool test_packet_to_char(uint32_t shift)
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected1, ARRAY_SIZE(expected1))) {
+    if (memcmp(bin, expected1, TRDB_ARRAY_SIZE(expected1))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -152,7 +154,7 @@ bool test_packet_to_char(uint32_t shift)
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected2, ARRAY_SIZE(expected2))) {
+    if (memcmp(bin, expected2, TRDB_ARRAY_SIZE(expected2))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -179,7 +181,7 @@ bool test_packet_to_char(uint32_t shift)
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected3, ARRAY_SIZE(expected3))) {
+    if (memcmp(bin, expected3, TRDB_ARRAY_SIZE(expected3))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }
@@ -210,7 +212,7 @@ bool test_packet_to_char(uint32_t shift)
         LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
         status = false;
     }
-    if (memcmp(bin, expected4, ARRAY_SIZE(expected4))) {
+    if (memcmp(bin, expected4, TRDB_ARRAY_SIZE(expected4))) {
         LOG_ERR("Packet bits don't match\n");
         status = false;
     }

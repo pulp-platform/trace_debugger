@@ -32,7 +32,7 @@
 /* ## is gcc extension */
 
 /* TODO: make this typesafer */
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define TRDB_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #define MASK_FROM(len) ((1ull << len) - 1)
 
