@@ -49,8 +49,9 @@ module trace_debugger_stimuli_gen
             $fdisplay(fd,"valid=%h exception=%h interrupt=%h cause=%h",
                       ivalid_i, iexception_i, interrupt_i, cause_i,
                       " tval=%h priv=%h addr=%h instr=%h",
-                      tval_i, priv_i, iaddr_i, instr_i);
+                      32'b0, priv_i, iaddr_i, instr_i);
         end
+        //tval_i is just 'x for now so ignore it
 
         $fclose(fd);
     end
