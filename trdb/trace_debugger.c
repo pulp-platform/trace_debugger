@@ -516,7 +516,7 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
 }
 
 
-int trdb_write_trace(char *path, struct list_head *packet_list)
+int trdb_write_trace(const char *path, struct list_head *packet_list)
 {
     int status = 0;
     FILE *fp = fopen(path, "wb");
@@ -572,6 +572,79 @@ fail:
 }
 
 
+/* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
+size_t trdb_stimuli_to_instr_sample(const char *path,
+                                    struct instr_sample **samples, int *status)
+{
+    *status = 0;
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        perror("trdb_stimuli_to_instr_sample");
+        *status = -1;
+        goto fail;
+    }
+    size_t scnt = 0;
+
+    int ret = 0;
+    int valid = 0;
+    int exception = 0;
+    int interrupt = 0;
+    uint32_t cause = 0;
+    uint32_t tval = 0;
+    uint32_t priv = 0;
+    uint32_t iaddr = 0;
+    uint32_t instr = 0;
+
+    size_t size = 128;
+    *samples = malloc(size * sizeof(**samples));
+    while ((ret = fscanf(fp,
+                         "valid= %d exception= %d interrupt= %d cause= %" SCNx32
+                         " tval= %" SCNx32 " priv= %" SCNx32 " addr= %" SCNx32
+                         " instr= %" SCNx32 " \n",
+                         &valid, &exception, &interrupt, &cause, &tval, &priv,
+                         &iaddr, &instr))
+           != EOF) {
+        if (!valid) {
+            continue;
+        }
+        if (scnt >= size) {
+            size = 2 * size;
+            struct instr_sample *tmp = realloc(*samples, size);
+            if (!tmp) {
+                perror("realloc");
+                *status = -1;
+                goto fail;
+            }
+            *samples = tmp;
+        }
+        (*samples)[scnt].exception = exception;
+        (*samples)[scnt].interrupt = interrupt;
+        (*samples)[scnt].cause = cause;
+        (*samples)[scnt].tval = tval;
+        (*samples)[scnt].priv = priv;
+        (*samples)[scnt].iaddr = iaddr;
+        (*samples)[scnt].instr = instr;
+        scnt++;
+    }
+
+    if (ferror(fp)) {
+        perror("fscanf");
+        *status = -1;
+        goto fail;
+    }
+
+    if (fp)
+        fclose(fp);
+    return scnt;
+fail:
+    if (fp)
+        fclose(fp);
+    free(*samples);
+    *samples = NULL;
+    return 0;
+}
+
+
 void trdb_dump_packet_list(struct list_head *packet_list)
 {
     struct tr_packet *packet;
@@ -581,7 +654,7 @@ void trdb_dump_packet_list(struct list_head *packet_list)
             LOG_ERR("Unsupported message type %" PRIu32 "\n", packet->msg_type);
             break;
         }
-	trdb_print_packet(packet);
+        trdb_print_packet(packet);
     }
 }
 
@@ -591,7 +664,7 @@ void trdb_print_packet(struct tr_packet *packet)
     switch (packet->format) {
     case F_BRANCH_FULL:
     case F_BRANCH_DIFF:
-        printf("\nPACKET ");
+        printf("PACKET ");
         packet->format == F_BRANCH_FULL ? printf("0: F_BRANCH_FULL\n")
                                         : printf("1: F_BRANCH_DIFF\n");
         printf("    branches  : %" PRIu32 "\n", packet->branches);

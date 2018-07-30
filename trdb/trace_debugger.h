@@ -133,7 +133,11 @@ void trdb_free_packet_list(struct list_head *packet_list);
 /* Write a list of tr_packets to a file located at path. Overwrites old file.
  * Return -1 on failure and 0 on success.
  */
-int trdb_write_trace(char *path, struct list_head *packet_list);
+int trdb_write_trace(const char *path, struct list_head *packet_list);
+
+size_t trdb_stimuli_to_instr_sample(const char *path,
+                                    struct instr_sample **samples, int *status);
+
 
 /* struct packet0 {
  *     uint32_t msg_type : 2;
