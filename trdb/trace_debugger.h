@@ -122,6 +122,9 @@ char *trdb_decompress_trace(bfd *abfd, struct list_head *packet_list);
 /* Prints a list of tr_packets in a formatted manner to stdout. */
 void trdb_dump_packet_list(struct list_head *packet_list);
 
+/* Prints a single packet in a formatted manner to stdout */
+void trdb_print_packet(struct tr_packet *packet);
+
 /* Free the entries of a list of tr_packets. Used to dealloacte the
  * list returned by trdb_compress_trace.
  */

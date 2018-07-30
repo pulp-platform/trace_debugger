@@ -571,6 +571,7 @@ fail:
     return status;
 }
 
+
 void trdb_dump_packet_list(struct list_head *packet_list)
 {
     struct tr_packet *packet;
@@ -578,50 +579,55 @@ void trdb_dump_packet_list(struct list_head *packet_list)
     {
         if (packet->msg_type != 0x2) {
             LOG_ERR("Unsupported message type %" PRIu32 "\n", packet->msg_type);
-            return;
-        }
-        switch (packet->format) {
-        case F_BRANCH_FULL:
-        case F_BRANCH_DIFF:
-            printf("PACKET ");
-            packet->format == F_BRANCH_FULL ? printf("0: F_BRANCH_FULL\n")
-                                            : printf("1: F_BRANCH_DIFF\n");
-            printf("    branches  : %" PRIu32 "\n", packet->branches);
-            printf("    branch_map: 0x%" PRIx32 "\n", packet->branch_map);
-            printf("    address   : 0x%" PRIx32 "\n", packet->address);
-            /* TODO: that special full branch map behaviour */
-            break;
-
-        case F_ADDR_ONLY:
-            printf("PACKET 2: F_ADDR_ONLY\n");
-            printf("    address   : 0x%" PRIx32 "\n", packet->address);
-            break;
-        case F_SYNC:
-            printf("PACKET 3: F_SYNC\n");
-            const char *subf[4];
-            subf[0] = "SF_START";
-            subf[1] = "SF_EXCEPTION";
-            subf[2] = "SF_CONTEXT";
-            subf[3] = "RESERVED";
-            printf("    subformat : %s\n", subf[packet->subformat]);
-
-            switch (packet->subformat) {
-            case SF_CONTEXT:
-                /* TODO fix this */
-                printf("    context   :\n");
-                printf("    privilege : 0x%" PRIx32 "\n", packet->privilege);
-            case SF_START:
-                printf("    branch    : %s\n",
-                       packet->branch ? "true" : "false");
-                printf("    address   : 0x%" PRIx32 "\n", packet->address);
-            case SF_EXCEPTION:
-                printf("    ecause    : 0x%" PRIx32 "\n", packet->ecause);
-                printf("    interrupt : %s\n",
-                       packet->interrupt ? "true" : "false");
-                printf("    tval      : 0x%" PRIx32 "\n", packet->tval);
-            }
             break;
         }
+	trdb_print_packet(packet);
+    }
+}
+
+
+void trdb_print_packet(struct tr_packet *packet)
+{
+    switch (packet->format) {
+    case F_BRANCH_FULL:
+    case F_BRANCH_DIFF:
+        printf("\nPACKET ");
+        packet->format == F_BRANCH_FULL ? printf("0: F_BRANCH_FULL\n")
+                                        : printf("1: F_BRANCH_DIFF\n");
+        printf("    branches  : %" PRIu32 "\n", packet->branches);
+        printf("    branch_map: 0x%" PRIx32 "\n", packet->branch_map);
+        printf("    address   : 0x%" PRIx32 "\n", packet->address);
+        /* TODO: that special full branch map behaviour */
+        break;
+
+    case F_ADDR_ONLY:
+        printf("PACKET 2: F_ADDR_ONLY\n");
+        printf("    address   : 0x%" PRIx32 "\n", packet->address);
+        break;
+    case F_SYNC:
+        printf("PACKET 3: F_SYNC\n");
+        const char *subf[4];
+        subf[0] = "SF_START";
+        subf[1] = "SF_EXCEPTION";
+        subf[2] = "SF_CONTEXT";
+        subf[3] = "RESERVED";
+        printf("    subformat : %s\n", subf[packet->subformat]);
+
+        switch (packet->subformat) {
+        case SF_CONTEXT:
+            /* TODO fix this */
+            printf("    context   :\n");
+            printf("    privilege : 0x%" PRIx32 "\n", packet->privilege);
+        case SF_START:
+            printf("    branch    : %s\n", packet->branch ? "true" : "false");
+            printf("    address   : 0x%" PRIx32 "\n", packet->address);
+        case SF_EXCEPTION:
+            printf("    ecause    : 0x%" PRIx32 "\n", packet->ecause);
+            printf("    interrupt : %s\n",
+                   packet->interrupt ? "true" : "false");
+            printf("    tval      : 0x%" PRIx32 "\n", packet->tval);
+        }
+        break;
     }
 }
 
