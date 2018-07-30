@@ -52,8 +52,8 @@ int main(int argc, char *argv[argc + 1])
     disassemble_init_for_target(&dinfo);
 
     /* Tests for trace_debugger.h */
-    struct instr_sample sample = {0};
-    struct instr_sample sample_arr[1];
+    struct tr_instr sample = {0};
+    struct tr_instr sample_arr[1];
     sample_arr[0] = sample;
     LIST_HEAD(packet_list);
     trdb_compress_trace(&packet_list, sample_arr, 1);

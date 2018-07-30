@@ -37,7 +37,7 @@
 #define ILEN 32
 
 /* Sample captured by the interface to the RISC-V CPU.*/
-struct instr_sample {
+struct tr_instr {
     /* bool valid; */
     bool exception;
     bool interrupt;
@@ -99,16 +99,16 @@ struct tr_packet {
 /* Call this function before any other */
 void trdb_init();
 
-/* Given a instr_sample array of length len and a list_head
+/* Given a tr_instr array of length len and a list_head
  * trdb_compress_trace returns the list_head with a number of packets
  * added to it. These packets should allow trdb_decompress_trace to
- * reconstruct the original sequence of instr_sample. Since the
+ * reconstruct the original sequence of tr_instr. Since the
  * function allocates new entries for list_head, the caller has to
  * deallocate them by calling trdb_free_packet_list. Use the functions
  * provided by list.h to handle list_head entries.
  */
 struct list_head *trdb_compress_trace(struct list_head *packet_list,
-                                      struct instr_sample[1], size_t len);
+                                      struct tr_instr[1], size_t len);
 
 /* packet from bitstream where parse single packet */
 /* packet from bitstream whole decode function */
@@ -135,8 +135,8 @@ void trdb_free_packet_list(struct list_head *packet_list);
  */
 int trdb_write_trace(const char *path, struct list_head *packet_list);
 
-size_t trdb_stimuli_to_instr_sample(const char *path,
-                                    struct instr_sample **samples, int *status);
+size_t trdb_stimuli_to_tr_instr(const char *path,
+                                    struct tr_instr **samples, int *status);
 
 
 /* struct packet0 {

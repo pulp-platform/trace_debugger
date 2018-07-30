@@ -324,14 +324,14 @@ int test_parse_stimuli_line()
 }
 
 
-int test_stimuli_to_instr_sample(const char *path)
+int test_stimuli_to_tr_instr(const char *path)
 {
-    struct instr_sample *tmp;
-    struct instr_sample **samples = &tmp;
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
     int status = 0;
-    trdb_stimuli_to_instr_sample(path, samples, &status);
+    trdb_stimuli_to_tr_instr(path, samples, &status);
     if (status != 0) {
-        LOG_ERR("Stimuli to instr_sample failed\n");
+        LOG_ERR("Stimuli to tr_instr failed\n");
         return 0;
     }
     free(*samples);
@@ -340,12 +340,12 @@ int test_stimuli_to_instr_sample(const char *path)
 
 int test_stimuli_to_packet_dump(const char *path)
 {
-    struct instr_sample *tmp;
-    struct instr_sample **samples = &tmp;
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_instr_sample(path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_tr_instr(path, samples, &status);
     if (status != 0) {
-        LOG_ERR("Stimuli to instr_sample failed\n");
+        LOG_ERR("Stimuli to tr_instr failed\n");
         return 0;
     }
 
@@ -369,6 +369,6 @@ int main(int argc, char *argv[argc + 1])
 
     RUN_TEST(test_trdb_write_trace);
     RUN_TEST(test_parse_stimuli_line);
-    RUN_TEST(test_stimuli_to_instr_sample, "data/trdb_stimuli");
+    RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");
 }

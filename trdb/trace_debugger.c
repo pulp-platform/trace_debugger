@@ -48,7 +48,7 @@ struct trdb_config {
 static struct trdb_config conf = {0};
 
 /* Records the state of the CPU. The compression routine looks at a sequence of
- * recorded or streamed instructions (struct instr_sample) to figure out the
+ * recorded or streamed instructions (struct tr_instr) to figure out the
  * entries of this struct. Based on those it decides when to emit packets.
  */
 struct trdb_state {
@@ -107,7 +107,7 @@ static bool is_branch(uint32_t instr)
 }
 
 
-static bool branch_taken(struct instr_sample before, struct instr_sample after)
+static bool branch_taken(struct tr_instr before, struct tr_instr after)
 {
     /* TODO: can this cause issues with RVC + degenerate jump (+2) ?*/
     return !(before.iaddr + 4 == after.iaddr
@@ -143,7 +143,7 @@ void trdb_close()
 
 
 struct list_head *trdb_compress_trace(struct list_head *packet_list,
-                                      struct instr_sample instrs[], size_t len)
+                                      struct tr_instr instrs[], size_t len)
 {
     bool full_address = conf.full_address;
 
@@ -573,13 +573,13 @@ fail:
 
 
 /* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
-size_t trdb_stimuli_to_instr_sample(const char *path,
-                                    struct instr_sample **samples, int *status)
+size_t trdb_stimuli_to_tr_instr(const char *path,
+                                    struct tr_instr **samples, int *status)
 {
     *status = 0;
     FILE *fp = fopen(path, "r");
     if (!fp) {
-        perror("trdb_stimuli_to_instr_sample");
+        perror("trdb_stimuli_to_tr_instr");
         *status = -1;
         goto fail;
     }
@@ -609,7 +609,7 @@ size_t trdb_stimuli_to_instr_sample(const char *path,
         }
         if (scnt >= size) {
             size = 2 * size;
-            struct instr_sample *tmp = realloc(*samples, size);
+            struct tr_instr *tmp = realloc(*samples, size);
             if (!tmp) {
                 perror("realloc");
                 *status = -1;
