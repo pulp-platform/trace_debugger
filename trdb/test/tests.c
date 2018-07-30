@@ -26,6 +26,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
+#include "../list.h"
 #include "../trace_debugger.h"
 #include "../trace_debugger.c"
 #include "../util.h"
@@ -282,12 +284,82 @@ static bool test_trdb_write_trace()
         LOG_ERR("Binary data mismatch\n");
         status = -1;
     }
-
 fail:
     if (fp)
         fclose(fp);
     free(buf);
     return status;
+}
+
+
+int test_parse_stimuli_line()
+{
+    int valid = 0;
+    int exception = 0;
+    int interrupt = 0;
+    uint32_t cause = 0;
+    uint32_t tval = 0;
+    uint32_t priv = 0;
+    uint32_t iaddr = 0;
+    uint32_t instr = 0;
+
+    int ret = sscanf(
+        "valid=1 exception=0 interrupt=0 cause=00 tval=ff priv=7 addr=1c00809c instr=ffff9317",
+        "valid= %d exception= %d interrupt= %d cause= %" SCNx32
+        " tval= %" SCNx32 " priv= %" SCNx32 " addr= %" SCNx32
+        " instr= %" SCNx32,
+        &valid, &exception, &interrupt, &cause, &tval, &priv, &iaddr, &instr);
+
+    if (ret != EOF) {
+    } else if (errno != 0) {
+        perror("scanf");
+        return -1;
+    } else {
+        fprintf(stderr, "No matching characters\n");
+        return -1;
+    }
+
+    return (valid == 1 && exception == 0 && cause == 0 && tval == 0xff
+            && iaddr == 0x1c00809c && instr == 0xffff9317);
+}
+
+
+int test_stimuli_to_instr_sample(const char *path)
+{
+    struct instr_sample *tmp;
+    struct instr_sample **samples = &tmp;
+    int status = 0;
+    trdb_stimuli_to_instr_sample(path, samples, &status);
+    if (status != 0) {
+        LOG_ERR("Stimuli to instr_sample failed\n");
+        return 0;
+    }
+    free(*samples);
+    return (status == 0);
+}
+
+int test_stimuli_to_packet_dump(const char *path)
+{
+    struct instr_sample *tmp;
+    struct instr_sample **samples = &tmp;
+    int status = 0;
+    size_t samplecnt = trdb_stimuli_to_instr_sample(path, samples, &status);
+    if (status != 0) {
+        LOG_ERR("Stimuli to instr_sample failed\n");
+        return 0;
+    }
+
+    LIST_HEAD(head);
+    struct list_head *ret = trdb_compress_trace(&head, *samples, samplecnt);
+    if (!ret) {
+        LOG_ERR("Compress trace failed\n");
+        return 0;
+    }
+    trdb_dump_packet_list(&head);
+
+    free(*samples);
+    trdb_free_packet_list(&head);
+    return 1;
 }
 
 int main(int argc, char *argv[argc + 1])
@@ -296,4 +368,7 @@ int main(int argc, char *argv[argc + 1])
         RUN_TEST(test_packet_to_char, i);
 
     RUN_TEST(test_trdb_write_trace);
+    RUN_TEST(test_parse_stimuli_line);
+    RUN_TEST(test_stimuli_to_instr_sample, "data/trdb_stimuli");
+    RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");
 }
