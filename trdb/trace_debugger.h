@@ -135,8 +135,8 @@ void trdb_free_packet_list(struct list_head *packet_list);
  */
 int trdb_write_trace(const char *path, struct list_head *packet_list);
 
-size_t trdb_stimuli_to_tr_instr(const char *path,
-                                    struct tr_instr **samples, int *status);
+size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
+                                int *status);
 
 
 /* struct packet0 {

@@ -573,8 +573,8 @@ fail:
 
 
 /* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
-size_t trdb_stimuli_to_tr_instr(const char *path,
-                                    struct tr_instr **samples, int *status)
+size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
+                                int *status)
 {
     *status = 0;
     FILE *fp = fopen(path, "r");
@@ -642,6 +642,16 @@ fail:
     free(*samples);
     *samples = NULL;
     return 0;
+}
+
+
+/* TODO: prepare a generic PULP disassemble_info struct */
+void trdb_disassemble_trace(struct tr_instr trace[1], size_t len,
+                            struct disassemble_info *dinfo)
+{
+    for (size_t i = 0; i < len; i++) {
+        disassemble_single_instruction(trace[i].instr, dinfo);
+    }
 }
 
 
