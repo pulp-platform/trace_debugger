@@ -14,36 +14,36 @@
 module tracer_if
     #(parameter L2_AWIDTH_NOAL = 12, // L2 address bus
       parameter TRANS_SIZE     = 16) // buffer size in L2 / transfer length
-    (input logic 		       clk_i,
-     input logic 		       rst_ni,
+    (input logic                       clk_i,
+     input logic                       rst_ni,
 
      // Configuration r/w from APB
-     input logic [31:0] 	       cfg_data_i,
-     input logic [4:0] 		       cfg_addr_i,
-     input logic 		       cfg_valid_i,
-     input logic 		       cfg_rw_ni,
-     output logic [31:0] 	       cfg_data_o,
-     output logic 		       cfg_ready_o,
+     input logic [31:0]                cfg_data_i,
+     input logic [4:0]                 cfg_addr_i,
+     input logic                       cfg_valid_i,
+     input logic                       cfg_rw_ni,
+     output logic [31:0]               cfg_data_o,
+     output logic                      cfg_ready_o,
 
      // Configuration state for the udma
      output logic [L2_AWIDTH_NOAL-1:0] cfg_rx_startaddr_o,
      output logic [TRANS_SIZE-1:0]     cfg_rx_size_o,
-     output logic 		       cfg_rx_continuous_o,
-     output logic 		       cfg_rx_en_o,
-     output logic 		       cfg_rx_filter_o,
-     output logic 		       cfg_rx_clr_o,
-     input logic 		       cfg_rx_en_i,
-     input logic 		       cfg_rx_pending_i,
+     output logic                      cfg_rx_continuous_o,
+     output logic                      cfg_rx_en_o,
+     output logic                      cfg_rx_filter_o,
+     output logic                      cfg_rx_clr_o,
+     input logic                       cfg_rx_en_i,
+     input logic                       cfg_rx_pending_i,
      input logic [L2_AWIDTH_NOAL-1:0]  cfg_rx_curr_addr_i,
      input logic [TRANS_SIZE-1:0]      cfg_rx_bytes_left_i,
 
      // Data from the tracer that goes to the udma
-     output logic [1:0] 	       data_rx_datasize_o,
-     output logic [31:0] 	       data_rx_data_o,
-     output logic 		       data_rx_valid_o,
-     input logic 		       data_rx_ready_i);
+     output logic [1:0]                data_rx_datasize_o,
+     output logic [31:0]               data_rx_data_o,
+     output logic                      data_rx_valid_o,
+     input logic                       data_rx_ready_i);
 
-    logic [31:0] 		       data_rx_data_q;
+    logic [31:0]                       data_rx_data_q;
     logic                              data_rx_valid_q;
 
     // We are in the same clockdomain as the SoC, so no DC stuff needed
