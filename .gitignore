@@ -4,3 +4,4 @@ build
 TAGS
 gmon.out
 *.o
+/trdb/scratch
