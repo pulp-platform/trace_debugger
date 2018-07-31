@@ -653,7 +653,6 @@ fail:
 }
 
 
-/* TODO: prepare a generic PULP disassemble_info struct */
 void trdb_disassemble_trace(struct tr_instr trace[1], size_t len,
                             struct disassemble_info *dinfo)
 {

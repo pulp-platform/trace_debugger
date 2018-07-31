@@ -35,13 +35,18 @@
 #include "../util.h"
 #include "../util.c"
 
+#define TRDB_TEST_VERBOSE 1
+
+/* TODO: and-ing of test results for main return value */
 #define RUN_TEST(fun, ...)                                                     \
     do {                                                                       \
         printf("Running %s: ", #fun);                                          \
-        if (fun(__VA_ARGS__))                                                  \
+        if (fun(__VA_ARGS__)) {                                                \
             printf("success\n");                                               \
-        else                                                                   \
+        } else {                                                               \
             printf("fail\n");                                                  \
+            _trdb_test_result = false;                                         \
+        }                                                                      \
     } while (false)
 
 
@@ -340,6 +345,7 @@ int test_stimuli_to_tr_instr(const char *path)
     return (status == 0);
 }
 
+
 int test_stimuli_to_packet_dump(const char *path)
 {
     struct tr_instr *tmp;
@@ -357,15 +363,49 @@ int test_stimuli_to_packet_dump(const char *path)
         LOG_ERR("Compress trace failed\n");
         return 0;
     }
+#ifdef TRDB_TEST_VERBOSE
     trdb_dump_packet_list(&head);
+#endif
 
     free(*samples);
     trdb_free_packet_list(&head);
     return 1;
 }
 
+
+int test_disassemble_trace(const char *path)
+{
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
+    int status = 0;
+    size_t samplecnt = trdb_stimuli_to_tr_instr(path, samples, &status);
+    if (status != 0) {
+        LOG_ERR("Stimuli to tr_instr failed\n");
+        return 0;
+    }
+
+    disassemble_info dinfo = {0};
+    /* TODO: make this API nicer in disasm.c */
+    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
+    init_disassemble_info_for_pulp(&dinfo);
+    disassemble_init_for_target(&dinfo);
+    /* TODO: we need this global variable, maybe make this nicer */
+    disassemble_fn = print_insn_riscv;
+    if (!disassemble_fn) {
+        LOG_ERR("No suitable disassembler found\n");
+        return 0;
+    }
+#ifdef TRDB_TEST_VERBOSE
+    trdb_disassemble_trace(*samples, samplecnt, &dinfo);
+#endif
+    free(*samples);
+    return 1;
+}
+
 int main(int argc, char *argv[argc + 1])
 {
+    bool _trdb_test_result = true;
+
     for (size_t i = 0; i < 8; i++)
         RUN_TEST(test_packet_to_char, i);
 
@@ -373,4 +413,7 @@ int main(int argc, char *argv[argc + 1])
     RUN_TEST(test_parse_stimuli_line);
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");
+    RUN_TEST(test_disassemble_trace, "data/trdb_stimuli");
+
+    return _trdb_test_result ? EXIT_SUCCESS : EXIT_FAILURE;
 }
