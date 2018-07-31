@@ -210,7 +210,11 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->subformat = 1;   /* exception */
             tr->context = 0;     /* TODO: what comes here? */
             tr->privilege = instrs[i].priv;
-            tr->branch = 0; /* TODO: figure if taken or not */
+            if (is_branch(instrs[i].instr)
+                && !branch_taken(instrs[i], instrs[i + 1]))
+                tr->branch = 1;
+            else
+                tr->branch = 0;
             tr->address = instrs[i].iaddr;
             /* With this packet we record last cycles exception
              * information. It's not possible for (i==0 &&
@@ -240,7 +244,11 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list,
             tr->subformat = 0;   /* start */
             tr->context = 0;     /* TODO: what comes here? */
             tr->privilege = instrs[i].priv;
-            tr->branch = 0; /* TODO: figure if taken or not */
+            if (is_branch(instrs[i].instr)
+                && !branch_taken(instrs[i], instrs[i + 1]))
+                tr->branch = 1;
+            else
+                tr->branch = 0;
             tr->address = instrs[i].iaddr;
             list_add(&tr->list, packet_list);
 
