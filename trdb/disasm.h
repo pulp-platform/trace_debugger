@@ -45,6 +45,8 @@
 #undef DECLARE_INSN
 
 
+void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
+
 void dump_section_header(bfd *, asection *, void *);
 
 void dump_bin_info(bfd *);

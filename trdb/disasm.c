@@ -40,6 +40,16 @@
 disassembler_ftype disassemble_fn;
 
 
+void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
+{
+    const bfd_arch_info_type *riscv32_arch = bfd_scan_arch("riscv:rv32");
+    dinfo->flavour = bfd_target_elf_flavour; /* TODO: const */
+    dinfo->arch = riscv32_arch->arch;
+    dinfo->mach = riscv32_arch->mach;
+    dinfo->endian = BFD_ENDIAN_LITTLE;
+}
+
+
 void riscv32_print_address(bfd_vma addr, struct disassemble_info *dinfo)
 {
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx", (uintmax_t)addr);
