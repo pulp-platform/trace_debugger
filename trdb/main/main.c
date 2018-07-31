@@ -22,6 +22,8 @@
  * Description: Running a few tests
  */
 
+#define PACKAGE "foo" /* quick hack for bfd if not using autotools */
+#include "bfd.h"
 #include "../disasm.h"
 #include "../trace_debugger.h"
 #include <stdio.h>
