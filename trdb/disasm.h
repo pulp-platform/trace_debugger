@@ -49,7 +49,7 @@ void dump_section_header(bfd *, asection *, void *);
 
 void dump_bin_info(bfd *);
 
-void override_print_address(bfd_vma, struct disassemble_info *);
+void riscv32_print_address(bfd_vma, struct disassemble_info *);
 
 asymbol *find_symbol_at_address(bfd_vma, struct disassemble_info *);
 

@@ -39,7 +39,8 @@
 /* TODO: make this global or pass it via args */
 disassembler_ftype disassemble_fn;
 
-void override_print_address(bfd_vma addr, struct disassemble_info *dinfo)
+
+void riscv32_print_address(bfd_vma addr, struct disassemble_info *dinfo)
 {
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx", (uintmax_t)addr);
 }

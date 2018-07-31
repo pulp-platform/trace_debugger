@@ -43,7 +43,7 @@ int main(int argc, char *argv[argc + 1])
     /* Override the stream the disassembler outputs to */
     init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
     dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.print_address_func = override_print_address;
+    dinfo.print_address_func = riscv32_print_address;
 
     dinfo.flavour = bfd_get_flavour(abfd);
     dinfo.arch = bfd_get_arch(abfd);
