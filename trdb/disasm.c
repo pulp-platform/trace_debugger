@@ -135,8 +135,9 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 
     printf("Disassembly of section %s:\n", section->name);
     while (addr_offset < stop_offset) {
+	/* print instr address */
         (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
-                               (uintmax_t)addr_offset); /* pc */
+                               (uintmax_t)(section->vma + addr_offset));
         int size = (*disassemble_fn)(section->vma + addr_offset, dinfo);
         addr_offset += size;
         (*dinfo->fprintf_func)(dinfo->stream, "\n");
