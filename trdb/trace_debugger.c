@@ -725,7 +725,8 @@ void trdb_print_packet(struct tr_packet *packet)
 void trdb_free_packet_list(struct list_head *packet_list)
 {
     struct tr_packet *packet;
-    list_for_each_entry(packet, packet_list, list)
+    struct tr_packet *packet_next;
+    list_for_each_entry_safe(packet, packet_next, packet_list, list)
     {
         free(packet);
     }
