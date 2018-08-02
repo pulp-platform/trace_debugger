@@ -58,7 +58,9 @@ struct tr_instr {
 #define SF_CONTEXT 2
 
 /* Canonical trace packet representation. There are four possible
- * packet types. See riscv-trace-spec.pdf for details.
+ * packet types. See riscv-trace-spec.pdf for details. A list or array
+ * of such packets and a bfd struct represent together a compressed
+ * list or array of tr_instr.
  */
 struct tr_packet {
     uint32_t msg_type : 2;
