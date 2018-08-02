@@ -142,8 +142,8 @@ void trdb_close()
 }
 
 
-struct list_head *trdb_compress_trace(struct list_head *packet_list,
-                                      struct tr_instr instrs[], size_t len)
+struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
+                                      struct tr_instr instrs[len])
 {
     bool full_address = conf.full_address;
 
@@ -653,7 +653,7 @@ fail:
 }
 
 
-void trdb_disassemble_trace(struct tr_instr trace[1], size_t len,
+void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                             struct disassemble_info *dinfo)
 {
     for (size_t i = 0; i < len; i++) {

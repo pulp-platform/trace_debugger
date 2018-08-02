@@ -358,7 +358,7 @@ int test_stimuli_to_packet_dump(const char *path)
     }
 
     LIST_HEAD(head);
-    struct list_head *ret = trdb_compress_trace(&head, *samples, samplecnt);
+    struct list_head *ret = trdb_compress_trace(&head, samplecnt, *samples);
     if (!ret) {
         LOG_ERR("Compress trace failed\n");
         return 0;
@@ -396,7 +396,7 @@ int test_disassemble_trace(const char *path)
         return 0;
     }
 #ifdef TRDB_TEST_VERBOSE
-    trdb_disassemble_trace(*samples, samplecnt, &dinfo);
+    trdb_disassemble_trace(samplecnt, *samples, &dinfo);
 #endif
     free(*samples);
     return 1;

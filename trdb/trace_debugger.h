@@ -107,8 +107,8 @@ void trdb_init();
  * deallocate them by calling trdb_free_packet_list. Use the functions
  * provided by list.h to handle list_head entries.
  */
-struct list_head *trdb_compress_trace(struct list_head *packet_list,
-                                      struct tr_instr[1], size_t len);
+struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
+                                      struct tr_instr[len]);
 
 /* packet from bitstream where parse single packet */
 /* packet from bitstream whole decode function */
