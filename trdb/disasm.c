@@ -177,12 +177,12 @@ void disassemble_single_instruction(uint32_t instr,
 {
     size_t len = 8;
     size_t pc = 0;
-    bfd_byte *data = malloc(len);
+    bfd_byte *data = malloc(len * sizeof(*data));
     if (!data) {
         perror("disassemble_single_instruction:");
         return;
     }
-    memset(data, 0, len);
+    memset(data, 0, len * sizeof(*data));
 
     if (dinfo->endian == BFD_ENDIAN_BIG) {
         data[3] = (bfd_byte)(instr & 0xff);

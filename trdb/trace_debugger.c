@@ -617,7 +617,7 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
         }
         if (scnt >= size) {
             size = 2 * size;
-            struct tr_instr *tmp = realloc(*samples, size);
+            struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
             if (!tmp) {
                 perror("realloc");
                 *status = -1;
