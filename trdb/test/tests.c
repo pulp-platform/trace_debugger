@@ -407,6 +407,51 @@ int test_disassemble_trace(const char *path)
     return 1;
 }
 
+
+int test_decompress_trace(const char *bin_path, const char *trace_path)
+{
+    trdb_init();
+
+    printf("\n");
+
+    bfd_init();
+    bfd *abfd = bfd_openr(bin_path, NULL);
+
+    if (!(abfd && bfd_check_format(abfd, bfd_object))) {
+        bfd_perror("test_decompress_trace");
+        return 0;
+    }
+
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
+    int status = 0;
+    size_t samplecnt = trdb_stimuli_to_tr_instr(trace_path, samples, &status);
+    if (status != 0) {
+        LOG_ERR("Stimuli to tr_instr failed\n");
+        return 0;
+    }
+
+    LIST_HEAD(packet_head);
+    LIST_HEAD(instr_head);
+    struct list_head *ret =
+        trdb_compress_trace(&packet_head, samplecnt, *samples);
+    if (!ret) {
+        LOG_ERR("Compress trace failed\n");
+        return 0;
+    }
+    LOG_ERR("\nSTARTING_TEST_DUMPING\n");
+
+    trdb_dump_packet_list(&packet_head);
+    trdb_decompress_trace(abfd, &packet_head, &instr_head);
+
+    free(*samples);
+    trdb_free_packet_list(&packet_head);
+    trdb_free_packet_list(&instr_head);
+
+    return 1;
+}
+
+
 int main(int argc, char *argv[argc + 1])
 {
     bool _trdb_test_result = true;
@@ -418,7 +463,11 @@ int main(int argc, char *argv[argc + 1])
     RUN_TEST(test_parse_stimuli_line);
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");
-    RUN_TEST(test_disassemble_trace, "data/trdb_stimuli");
+    /* NOTE: there is a memory leak ~230 bytes in riscv-dis.c with struct
+     * riscv_subset for each instantiation of a disassembler.
+     */
+    /* RUN_TEST(test_disassemble_trace, "data/trdb_stimuli"); */
+    RUN_TEST(test_decompress_trace, "data/interrupt", "data/trdb_stimuli");
 
     return _trdb_test_result ? EXIT_SUCCESS : EXIT_FAILURE;
 }

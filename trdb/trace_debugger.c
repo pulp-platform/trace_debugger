@@ -44,6 +44,8 @@ struct trdb_config {
     bool iaddress_lsb_p;
     bool implicit_except;
     bool set_trace;
+    /* set to true to always diassemble to most general representation */
+    bool no_aliases;
 };
 static struct trdb_config conf = {0};
 
@@ -68,6 +70,16 @@ struct trdb_state {
 static struct trdb_state lastc = {0};
 static struct trdb_state thisc = {0};
 static struct trdb_state nextc = {0};
+
+/* Current state of the cpu during decompression. Allows one to
+ * precisely emit a sequence  tr_instr. The members mostly match
+ * tr_packet but we use a seperate struct to make it clear that there
+ * is a conceptual difference.
+ */
+struct trdb_dec_state {
+};
+
+/* TODO: interrupt stack (nested interrupts) for decompression? */
 
 /* Responsible to hold current branch state, that is the sequence of taken/not
  * taken branches so far. The bits field keeps track of that by setting the
@@ -128,7 +140,8 @@ static bool is_unpred_discontinuity(uint32_t instr)
 
 void trdb_init()
 {
-    conf = (struct trdb_config){.resync_max = UINT64_MAX, .full_address = true};
+    conf = (struct trdb_config){
+        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
     lastc = (struct trdb_state){0};
     thisc = (struct trdb_state){0};
     nextc = (struct trdb_state){0};
@@ -376,14 +389,231 @@ fail_malloc:
 }
 
 
-char *trdb_decompress_trace(bfd *abfd, struct list_head *packet_list)
+struct list_head *trdb_decompress_trace(bfd *abfd,
+                                        struct list_head *packet_list,
+                                        struct list_head *instr_list)
 {
     /* We assume our hw block in the pulp generated little endian
      * addresses, thus we should make sure that before we interact
      * with bfd addresses to convert this foreign format to the local
      * host format
      */
-    return (char *)0;
+    /* TODO: supports only statically linked elf executables */
+    /* TODO: nested interrupt support */
+    /* TODO: boot code hack */
+
+    /* find section belonging to start_address */
+    bfd_vma start_address = abfd->start_address;
+    asection *section = get_section_for_vma(abfd, start_address);
+    if (!section) {
+        LOG_ERR("VMA not pointing to any section");
+        goto fail;
+    }
+    LOG_ERR("Section of start_address:%s\n", section->name);
+
+    /* initialize libopcodes disassembler */
+    struct disassemble_info dinfo = {0};
+    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
+    dinfo.fprintf_func = (fprintf_ftype)fprintf;
+    dinfo.print_address_func = riscv32_print_address;
+
+    dinfo.flavour = bfd_get_flavour(abfd);
+    dinfo.arch = bfd_get_arch(abfd);
+    dinfo.mach = bfd_get_mach(abfd);
+    dinfo.endian = abfd->xvec->byteorder;
+    dinfo.disassembler_options = conf.no_aliases ? "no-aliases" : NULL;
+    disassemble_init_for_target(&dinfo);
+
+    struct disassembler_unit dunit = {0};
+    dunit.dinfo = &dinfo;
+    dunit.disassemble_fn = disassembler(abfd);
+    if (!dunit.disassemble_fn) {
+        LOG_ERR("No suitable disassembler found\n");
+        goto fail;
+    }
+
+    /* Alloc and config section data for disassembler */
+    bfd_size_type section_size = bfd_get_section_size(section);
+    bfd_vma stop_offset = section_size / dinfo.octets_per_byte;
+
+    bfd_byte *section_data = malloc(section_size);
+    if (!section_data) {
+        perror("malloc");
+        goto fail;
+    }
+    /* TODO: bfd_malloc_and_get_section */
+    if (!bfd_get_section_contents(abfd, section, section_data, 0,
+                                  section_size)) {
+        bfd_perror("bfd_get_section_contents");
+        goto fail;
+    }
+    dinfo.buffer = section_data;
+    dinfo.buffer_vma = section->vma;
+    dinfo.buffer_length = section_size;
+    dinfo.section = section;
+
+    bfd_vma pc = start_address; /* TODO: well we get a sync packet anyway... */
+    struct branch_map_state branch_map = {0};
+    struct tr_packet *packet;
+
+    list_for_each_entry_reverse(packet, packet_list, list)
+    {
+        switch (packet->format) {
+        case F_BRANCH_FULL:
+            branch_map.cnt = packet->branches;
+            branch_map.bits = packet->branch_map;
+            break;
+        case F_SYNC:
+            break;
+        default:
+            LOG_ERR("Unimplemented\n");
+            goto fail;
+        }
+
+        if (packet->format == F_BRANCH_FULL) {
+            LOG_ERR("F_BRANCH_FULL\n");
+            /* Consume all branches and consume address sync */
+            /*TODO: not true for discontinuous before last branch*/
+            bool sync_consumed = branch_map.cnt == 31;
+            while (!(branch_map.cnt == 0 && sync_consumed)) {
+
+                /* print instr address */
+                (*dinfo.fprintf_func)(dinfo.stream, "0x%016jx  ",
+                                      (uintmax_t)pc);
+                dinfo.insn_info_valid = 0;
+                int size = (*dunit.disassemble_fn)(pc, &dinfo);
+                pc += size;
+                (*dinfo.fprintf_func)(dinfo.stream, "\n");
+                if (size <= 0) {
+                    LOG_ERR("Encountered instruction with %d bytes, stopping\n",
+                            size);
+                    goto fail;
+                }
+                if (!dinfo.insn_info_valid)
+                    LOG_ERR("Encountered invalid instruction info\n");
+
+
+                /* we hit a conditional branch, follow or not and update map */
+                switch (dinfo.insn_type) {
+                case dis_nonbranch:
+                    /* We just normally advance the pc */
+                    break;
+
+                case dis_jsr:    /* There is not real difference ... */
+                case dis_branch: /* ... between those two */
+                    /* we know that this instruction must have its jump target
+                     * encoded in the binary else we would have gotten a
+                     * non-predictable discontinuity packet. If
+                     * branch_map.cnt == 0 + jump target unknown and we are here
+                     * then we know that its actually a branch_map
+                     * flush + discontinuity packet.
+                     */
+                    if (dinfo.target == 0 && branch_map.cnt)
+                        LOG_ERR(
+                            "We can't predict the jump target, never happens \n");
+                    if (branch_map.cnt || dinfo.target != 0) {
+                        pc = dinfo.target;
+                    } else {
+                        /* we finally hit a jump with unknown  destination,
+                         * thus the information in this packet  is used up
+                         */
+                        pc = packet->address;
+                        sync_consumed = true;
+                    }
+                    break;
+
+                case dis_condbranch:
+                    /* this case allows us to exhaust the branch bits */
+                    {
+                        /* 32 would be undefined */
+                        bool branch_taken = branch_map.bits & 1;
+                        branch_map.bits >>= 1;
+                        branch_map.cnt--;
+                        if (dinfo.target == 0)
+                            LOG_ERR(
+                                "We can't predict the jump target, never happens \n");
+                        if (branch_taken)
+                            pc = dinfo.target;
+                        break;
+                    }
+                case dis_dref:
+                    /* LOG_ERR("Don't know what to do with this type\n"); */
+                    break;
+
+                case dis_dref2:
+                case dis_condjsr:
+                case dis_noninsn:
+                    LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                    goto fail;
+                }
+            }
+        } else if (packet->format == F_SYNC) {
+            LOG_ERR("FSYNC\n");
+            /* sync pc */
+            pc = packet->address;
+            /* TODO: this is our small boothack for the PULP */
+            if (pc == 0x000000001c008080) {
+                pc = start_address;
+            }
+
+            /* print instr address */
+            (*dinfo.fprintf_func)(dinfo.stream, "0x%016jx  ", (uintmax_t)pc);
+            dinfo.insn_info_valid = 0;
+            int size = (*dunit.disassemble_fn)(pc, &dinfo);
+            pc += size;
+            (*dinfo.fprintf_func)(dinfo.stream, "\n");
+            if (size <= 0) {
+                LOG_ERR("Encountered instruction with %d bytes, stopping\n",
+                        size);
+                goto fail;
+            }
+            if (!dinfo.insn_info_valid)
+                LOG_ERR("Encountered invalid instruction info\n");
+
+            switch (dinfo.insn_type) {
+            case dis_nonbranch:
+                /* We just normally advance the pc */
+                break;
+            case dis_dref: /* TODO: is this useful? */
+                break;
+
+            case dis_jsr:    /* There is not real difference ... */
+            case dis_branch: /* ... between those two */
+                if (dinfo.target == 0)
+                    LOG_ERR(
+                        "We can't predict the jump target, never happens\n");
+                pc = dinfo.target;
+                break;
+
+            case dis_condbranch:
+                if (dinfo.target == 0)
+                    LOG_ERR(
+                        "We can't predict the jump target, never happens\\n");
+                if (packet->branch == 0) {
+                    LOG_ERR("Doing a branch from a F_SYNC packet");
+                    pc = dinfo.target;
+                }
+                break;
+
+            case dis_dref2:
+            case dis_condjsr:
+            case dis_noninsn:
+                LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                goto fail;
+            }
+        }
+        /* this is just a security check */
+        if (pc >= section->vma + stop_offset || pc < section->vma) {
+            /* TODO: make it change section */
+            LOG_ERR("PC left current section\n");
+            goto fail;
+        }
+        /* goto fail; /\* TODO: REMOVE THIS *\/ */
+    }
+
+fail:
+    free(section_data);
+    return NULL;
 }
 
 
@@ -542,6 +772,7 @@ int trdb_write_trace(const char *path, struct list_head *packet_list)
     size_t rest = 0;
 
     struct tr_packet *packet;
+    /* TODO: do we need the rever version? I think we do*/
     list_for_each_entry(packet, packet_list, list)
     {
         if (packet_to_char(packet, &bitcnt, alignment, bin)) {
@@ -654,10 +885,10 @@ fail:
 
 
 void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
-                            struct disassemble_info *dinfo)
+                            struct disassembler_unit *dunit)
 {
     for (size_t i = 0; i < len; i++) {
-        disassemble_single_instruction(trace[i].instr, dinfo);
+        disassemble_single_instruction(trace[i].instr, dunit);
     }
 }
 
@@ -665,7 +896,7 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
 void trdb_dump_packet_list(struct list_head *packet_list)
 {
     struct tr_packet *packet;
-    list_for_each_entry(packet, packet_list, list)
+    list_for_each_entry_reverse(packet, packet_list, list)
     {
         if (packet->msg_type != 0x2) {
             LOG_ERR("Unsupported message type %" PRIu32 "\n", packet->msg_type);

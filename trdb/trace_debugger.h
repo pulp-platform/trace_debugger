@@ -48,6 +48,7 @@ struct tr_instr {
     uint32_t instr : ILEN;     /* ILEN */
 };
 
+/* TODO: maybe make enums */
 #define F_BRANCH_FULL 0
 #define F_BRANCH_DIFF 1
 #define F_ADDR_ONLY 2
@@ -119,7 +120,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
  * tr_packets, given the binary from which the instruction sequence
  * was produced.
  */
-char *trdb_decompress_trace(bfd *abfd, struct list_head *packet_list);
+struct list_head *trdb_decompress_trace(bfd *abfd,
+                                        struct list_head *packet_list,
+                                        struct list_head *instr_list);
 
 /* Prints a list of tr_packets in a formatted manner to stdout. */
 void trdb_dump_packet_list(struct list_head *packet_list);
