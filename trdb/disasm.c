@@ -94,6 +94,24 @@ void dump_target_list()
 }
 
 
+bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma)
+{
+    return (vma >= section->vma
+            && vma < (section->vma + bfd_section_size(abfd, section)));
+}
+
+
+asection *get_section_for_vma(bfd *abfd, bfd_vma vma)
+{
+    asection *p;
+    for (p = abfd->sections; p != NULL; p = p->next) {
+        if (vma_in_section(abfd, p, vma)) {
+            return p;
+        }
+    }
+    return NULL;
+}
+
 void disassemble_section(bfd *abfd, asection *section, void *inf)
 {
     /* Do not disassemble sections without machine code*/

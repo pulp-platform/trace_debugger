@@ -63,6 +63,10 @@ void dump_section_names(bfd *);
 
 void dump_target_list();
 
+bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma);
+
+asection *get_section_for_vma(bfd *abfd, bfd_vma vma);
+
 void disassemble_section(bfd *, asection *, void *);
 
 void disassemble_block(bfd_byte *, size_t, struct disassembler_unit*);
