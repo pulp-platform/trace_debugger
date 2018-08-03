@@ -390,13 +390,15 @@ int test_disassemble_trace(const char *path)
     init_disassemble_info_for_pulp(&dinfo);
     disassemble_init_for_target(&dinfo);
     /* TODO: we need this global variable, maybe make this nicer */
-    disassemble_fn = print_insn_riscv;
-    if (!disassemble_fn) {
+    struct disassembler_unit dunit = {0};
+    dunit.dinfo = &dinfo;
+    dunit.disassemble_fn = print_insn_riscv;
+    if (!dunit.disassemble_fn) {
         LOG_ERR("No suitable disassembler found\n");
         return 0;
     }
 #ifdef TRDB_TEST_VERBOSE
-    trdb_disassemble_trace(samplecnt, *samples, &dinfo);
+    trdb_disassemble_trace(samplecnt, *samples, &dunit);
 #endif
     free(*samples);
     return 1;

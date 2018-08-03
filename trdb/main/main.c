@@ -29,15 +29,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-bfd *abfd = NULL;
-disassemble_info dinfo = {0};
-disassembler_ftype disassemble_fn;
+
+void other_print_address(bfd_vma addr, struct disassemble_info *dinfo)
+{
+    (*dinfo->fprintf_func)(dinfo->stream, "addr: 0x%08jx target: 0x%08lx",
+                           (uintmax_t)addr, dinfo->target);
+}
+
 
 int main(int argc, char *argv[argc + 1])
 {
+    bfd *abfd = NULL;
+    disassemble_info dinfo = {0};
+
     bfd_init();
 
-    abfd = bfd_openr("interrupt", NULL);
+    abfd = bfd_openr("data/interrupt", NULL);
 
     if (!(abfd && bfd_check_format(abfd, bfd_object)))
         return EXIT_FAILURE;
@@ -64,16 +71,19 @@ int main(int argc, char *argv[argc + 1])
     dump_target_list();
     dump_bin_info(abfd);
 
-    disassemble_fn = disassembler(abfd);
-    if (!disassemble_fn) {
+    /* set up disassembly context */
+    struct disassembler_unit dunit = {0};
+    dunit.dinfo = &dinfo;
+    dunit.disassemble_fn = disassembler(abfd);
+    if (!dunit.disassemble_fn) {
         fprintf(stderr, "No suitable disassembler found\n");
         return EXIT_FAILURE;
     }
     /* TODO: bfd_count_sections */
     dump_section_names(abfd);
     printf("num_sections: %d\n", bfd_count_sections(abfd));
-    disassemble_single_instruction(0x10, &dinfo);
-    bfd_map_over_sections(abfd, disassemble_section, &dinfo);
+    disassemble_single_instruction(0x10, &dunit);
+    bfd_map_over_sections(abfd, disassemble_section, &dunit);
 
     bfd_close(abfd);
 

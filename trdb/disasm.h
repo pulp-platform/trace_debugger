@@ -44,6 +44,10 @@
 #include "riscv_encoding.h"
 #undef DECLARE_INSN
 
+struct disassembler_unit {
+    disassembler_ftype disassemble_fn;
+    struct disassemble_info *dinfo;
+};
 
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
 
@@ -61,8 +65,8 @@ void dump_target_list();
 
 void disassemble_section(bfd *, asection *, void *);
 
-void disassemble_block(bfd_byte *, size_t, struct disassemble_info *);
+void disassemble_block(bfd_byte *, size_t, struct disassembler_unit*);
 
-void disassemble_single_instruction(uint32_t, struct disassemble_info *);
+void disassemble_single_instruction(uint32_t, struct disassembler_unit*);
 
 #endif

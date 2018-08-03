@@ -24,6 +24,7 @@
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
 #include "disasm.h"
+#include "util.h"
 #include "bfd.h"
 #include "dis-asm.h"
 #include "libiberty.h"
@@ -35,9 +36,6 @@
 #include <ctype.h>
 #include <limits.h>
 #include <inttypes.h>
-
-/* TODO: make this global or pass it via args */
-disassembler_ftype disassemble_fn;
 
 
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
@@ -103,8 +101,18 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
         != (SEC_CODE | SEC_HAS_CONTENTS)) {
         return;
     }
+    struct disassembler_unit *dunit = inf;
+    if (!dunit) {
+        LOG_ERR("disassembler_unit is NULL\n");
+        return;
+    }
 
-    struct disassemble_info *dinfo = inf;
+    struct disassemble_info *dinfo = dunit->dinfo;
+    disassembler_ftype disassemble_fn = dunit->disassemble_fn;
+    if (!dinfo || !disassemble_fn) {
+        LOG_ERR("Unitialized member of disassembler_unit");
+        return;
+    }
 
     bfd_size_type datasize = bfd_get_section_size(section);
     if (datasize == 0)
@@ -153,8 +161,20 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 
 
 void disassemble_block(bfd_byte *data, size_t len,
-                       struct disassemble_info *dinfo)
+                       struct disassembler_unit *dunit)
 {
+    if (!dunit) {
+        LOG_ERR("disassembler_unit is NULL\n");
+        return;
+    }
+
+    struct disassemble_info *dinfo = dunit->dinfo;
+    disassembler_ftype disassemble_fn = dunit->disassemble_fn;
+    if (!dinfo || !disassemble_fn) {
+        LOG_ERR("Unitialized member of disassembler_unit");
+        return;
+    }
+
     size_t pc = 0;
     dinfo->buffer = data;
     dinfo->buffer_vma = pc;
@@ -174,8 +194,20 @@ void disassemble_block(bfd_byte *data, size_t len,
 
 
 void disassemble_single_instruction(uint32_t instr,
-                                    struct disassemble_info *dinfo)
+                                    struct disassembler_unit *dunit)
 {
+    if (!dunit) {
+        LOG_ERR("disassembler_unit is NULL\n");
+        return;
+    }
+
+    struct disassemble_info *dinfo = dunit->dinfo;
+    disassembler_ftype disassemble_fn = dunit->disassemble_fn;
+    if (!dinfo || !disassemble_fn) {
+        LOG_ERR("Unitialized member of disassembler_unit\n");
+        return;
+    }
+
     size_t len = 8;
     size_t pc = 0;
     bfd_byte *data = malloc(len * sizeof(*data));
