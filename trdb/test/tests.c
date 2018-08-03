@@ -333,6 +333,7 @@ int test_parse_stimuli_line()
 
 int test_stimuli_to_tr_instr(const char *path)
 {
+    trdb_init();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
@@ -348,6 +349,7 @@ int test_stimuli_to_tr_instr(const char *path)
 
 int test_stimuli_to_packet_dump(const char *path)
 {
+    trdb_init();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
@@ -375,6 +377,7 @@ int test_stimuli_to_packet_dump(const char *path)
 
 int test_disassemble_trace(const char *path)
 {
+    trdb_init();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
