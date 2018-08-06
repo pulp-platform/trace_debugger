@@ -30,6 +30,12 @@
                 __func__, ##__VA_ARGS__);                                      \
     } while (false)
 /* ## is gcc extension */
+#define LOG_INFO(format, ...)                                                  \
+    do {                                                                       \
+        fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,          \
+                __func__, ##__VA_ARGS__);                                      \
+    } while (false)
+
 
 /* TODO: make this typesafer */
 #define TRDB_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
