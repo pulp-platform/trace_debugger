@@ -389,6 +389,32 @@ fail_malloc:
 }
 
 
+static int disassemble_at_pc(struct disassembler_unit *dunit, bfd_vma pc,
+                             int *status)
+{
+    *status = 0;
+    struct disassemble_info *dinfo = dunit->dinfo;
+    /* print instr address */
+    (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ", (uintmax_t)pc);
+    /* check if insn_info works */
+    dinfo->insn_info_valid = 0;
+    int instr_size = (*dunit->disassemble_fn)(pc, dinfo);
+    (*dinfo->fprintf_func)(dinfo->stream, "\n");
+    if (instr_size <= 0) {
+        LOG_ERR("Encountered instruction with %d bytes, stopping\n",
+                instr_size);
+        *status = -1;
+        return 0;
+    }
+    if (!dinfo->insn_info_valid) {
+        LOG_ERR("Encountered invalid instruction info\n");
+        *status = -1;
+        return 0;
+    }
+    return instr_size;
+}
+
+
 struct list_head *trdb_decompress_trace(bfd *abfd,
                                         struct list_head *packet_list,
                                         struct list_head *instr_list)
@@ -399,6 +425,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
      * host format
      */
     /* TODO: supports only statically linked elf executables */
+    /* TODO: interrupt/exception support: mret, sret, uret and similar */
     /* TODO: nested interrupt support */
     /* TODO: boot code hack */
 
@@ -406,31 +433,15 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
     bfd_vma start_address = abfd->start_address;
     asection *section = get_section_for_vma(abfd, start_address);
     if (!section) {
-        LOG_ERR("VMA not pointing to any section");
+        LOG_ERR("VMA not pointing to any section\n");
         goto fail;
     }
     LOG_ERR("Section of start_address:%s\n", section->name);
 
-    /* initialize libopcodes disassembler */
-    struct disassemble_info dinfo = {0};
-    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
-    dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.print_address_func = riscv32_print_address;
-
-    dinfo.flavour = bfd_get_flavour(abfd);
-    dinfo.arch = bfd_get_arch(abfd);
-    dinfo.mach = bfd_get_mach(abfd);
-    dinfo.endian = abfd->xvec->byteorder;
-    dinfo.disassembler_options = conf.no_aliases ? "no-aliases" : NULL;
-    disassemble_init_for_target(&dinfo);
-
     struct disassembler_unit dunit = {0};
+    struct disassemble_info dinfo = {0};
     dunit.dinfo = &dinfo;
-    dunit.disassemble_fn = disassembler(abfd);
-    if (!dunit.disassemble_fn) {
-        LOG_ERR("No suitable disassembler found\n");
-        goto fail;
-    }
+    init_disassembler_unit(&dunit, abfd, conf.no_aliases ? "no-aliases" : NULL);
 
     /* Alloc and config section data for disassembler */
     bfd_size_type section_size = bfd_get_section_size(section);
@@ -454,44 +465,82 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
     bfd_vma pc = start_address; /* TODO: well we get a sync packet anyway... */
     struct branch_map_state branch_map = {0};
+    /* we need to be able to look at two packets to make the right
+     * decompression decision
+     */
     struct tr_packet *packet;
+    struct tr_packet *next_packet;
 
-    list_for_each_entry_reverse(packet, packet_list, list)
+    struct list_head *p;
+    list_for_each_prev(p, packet_list)
     {
+        packet = list_entry(p, typeof(*packet), list);
+        /* this is a bit ugly, we determine the next packet if it exists */
+        if (p->prev != packet_list) {
+            next_packet = list_entry(p->prev, typeof(*next_packet), list);
+        } else {
+            next_packet = NULL;
+        }
         switch (packet->format) {
         case F_BRANCH_FULL:
+        case F_BRANCH_DIFF:
             branch_map.cnt = packet->branches;
             branch_map.bits = packet->branch_map;
+            branch_map.full = packet->branches == 31;
             break;
         case F_SYNC:
+            break;
+        case F_ADDR_ONLY:
             break;
         default:
             LOG_ERR("Unimplemented\n");
             goto fail;
         }
-
+        trdb_print_packet(packet);
         if (packet->format == F_BRANCH_FULL) {
-            LOG_ERR("F_BRANCH_FULL\n");
-            /* Consume all branches and consume address sync */
-            /*TODO: not true for discontinuous before last branch*/
-            bool sync_consumed = branch_map.cnt == 31;
-            while (!(branch_map.cnt == 0 && sync_consumed)) {
+            /* TODO: not true for discontinuous before last branch*/
+            /* bool sync_consumed = branch_map.cnt == 31; */
+            /* We have to find the instruction where we can apply the address
+             * information to. This might either be a discontinuity infromation
+             * or a sync up address. The search_discontinuity
+             * variable tells us which one is it
+             */
+            bool hit_address = false; /* TODO: for now we don't allow
+                                       * resync packets, see todo.org
+                                       */
+            /* We don't need to care about the address field if the branch map
+             * is full,(except if full and instr before last branch is
+             * discontinuity)
+             */
+            bool hit_discontinuity = branch_map.full;
 
-                /* print instr address */
-                (*dinfo.fprintf_func)(dinfo.stream, "0x%016jx  ",
-                                      (uintmax_t)pc);
-                dinfo.insn_info_valid = 0;
-                int size = (*dunit.disassemble_fn)(pc, &dinfo);
-                pc += size;
-                (*dinfo.fprintf_func)(dinfo.stream, "\n");
-                if (size <= 0) {
-                    LOG_ERR("Encountered instruction with %d bytes, stopping\n",
-                            size);
+            bool search_discontinuity = true;
+            if (next_packet == NULL
+                || (next_packet->format == F_SYNC
+                    && (next_packet->subformat == SF_START
+                        || next_packet->subformat == SF_EXCEPTION))) {
+                /* advance until address */
+                LOG_ERR("Searching for address\n");
+                search_discontinuity = false;
+            } else {
+                /* advance until unpredictable discontinuity */
+                LOG_ERR("Searching for discontinuity\n");
+                search_discontinuity = true;
+            }
+
+            while (
+                !(branch_map.cnt == 0 && (hit_discontinuity || hit_address))) {
+
+                int status = 0;
+                int size = disassemble_at_pc(&dunit, pc, &status);
+                if (status != 0)
                     goto fail;
-                }
-                if (!dinfo.insn_info_valid)
-                    LOG_ERR("Encountered invalid instruction info\n");
 
+                if (!search_discontinuity && branch_map.cnt == 0
+                    && pc == packet->address)
+                    hit_address = true;
+                /* advance pc */
+                pc += size;
 
                 /* we hit a conditional branch, follow or not and update map */
                 switch (dinfo.insn_type) {
@@ -508,17 +557,32 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                      * then we know that its actually a branch_map
                      * flush + discontinuity packet.
                      */
-                    if (dinfo.target == 0 && branch_map.cnt)
+                    if (branch_map.cnt > 1 && dinfo.target == 0)
                         LOG_ERR(
-                            "We can't predict the jump target, never happens \n");
-                    if (branch_map.cnt || dinfo.target != 0) {
+                            "Can't predict the jump target, never happens\n");
+
+                    if (branch_map.cnt == 1 && dinfo.target == 0) {
+                        if (!branch_map.full) {
+                            LOG_ERR(
+                                "Hit edge case of full branch_map and discontinuity, but branch_map was not full\n");
+                            goto fail;
+                        }
+                        LOG_ERR(
+                            "We hit the full branch_map + address edge case\n");
+                        pc = packet->address;
+                    } else if (branch_map.cnt > 0 || dinfo.target != 0) {
+                        /* we should not hit unpredictable
+                         * discontinuities */
                         pc = dinfo.target;
                     } else {
                         /* we finally hit a jump with unknown  destination,
                          * thus the information in this packet  is used up
                          */
+                        if (!search_discontinuity)
+                            LOG_ERR(
+                                "We were searching for an address and not a discontinuity\n");
                         pc = packet->address;
-                        sync_consumed = true;
+                        hit_discontinuity = true;
                     }
                     break;
 
@@ -531,7 +595,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                         branch_map.cnt--;
                         if (dinfo.target == 0)
                             LOG_ERR(
-                                "We can't predict the jump target, never happens \n");
+                                "Can't predict the jump target, never happens\n");
                         if (branch_taken)
                             pc = dinfo.target;
                         break;
@@ -547,28 +611,25 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     goto fail;
                 }
             }
+        } else if (packet->format == F_BRANCH_DIFF) {
+            LOG_ERR("F_BRANCH_DIFF decoding: not implemented yet\n");
+
         } else if (packet->format == F_SYNC) {
-            LOG_ERR("FSYNC\n");
-            /* sync pc */
+            /* Sync pc. As in todo.org described this doesn't work
+             * for resync (empty branch map) and context change. For
+             * now we dont allow both situations
+             */
             pc = packet->address;
             /* TODO: this is our small boothack for the PULP */
             if (pc == 0x000000001c008080) {
                 pc = start_address;
             }
 
-            /* print instr address */
-            (*dinfo.fprintf_func)(dinfo.stream, "0x%016jx  ", (uintmax_t)pc);
-            dinfo.insn_info_valid = 0;
-            int size = (*dunit.disassemble_fn)(pc, &dinfo);
-            pc += size;
-            (*dinfo.fprintf_func)(dinfo.stream, "\n");
-            if (size <= 0) {
-                LOG_ERR("Encountered instruction with %d bytes, stopping\n",
-                        size);
+            int status = 0;
+            int size = disassemble_at_pc(&dunit, pc, &status);
+            if (status != 0)
                 goto fail;
-            }
-            if (!dinfo.insn_info_valid)
-                LOG_ERR("Encountered invalid instruction info\n");
+            pc += size;
 
             switch (dinfo.insn_type) {
             case dis_nonbranch:
@@ -580,17 +641,15 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
                 if (dinfo.target == 0)
-                    LOG_ERR(
-                        "We can't predict the jump target, never happens\n");
+                    LOG_ERR("Can't predict the jump target, never happens\n");
                 pc = dinfo.target;
                 break;
 
             case dis_condbranch:
                 if (dinfo.target == 0)
-                    LOG_ERR(
-                        "We can't predict the jump target, never happens\\n");
+                    LOG_ERR("Can't predict the jump target, never happens\n");
                 if (packet->branch == 0) {
-                    LOG_ERR("Doing a branch from a F_SYNC packet");
+                    LOG_ERR("Doing a branch from a F_SYNC packet\n");
                     pc = dinfo.target;
                 }
                 break;
@@ -601,14 +660,102 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
                 goto fail;
             }
+        } else if (packet->format == F_ADDR_ONLY) {
+            /* We have to find the instruction where we can apply the address
+             * information to. This might either be a discontinuity infromation
+             * or a sync up address. So we stop either at the given address or
+             * use it on a discontinuity, whichever comes first
+             *
+             * TODO: we don't allow resync packets for now, that means
+             * we won't have issues distinguishing between address
+             * sync and unpredictable discontinuities. We can
+             * distinguish the case of advance to next address with
+             * advance to unpredictable discontinuitiy by inspecting
+             * the next packet. The events halt and unqualified happen
+             * if we don't have any more packets (next_packet == NULL,
+             * TODO: make this better). Exception and privilege change
+             * events always happen in packet pairs, which, again, we
+             * can figure out by looking at next_packet. If any test
+             * so far failed, then we know, since we are disallowing
+             * resync packets for now, that we are dealing with a
+             * unpredictable discontinuity.
+             */
+            bool hit_address = false;
+            bool hit_discontinuity = false;
+
+            bool search_discontinuity = true;
+            if (next_packet == NULL
+                || (next_packet->format == F_SYNC
+                    && (next_packet->subformat == SF_START
+                        || next_packet->subformat == SF_EXCEPTION))) {
+                /* advance until address */
+                LOG_ERR("Searching for address\n");
+                search_discontinuity = false;
+            } else {
+                /* advance until unpredictable discontinuity */
+                LOG_ERR("Searching for discontinuity\n");
+                search_discontinuity = true;
+            }
+
+            while (!(hit_address || hit_discontinuity)) {
+                int status = 0;
+                int size = disassemble_at_pc(&dunit, pc, &status);
+                if (status != 0)
+                    goto fail;
+
+                /* TODO: fix */
+                if (!conf.full_address) {
+                    LOG_ERR("full_address false: not implemented yet\n");
+                    goto fail;
+                }
+
+                if (!search_discontinuity && pc == packet->address)
+                    hit_address = true;
+
+                /* advance pc */
+                pc += size;
+
+                switch (dinfo.insn_type) {
+                case dis_nonbranch:
+                    /* We just normally advance the pc */
+                    break;
+                case dis_dref: /* TODO: is this useful? */
+                    break;
+
+                case dis_jsr:    /* There is not real difference ... */
+                case dis_branch: /* ... between those two */
+                    if (dinfo.target) {
+                        pc = dinfo.target;
+                    } else {
+                        if (!search_discontinuity)
+                            LOG_ERR(
+                                "We were searching for an address and not a discontinuity\n");
+                        LOG_ERR("Found the discontinuity\n");
+                        pc = packet->address;
+                        hit_discontinuity = true;
+                    }
+                    break;
+
+                case dis_condbranch:
+                    LOG_ERR(
+                        "We shouldn't hit conditional branches with F_ADDRESS_ONLY\n");
+                    break;
+
+                case dis_dref2:
+                case dis_condjsr:
+                case dis_noninsn:
+                    LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                    goto fail;
+                }
+            }
         }
-        /* this is just a security check */
+
+        /* this is just a sanity check */
         if (pc >= section->vma + stop_offset || pc < section->vma) {
             /* TODO: make it change section */
             LOG_ERR("PC left current section\n");
             goto fail;
         }
-        /* goto fail; /\* TODO: REMOVE THIS *\/ */
     }
 
 fail:
