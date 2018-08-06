@@ -82,7 +82,7 @@ int main(int argc, char *argv[argc + 1])
     /* TODO: bfd_count_sections */
     dump_section_names(abfd);
     printf("num_sections: %d\n", bfd_count_sections(abfd));
-    disassemble_single_instruction(0x10, &dunit);
+    disassemble_single_instruction(0x10, 0, &dunit);
     bfd_map_over_sections(abfd, disassemble_section, &dunit);
 
     bfd_close(abfd);

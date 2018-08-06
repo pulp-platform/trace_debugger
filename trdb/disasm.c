@@ -48,6 +48,42 @@ void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
 }
 
 
+int init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
+                                   char *options)
+{
+    init_disassemble_info(dinfo, stdout, (fprintf_ftype)fprintf);
+    dinfo->fprintf_func = (fprintf_ftype)fprintf;
+    dinfo->print_address_func = riscv32_print_address;
+
+    dinfo->flavour = bfd_get_flavour(abfd);
+    dinfo->arch = bfd_get_arch(abfd);
+    dinfo->mach = bfd_get_mach(abfd);
+    dinfo->endian = abfd->xvec->byteorder;
+    dinfo->disassembler_options = options;
+    disassemble_init_for_target(dinfo);
+    return 0;
+}
+
+
+int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
+                           char *options)
+{
+    /* initialize libopcodes disassembler */
+    struct disassemble_info *dinfo = dunit->dinfo;
+    if (!dinfo) {
+        LOG_ERR("disassemble_info is null\n");
+        return -1;
+    }
+    init_disassemble_info_from_bfd(dinfo, abfd, options);
+    dunit->disassemble_fn = disassembler(abfd);
+    if (!dunit->disassemble_fn) {
+        LOG_ERR("No suitable disassembler found\n");
+        return -1;
+    }
+    return 0;
+}
+
+
 void riscv32_print_address(bfd_vma addr, struct disassemble_info *dinfo)
 {
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx", (uintmax_t)addr);
@@ -161,7 +197,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 
     printf("Disassembly of section %s:\n", section->name);
     while (addr_offset < stop_offset) {
-	/* print instr address */
+        /* print instr address */
         (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
                                (uintmax_t)(section->vma + addr_offset));
         int size = (*disassemble_fn)(section->vma + addr_offset, dinfo);
@@ -211,7 +247,7 @@ void disassemble_block(bfd_byte *data, size_t len,
 }
 
 
-void disassemble_single_instruction(uint32_t instr,
+void disassemble_single_instruction(uint32_t instr, uint32_t addr,
                                     struct disassembler_unit *dunit)
 {
     if (!dunit) {
@@ -227,7 +263,7 @@ void disassemble_single_instruction(uint32_t instr,
     }
 
     size_t len = 8;
-    size_t pc = 0;
+    /* size_t pc = 0; */
     bfd_byte *data = malloc(len * sizeof(*data));
     if (!data) {
         perror("disassemble_single_instruction:");
@@ -248,10 +284,10 @@ void disassemble_single_instruction(uint32_t instr,
         data[3] = (bfd_byte)((instr >> 24) & 0xff);
     }
     dinfo->buffer = data;
-    dinfo->buffer_vma = pc;
+    dinfo->buffer_vma = addr;
     dinfo->buffer_length = len;
 
-    int size = (*disassemble_fn)(pc, dinfo);
+    int size = (*disassemble_fn)(addr, dinfo);
     (*dinfo->fprintf_func)(dinfo->stream, "\n");
     if (size <= 0) {
         fprintf(stderr, "Encountered instruction with %d bytes, stopping",

@@ -51,6 +51,12 @@ struct disassembler_unit {
 
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
 
+int init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
+                                   char *options);
+
+int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
+                           char *options);
+
 void dump_section_header(bfd *, asection *, void *);
 
 void dump_bin_info(bfd *);
@@ -69,8 +75,8 @@ asection *get_section_for_vma(bfd *abfd, bfd_vma vma);
 
 void disassemble_section(bfd *, asection *, void *);
 
-void disassemble_block(bfd_byte *, size_t, struct disassembler_unit*);
+void disassemble_block(bfd_byte *, size_t, struct disassembler_unit *);
 
-void disassemble_single_instruction(uint32_t, struct disassembler_unit*);
+void disassemble_single_instruction(uint32_t, uint32_t, struct disassembler_unit *);
 
 #endif

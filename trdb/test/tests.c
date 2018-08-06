@@ -375,31 +375,43 @@ int test_stimuli_to_packet_dump(const char *path)
 }
 
 
-int test_disassemble_trace(const char *path)
+int test_disassemble_trace(const char *bin_path, const char *trace_path)
 {
     trdb_init();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_tr_instr(path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_tr_instr(trace_path, samples, &status);
     if (status != 0) {
         LOG_ERR("Stimuli to tr_instr failed\n");
         return 0;
     }
 
-    disassemble_info dinfo = {0};
-    /* TODO: make this API nicer in disasm.c */
-    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
-    init_disassemble_info_for_pulp(&dinfo);
-    disassemble_init_for_target(&dinfo);
-    /* TODO: we need this global variable, maybe make this nicer */
-    struct disassembler_unit dunit = {0};
-    dunit.dinfo = &dinfo;
-    dunit.disassemble_fn = print_insn_riscv;
-    if (!dunit.disassemble_fn) {
-        LOG_ERR("No suitable disassembler found\n");
+    bfd_init();
+    bfd *abfd = bfd_openr(bin_path, NULL);
+
+    if (!(abfd && bfd_check_format(abfd, bfd_object))) {
+        bfd_perror("test_decompress_trace");
         return 0;
     }
+
+    struct disassembler_unit dunit = {0};
+    struct disassemble_info dinfo = {0};
+    dunit.dinfo = &dinfo;
+    init_disassembler_unit(&dunit, abfd, NULL);
+
+    /* disassemble_info dinfo = {0}; */
+    /* /\* TODO: make this API nicer in disasm.c *\/ */
+    /* init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf); */
+    /* init_disassemble_info_for_pulp(&dinfo); */
+    /* disassemble_init_for_target(&dinfo); */
+    /* struct disassembler_unit dunit = {0}; */
+    /* dunit.dinfo = &dinfo; */
+    /* dunit.disassemble_fn = print_insn_riscv; */
+    /* if (!dunit.disassemble_fn) { */
+    /*     LOG_ERR("No suitable disassembler found\n"); */
+    /*     return 0; */
+    /* } */
 #ifdef TRDB_TEST_VERBOSE
     trdb_disassemble_trace(samplecnt, *samples, &dunit);
 #endif
@@ -466,7 +478,7 @@ int main(int argc, char *argv[argc + 1])
     /* NOTE: there is a memory leak ~230 bytes in riscv-dis.c with struct
      * riscv_subset for each instantiation of a disassembler.
      */
-    /* RUN_TEST(test_disassemble_trace, "data/trdb_stimuli"); */
+    RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
     RUN_TEST(test_decompress_trace, "data/interrupt", "data/trdb_stimuli");
 
     return _trdb_test_result ? EXIT_SUCCESS : EXIT_FAILURE;

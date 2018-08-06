@@ -887,8 +887,11 @@ fail:
 void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                             struct disassembler_unit *dunit)
 {
+    struct disassemble_info *dinfo = dunit->dinfo;
     for (size_t i = 0; i < len; i++) {
-        disassemble_single_instruction(trace[i].instr, dunit);
+        (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
+                               (uintmax_t)trace[i].iaddr);
+        disassemble_single_instruction(trace[i].instr, trace[i].iaddr, dunit);
     }
 }
 
