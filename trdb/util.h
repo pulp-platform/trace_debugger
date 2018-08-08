@@ -23,19 +23,36 @@
  */
 #include <stdio.h>
 #include <inttypes.h>
-
+#define TRDB_LEVEL 3
+#define TRDB_TRACE 1 /* TODO: set this for release builds */
 #define LOG_ERR(format, ...)                                                   \
     do {                                                                       \
-        fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,          \
-                __func__, ##__VA_ARGS__);                                      \
+        if (TRDB_LEVEL > 0)                                                    \
+            fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
+                    __func__, ##__VA_ARGS__);                                  \
     } while (false)
 /* ## is gcc extension */
-#define LOG_INFO(format, ...)                                                  \
+
+#define LOG_WARN(format, ...)                                                  \
     do {                                                                       \
-        fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,          \
-                __func__, ##__VA_ARGS__);                                      \
+        if (TRDB_LEVEL > 1)                                                    \
+            fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
+                    __func__, ##__VA_ARGS__);                                  \
     } while (false)
 
+#define LOG_INFO(format, ...)                                                  \
+    do {                                                                       \
+        if (TRDB_LEVEL > 2)                                                    \
+            fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
+                    __func__, ##__VA_ARGS__);                                  \
+    } while (false)
+
+#define LOG_TRACE(format, ...)                                                 \
+    do {                                                                       \
+        if (TRDB_TRACE)                                                        \
+            fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
+                    __func__, ##__VA_ARGS__);                                  \
+    } while (false)
 
 /* TODO: make this typesafer */
 #define TRDB_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
