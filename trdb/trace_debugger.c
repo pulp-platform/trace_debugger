@@ -711,11 +711,33 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             LOG_ERR("F_BRANCH_DIFF decoding: not implemented yet\n");
 
         } else if (packet->format == F_SYNC) {
-            /* Sync pc. As in todo.org described this doesn't work
-             * for resync (empty branch map) and context change. For
-             * now we dont allow both situations
+            /* Sync pc. As in todo.org described this doesn't work for resync
+             * (empty branch map) and context change. For now we dont allow both
+             * situations
              */
             pc = packet->address;
+
+            /* since we are abruptly changing the pc we have to check if we
+             * leave the section before we can disassemble. This is really ugly
+             * TODO: fix
+             */
+            if (pc >= section->vma + stop_offset || pc < section->vma) {
+                free_section_for_debugging(&dinfo);
+
+                section = get_section_for_vma(abfd, pc);
+                if (!section) {
+                    LOG_ERR("VMA (PC) not pointing to any section\n");
+                    goto fail;
+                }
+                stop_offset =
+                    bfd_get_section_size(section) / dinfo.octets_per_byte;
+
+                if (alloc_section_for_debugging(abfd, section, &dinfo)) {
+                    LOG_ERR("Failed alloc_section_for_debugging\n");
+                    goto fail;
+                }
+                LOG_INFO("Switched to section:%s\n", section->name);
+            }
 
             int status = 0;
             int size = disassemble_at_pc(&dunit, pc, &status);
