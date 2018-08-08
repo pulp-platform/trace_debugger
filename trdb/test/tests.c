@@ -88,9 +88,6 @@ bool test_packet_to_char(uint32_t shift)
                            0xbe, 0xad, 0xde, 0xaa, 0x00};
     shiftl_array(expected0, TRDB_ARRAY_SIZE(expected0), shift);
 
-    for (size_t i; i < sizeof(expected0); i++) {
-        /* printf("test: %" PRIx8 "\n", expected0[i]); */
-    }
     /* this is surely enough space */
     uint8_t *bin = malloc(sizeof(struct tr_packet));
     memset(bin, 0, sizeof(struct tr_packet));

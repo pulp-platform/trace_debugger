@@ -72,13 +72,26 @@ static struct trdb_state thisc = {0};
 static struct trdb_state nextc = {0};
 
 /* Current state of the cpu during decompression. Allows one to
- * precisely emit a sequence  tr_instr. The members mostly match
- * tr_packet but we use a seperate struct to make it clear that there
- * is a conceptual difference.
+ * precisely emit a sequence  tr_instr. Handles the exception stack
+ * (well here we assume that programs actually do nested exception
+ * handling properly) and hardware loops (only the TODO: immediate
+ * version for now).
+ */
+/* TODO: Note on hw loops interrupted by an interrupt: look at after
+ * the interrupt how many instructions of the loop are executed to
+ * figure out in which loop number we got interrupted
  */
 struct trdb_dec_state {
+    /* absolute loop addresses */
+    uint32_t lp_start0;
+    uint32_t lp_end0;
+    uint32_t lp_cnt0;
+    uint32_t lp_start1;
+    uint32_t lp_end1;
+    uint32_t lp_cnt1;
 };
 
+static struct trdb_dec_state trdb_dec_state = {0};
 /* TODO: interrupt stack (nested interrupts) for decompression? */
 
 /* Responsible to hold current branch state, that is the sequence of taken/not
@@ -111,10 +124,11 @@ static struct filter_state filter = {0};
 static bool is_branch(uint32_t instr)
 {
     /* static bool is_##code##_instr(long insn) */
-    return is_beq_instr(instr) || is_bne_instr(instr) || is_blt_instr(instr)
-           || is_bge_instr(instr) || is_bltu_instr(instr)
-           || is_bgeu_instr(instr);
-    /* is_jalr_instr(instr) is_jal_instr(instr) */
+    bool is_riscv_branch = is_beq_instr(instr) || is_bne_instr(instr)
+                           || is_blt_instr(instr) || is_bge_instr(instr)
+                           || is_bltu_instr(instr) || is_bgeu_instr(instr);
+    bool is_pulp_branch = is_p_bneimm_instr(instr) || is_p_beqimm_instr(instr);
+    return is_riscv_branch || is_pulp_branch;
     /* auipc */
 }
 
@@ -138,6 +152,14 @@ static bool is_unpred_discontinuity(uint32_t instr)
 }
 
 
+static bool is_unsupported(uint32_t instr)
+{
+    return is_lp_setup_instr(instr) || is_lp_counti_instr(instr)
+           || is_lp_count_instr(instr) || is_lp_endi_instr(instr)
+           || is_lp_starti_instr(instr) || is_lp_setupi_instr(instr);
+}
+
+
 void trdb_init()
 {
     conf = (struct trdb_config){
@@ -147,6 +169,8 @@ void trdb_init()
     nextc = (struct trdb_state){0};
     branch_map = (struct branch_map_state){0};
     filter = (struct filter_state){0};
+
+    trdb_dec_state = (struct trdb_dec_state){0};
 }
 
 
@@ -193,6 +217,13 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             continue; /* end of cycle */
         }
 
+        if (is_unsupported(instrs[i].instr)) {
+            LOG_ERR("Instruction is not supported for compression: 0x%" PRIx32
+                    " at addr: 0x%" PRIx32 "\n",
+                    instrs[i].instr, instrs[i].iaddr);
+            goto fail;
+        }
+
         if (filter.resync_cnt++ == conf.resync_max) {
             filter.resync_pend = true;
             filter.resync_cnt = 0;
@@ -208,7 +239,6 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
                 branch_map.full = true;
             }
         }
-
         /* We trace the packet before the trapped instruction and the
          * first one of the exception handler
          */
@@ -415,6 +445,53 @@ static int disassemble_at_pc(struct disassembler_unit *dunit, bfd_vma pc,
 }
 
 
+static void free_section_for_debugging(struct disassemble_info *dinfo)
+{
+    if (!dinfo)
+        return;
+    free(dinfo->buffer);
+    dinfo->buffer_vma = 0;
+    dinfo->buffer_length = 0;
+    dinfo->section = NULL;
+}
+
+
+static int alloc_section_for_debugging(bfd *abfd, asection *section,
+                                       struct disassemble_info *dinfo)
+{
+    if (!dinfo || !section) {
+        LOG_ERR("disassemble_info or asection is NULL\n");
+        return -1;
+    }
+
+    bfd_size_type section_size = bfd_get_section_size(section);
+
+    bfd_byte *section_data = malloc(section_size);
+    if (!section_data) {
+        perror("malloc");
+        return -1;
+    }
+
+    if (!bfd_get_section_contents(abfd, section, section_data, 0,
+                                  section_size)) {
+        bfd_perror("bfd_get_section_contents");
+        free(section_data);
+        return -1;
+    }
+
+    dinfo->buffer = section_data;
+    dinfo->buffer_vma = section->vma;
+    dinfo->buffer_length = section_size;
+    dinfo->section = section;
+    return 0;
+}
+
+static bfd_vma advance_pc(bfd_vma pc, int step, struct trdb_dec_state state)
+{
+    return pc + step;
+}
+
+
 struct list_head *trdb_decompress_trace(bfd *abfd,
                                         struct list_head *packet_list,
                                         struct list_head *instr_list)
@@ -436,7 +513,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
         LOG_ERR("VMA not pointing to any section\n");
         goto fail;
     }
-    LOG_ERR("Section of start_address:%s\n", section->name);
+    LOG_INFO("Section of start_address:%s\n", section->name);
 
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
@@ -444,26 +521,14 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
     init_disassembler_unit(&dunit, abfd, conf.no_aliases ? "no-aliases" : NULL);
 
     /* Alloc and config section data for disassembler */
-    bfd_size_type section_size = bfd_get_section_size(section);
-    bfd_vma stop_offset = section_size / dinfo.octets_per_byte;
+    bfd_vma stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
 
-    bfd_byte *section_data = malloc(section_size);
-    if (!section_data) {
-        perror("malloc");
+    if (alloc_section_for_debugging(abfd, section, &dinfo)) {
+        LOG_ERR("Failed alloc_section_for_debugging\n");
         goto fail;
     }
-    /* TODO: bfd_malloc_and_get_section */
-    if (!bfd_get_section_contents(abfd, section, section_data, 0,
-                                  section_size)) {
-        bfd_perror("bfd_get_section_contents");
-        goto fail;
-    }
-    dinfo.buffer = section_data;
-    dinfo.buffer_vma = section->vma;
-    dinfo.buffer_length = section_size;
-    dinfo.section = section;
-
     bfd_vma pc = start_address; /* TODO: well we get a sync packet anyway... */
+
     struct branch_map_state branch_map = {0};
     /* we need to be able to look at two packets to make the right
      * decompression decision
@@ -481,6 +546,28 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
         } else {
             next_packet = NULL;
         }
+
+        /* Sometimes we leave the current section (e.g. changing from
+         * the .start to the .text section), so let's load the
+         * appropriate section and remove the old one
+         */
+        if (pc >= section->vma + stop_offset || pc < section->vma) {
+            free_section_for_debugging(&dinfo);
+
+            section = get_section_for_vma(abfd, pc);
+            if (!section) {
+                LOG_ERR("VMA (PC) not pointing to any section\n");
+                goto fail;
+            }
+            stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
+
+            if (alloc_section_for_debugging(abfd, section, &dinfo)) {
+                LOG_ERR("Failed alloc_section_for_debugging\n");
+                goto fail;
+            }
+            LOG_INFO("Switched to section:%s\n", section->name);
+        }
+
         switch (packet->format) {
         case F_BRANCH_FULL:
         case F_BRANCH_DIFF:
@@ -496,7 +583,9 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             LOG_ERR("Unimplemented\n");
             goto fail;
         }
-        trdb_print_packet(packet);
+        /* TODO: change this behaviour */
+        if (TRDB_TRACE)
+            trdb_print_packet(packet);
         if (packet->format == F_BRANCH_FULL) {
             /* TODO: not true for discontinuous before last branch*/
             /* bool sync_consumed = branch_map.cnt == 31; */
@@ -520,11 +609,11 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     && (next_packet->subformat == SF_START
                         || next_packet->subformat == SF_EXCEPTION))) {
                 /* advance until address */
-                LOG_ERR("Searching for address\n");
+                LOG_INFO("Searching for address\n");
                 search_discontinuity = false;
             } else {
                 /* advance until unpredictable discontinuity */
-                LOG_ERR("Searching for discontinuity\n");
+                LOG_INFO("Searching for discontinuity\n");
                 search_discontinuity = true;
             }
 
@@ -563,13 +652,19 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
                     if (branch_map.cnt == 1 && dinfo.target == 0) {
                         if (!branch_map.full) {
-                            LOG_ERR(
-                                "Hit edge case of full branch_map and discontinuity, but branch_map was not full\n");
-                            goto fail;
+                            LOG_INFO(
+                                "We hit the not-full branch_map + address edge case, (branch following discontinuity is included in this packet)\n");
+                            if (!search_discontinuity)
+                                LOG_ERR(
+                                    "Not searching for discontinuity but hit not-full branch + address edge case\n");
+                            /* TODO: should I poison addr? */
+                            pc = packet->address;
+                        } else {
+                            LOG_INFO(
+                                "We hit the full branch_map + address edge case\n");
+                            pc = packet->address;
                         }
-                        LOG_ERR(
-                            "We hit the full branch_map + address edge case\n");
-                        pc = packet->address;
+                        hit_discontinuity = true;
                     } else if (branch_map.cnt > 0 || dinfo.target != 0) {
                         /* we should not hit unpredictable
                          * discontinuities */
@@ -583,6 +678,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                                 "We were searching for an address and not a discontinuity\n");
                         pc = packet->address;
                         hit_discontinuity = true;
+                        LOG_INFO("Found the discontinuity\n");
                     }
                     break;
 
@@ -620,10 +716,6 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
              * now we dont allow both situations
              */
             pc = packet->address;
-            /* TODO: this is our small boothack for the PULP */
-            if (pc == 0x000000001c008080) {
-                pc = start_address;
-            }
 
             int status = 0;
             int size = disassemble_at_pc(&dunit, pc, &status);
@@ -689,11 +781,11 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     && (next_packet->subformat == SF_START
                         || next_packet->subformat == SF_EXCEPTION))) {
                 /* advance until address */
-                LOG_ERR("Searching for address\n");
+                LOG_INFO("Searching for address\n");
                 search_discontinuity = false;
             } else {
                 /* advance until unpredictable discontinuity */
-                LOG_ERR("Searching for discontinuity\n");
+                LOG_INFO("Searching for discontinuity\n");
                 search_discontinuity = true;
             }
 
@@ -730,7 +822,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                         if (!search_discontinuity)
                             LOG_ERR(
                                 "We were searching for an address and not a discontinuity\n");
-                        LOG_ERR("Found the discontinuity\n");
+                        LOG_INFO("Found the discontinuity\n");
                         pc = packet->address;
                         hit_discontinuity = true;
                     }
@@ -749,17 +841,10 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 }
             }
         }
-
-        /* this is just a sanity check */
-        if (pc >= section->vma + stop_offset || pc < section->vma) {
-            /* TODO: make it change section */
-            LOG_ERR("PC left current section\n");
-            goto fail;
-        }
     }
 
 fail:
-    free(section_data);
+    free_section_for_debugging(&dinfo);
     return NULL;
 }
 
@@ -1038,6 +1123,8 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
     for (size_t i = 0; i < len; i++) {
         (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
                                (uintmax_t)trace[i].iaddr);
+        (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ",
+                               (uintmax_t)trace[i].instr);
         disassemble_single_instruction(trace[i].instr, trace[i].iaddr, dunit);
     }
 }
