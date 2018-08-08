@@ -1147,6 +1147,8 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                                (uintmax_t)trace[i].iaddr);
         (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ",
                                (uintmax_t)trace[i].instr);
+        (*dinfo->fprintf_func)(dinfo->stream, "%s",
+                               trace[i].exception ? "TRAP!  " : "");
         disassemble_single_instruction(trace[i].instr, trace[i].iaddr, dunit);
     }
 }
