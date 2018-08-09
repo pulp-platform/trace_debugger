@@ -63,6 +63,8 @@ struct trdb_state {
     bool unqualified;
     bool exception;
     bool unpred_disc; /* unpredicted discontinuity*/
+    bool emitted_exception_sync;
+
     uint32_t privilege;
     bool privilege_change;
 };
@@ -207,6 +209,8 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
 
         thisc.privilege_change = (thisc.privilege != lastc.privilege);
         nextc.privilege_change = (thisc.privilege != nextc.privilege);
+        /* TODO: clean this up, proper initial state per round required */
+        thisc.emitted_exception_sync = false;
 
         bool firstc_qualified = !lastc.qualified && thisc.qualified;
 
@@ -253,11 +257,16 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             tr->subformat = 1;   /* exception */
             tr->context = 0;     /* TODO: what comes here? */
             tr->privilege = instrs[i].priv;
+            /* TODO: actually we should clear the branch map if we really
+             * fill out this entry, else we have recorded twice (in the next
+             * packet)
+             */
             if (is_branch(instrs[i].instr)
                 && !branch_taken(instrs[i], instrs[i + 1]))
                 tr->branch = 1;
             else
                 tr->branch = 0;
+
             tr->address = instrs[i].iaddr;
             /* With this packet we record last cycles exception
              * information. It's not possible for (i==0 &&
@@ -270,7 +279,43 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             tr->tval = instrs[i - 1].tval;
             list_add(&tr->list, packet_list);
 
+            thisc.emitted_exception_sync = true;
             filter.resync_pend = false; /* TODO: how to handle this */
+            /* end of cycle */
+
+        } else if (lastc.emitted_exception_sync) {
+            /* First we assume that the vector table entry is a jump. Since that
+             * entry can change during runtime, we need to emit the jump
+             * destination address, which is the second instruction of the trap
+             * handler. This a bit hacky and made to work for the PULP. If
+             * someone puts something else than a jump instruction there then
+             * all bets are off. This is a custom change.
+             * TODO: merge this with lastc.unpred_discon
+             */
+            /* Send te_inst:
+             * format 0/1/2
+             */
+            ALLOC_INIT_PACKET(tr);
+            /* TODO: for now only full address */
+            if (!full_address) {
+                LOG_ERR("full_address false: Not implemented yet\n");
+                goto fail;
+            }
+            if (branch_map.cnt == 0) {
+                tr->format = F_ADDR_ONLY;
+                tr->address = full_address ? instrs[i].iaddr : 0;
+
+                assert(branch_map.bits == 0);
+            } else {
+                tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
+                tr->branches = branch_map.cnt;
+                tr->branch_map = branch_map.bits;
+                tr->address = full_address ? instrs[i].iaddr : 0;
+
+                branch_map = (struct branch_map_state){0};
+            }
+            list_add(&tr->list, packet_list);
+
             /* end of cycle */
 
         } else if (firstc_qualified || thisc.unhalted || thisc.privilege_change
@@ -533,18 +578,26 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
     /* we need to be able to look at two packets to make the right
      * decompression decision
      */
-    struct tr_packet *packet;
-    struct tr_packet *next_packet;
+    struct tr_packet *last_packet = NULL;
+    struct tr_packet *packet = NULL;
+    struct tr_packet *next_packet = NULL;
 
     struct list_head *p;
     list_for_each_prev(p, packet_list)
     {
         packet = list_entry(p, typeof(*packet), list);
-        /* this is a bit ugly, we determine the next packet if it exists */
+        /* this is a bit ugly, we determine the next packet if it exists. Also
+         * we have to iterate the list in reverse order
+         */
         if (p->prev != packet_list) {
             next_packet = list_entry(p->prev, typeof(*next_packet), list);
         } else {
             next_packet = NULL;
+        }
+        if (p->next != packet_list) {
+            last_packet = list_entry(p->next, typeof(*last_packet), list);
+        } else {
+            last_packet = NULL;
         }
 
         /* Sometimes we leave the current section (e.g. changing from
@@ -586,7 +639,86 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
         /* TODO: change this behaviour */
         if (TRDB_TRACE)
             trdb_print_packet(packet);
-        if (packet->format == F_BRANCH_FULL) {
+        if (last_packet && last_packet->format == F_SYNC
+            && last_packet->subformat == SF_EXCEPTION) {
+            /* exceptions come with three packets: flush, F_SYNC, and
+             * F_ADDR_ONLY/F_BRANCH_*. The last packet is kinda of a hack to
+             * bridge over the vector table jump instruction (which can change
+             * at runtime)
+             */
+            assert(packet->format == F_BRANCH_FULL
+                   || packet->format == F_ADDR_ONLY
+                   || packet->format == F_BRANCH_DIFF);
+            LOG_INFO("Jumping over vector table\n");
+
+            pc = packet->address;
+
+            /* since we are abruptly changing the pc we have to check if we
+             * leave the section before we can disassemble. This is really ugly
+             * TODO: fix
+             */
+            if (pc >= section->vma + stop_offset || pc < section->vma) {
+                free_section_for_debugging(&dinfo);
+
+                section = get_section_for_vma(abfd, pc);
+                if (!section) {
+                    LOG_ERR("VMA (PC) not pointing to any section\n");
+                    goto fail;
+                }
+                stop_offset =
+                    bfd_get_section_size(section) / dinfo.octets_per_byte;
+
+                if (alloc_section_for_debugging(abfd, section, &dinfo)) {
+                    LOG_ERR("Failed alloc_section_for_debugging\n");
+                    goto fail;
+                }
+                LOG_INFO("Switched to section:%s\n", section->name);
+            }
+
+            int status = 0;
+            int size = disassemble_at_pc(&dunit, pc, &status);
+            if (status != 0)
+                goto fail;
+
+            pc += size; /* normal case */
+
+            switch (dinfo.insn_type) {
+            case dis_nonbranch:
+                /* We just normally advance the pc */
+                break;
+            case dis_dref: /* TODO: is this useful? */
+                break;
+
+            case dis_jsr:    /* There is not real difference ... */
+            case dis_branch: /* ... between those two */
+                if (dinfo.target == 0) {
+                    LOG_ERR(
+                        "First instruction after vector table is unpredictable discontinuity\n");
+                    LOG_ERR("TODO: fix this case by looking at next packet\n");
+                    goto fail;
+                }
+                pc = dinfo.target;
+                break;
+
+            case dis_condbranch:
+                if (dinfo.target == 0)
+                    LOG_ERR("Can't predict the jump target, never happens\n");
+                if (packet->branches != 1)
+                    LOG_ERR("Wrong number of branch entries\n");
+                if (packet->branch_map & 1) {
+                    LOG_ERR(
+                        "Doing a branch in the first intruction after vector table jump\n");
+                    pc = dinfo.target;
+                }
+                break;
+
+            case dis_dref2:
+            case dis_condjsr:
+            case dis_noninsn:
+                LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                goto fail;
+            }
+        } else if (packet->format == F_BRANCH_FULL) {
             /* TODO: not true for discontinuous before last branch*/
             /* bool sync_consumed = branch_map.cnt == 31; */
             /* We have to find the instruction where we can apply the address
