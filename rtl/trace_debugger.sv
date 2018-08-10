@@ -22,7 +22,8 @@ module trace_debugger
      input logic [31:0] tval_i,
      input logic [ 2:0] priv_i,
      input logic [31:0] iaddr_i,
-     input logic [31:0] instr_i);
+     input logic [31:0] instr_i,
+     input logic        compressed_i);
 
     logic               ivalid_q, ivalid_d;
     logic               iexception_q, iexception_d;

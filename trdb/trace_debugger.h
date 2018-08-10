@@ -46,6 +46,7 @@ struct tr_instr {
     uint32_t priv : PRIVLEN;   /* PRIVLEN */
     uint32_t iaddr : XLEN;     /* XLEN */
     uint32_t instr : ILEN;     /* ILEN */
+    bool compressed;
 };
 
 /* TODO: maybe make enums */

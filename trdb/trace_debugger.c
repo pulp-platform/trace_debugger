@@ -46,6 +46,8 @@ struct trdb_config {
     bool set_trace;
     /* set to true to always diassemble to most general representation */
     bool no_aliases;
+    /* decoder can assume interrupts are nested properly */
+    bool assume_nested_interrupts;
 };
 static struct trdb_config conf = {0};
 
@@ -91,9 +93,15 @@ struct trdb_dec_state {
     uint32_t lp_start1;
     uint32_t lp_end1;
     uint32_t lp_cnt1;
+    /* nested interrupt stacks for each privilege mode*/
+    /* uint32_t m_exc_stack; */
+    /* uint32_t s_exc_stack; */
+    /* uint32_t u_exc_stack; */
+    /* record current privilege level */
+    uint32_t privilege : PRIVLEN;
 };
 
-static struct trdb_dec_state trdb_dec_state = {0};
+static struct trdb_dec_state decompression_state = {0};
 /* TODO: interrupt stack (nested interrupts) for decompression? */
 
 /* Responsible to hold current branch state, that is the sequence of taken/not
@@ -126,6 +134,8 @@ static struct filter_state filter = {0};
 static bool is_branch(uint32_t instr)
 {
     /* static bool is_##code##_instr(long insn) */
+    /* TODO: add rvc instr */
+    assert((instr & 3) == 3);
     bool is_riscv_branch = is_beq_instr(instr) || is_bne_instr(instr)
                            || is_blt_instr(instr) || is_bge_instr(instr)
                            || is_bltu_instr(instr) || is_bgeu_instr(instr);
@@ -137,9 +147,15 @@ static bool is_branch(uint32_t instr)
 
 static bool branch_taken(struct tr_instr before, struct tr_instr after)
 {
-    /* TODO: can this cause issues with RVC + degenerate jump (+2) ?*/
-    return !(before.iaddr + 4 == after.iaddr
-             || before.iaddr + 2 == after.iaddr);
+    /* can this cause issues with RVC + degenerate jump (+2)? -> yes*/
+    /* TODO: this definitely doens't work for 64 bit instructions */
+    /* since we have already decompressed instructions, but still compressed
+     * addresses we need this additional flag to tell us what the isntruction
+     * originally was. So we can't tell by looking at the lower two bits of
+     * instr.
+     */
+    return before.compressed ? !(before.iaddr + 2 == after.iaddr)
+                             : !(before.iaddr + 4 == after.iaddr);
 }
 
 
@@ -150,7 +166,9 @@ static bool branch_taken(struct tr_instr before, struct tr_instr after)
  */
 static bool is_unpred_discontinuity(uint32_t instr)
 {
-    return is_jalr_instr(instr);
+    /* Should also work just fine with rvc instructions */
+    return is_jalr_instr(instr) || is_mret_instr(instr) || is_sret_instr(instr)
+           || is_uret_instr(instr);
 }
 
 
@@ -172,7 +190,7 @@ void trdb_init()
     branch_map = (struct branch_map_state){0};
     filter = (struct filter_state){0};
 
-    trdb_dec_state = (struct trdb_dec_state){0};
+    decompression_state = (struct trdb_dec_state){0};
 }
 
 
@@ -531,6 +549,32 @@ static int alloc_section_for_debugging(bfd *abfd, asection *section,
     return 0;
 }
 
+static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
+                             struct disassemble_info *dinfo)
+{
+    /* return (*dinfo->read_memory_func)(pc, myaddr, len, dinfo); */
+    bfd_byte packet[2];
+    *instr = 0;
+    bfd_vma n;
+    int status;
+
+    /* Instructions are a sequence of 2-byte packets in little-endian order.  */
+    for (n = 0; n < sizeof(uint64_t) && n < riscv_instr_len(*instr); n += 2) {
+        status = (*dinfo->read_memory_func)(pc + n, packet, 2, dinfo);
+        if (status != 0) {
+            /* Don't fail just because we fell off the end.  */
+            if (n > 0)
+                break;
+            (*dinfo->memory_error_func)(status, pc, dinfo);
+            return status;
+        }
+
+        (*instr) |= ((uint64_t)bfd_getl16(packet)) << (8 * n);
+    }
+    return status;
+}
+
+
 static bfd_vma advance_pc(bfd_vma pc, int step, struct trdb_dec_state state)
 {
     return pc + step;
@@ -680,15 +724,22 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             if (status != 0)
                 goto fail;
 
+            uint64_t instr_at_pc = 0;
+            if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
+                LOG_ERR("Reading instr at pc failed\n");
+                goto fail;
+            }
+
             pc += size; /* normal case */
 
             switch (dinfo.insn_type) {
             case dis_nonbranch:
-                /* We just normally advance the pc */
-                break;
-            case dis_dref: /* TODO: is this useful? */
-                break;
-
+                /* TODO: we need this hack since {m,s,u} ret are not classified
+                 */
+                if (!is_unpred_discontinuity(instr_at_pc)) {
+                    break;
+                }
+                LOG_INFO("Detected mret, uret or sret\n");
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
                 if (dinfo.target == 0) {
@@ -712,6 +763,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 }
                 break;
 
+            case dis_dref: /* TODO: is this useful? */
             case dis_dref2:
             case dis_condjsr:
             case dis_noninsn:
@@ -757,18 +809,29 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 if (status != 0)
                     goto fail;
 
+                uint64_t instr_at_pc = 0;
+                if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
+                    LOG_ERR("Reading instr at pc failed\n");
+                    goto fail;
+                }
+
                 if (!search_discontinuity && branch_map.cnt == 0
                     && pc == packet->address)
                     hit_address = true;
+
                 /* advance pc */
                 pc += size;
 
                 /* we hit a conditional branch, follow or not and update map */
                 switch (dinfo.insn_type) {
                 case dis_nonbranch:
-                    /* We just normally advance the pc */
-                    break;
-
+                    /* TODO: we need this hack since {m,s,u} ret are not
+                     * classified
+                     */
+                    if (!is_unpred_discontinuity(instr_at_pc)) {
+                        break;
+                    }
+                    LOG_INFO("Detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
@@ -847,6 +910,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
              * (empty branch map) and context change. For now we dont allow both
              * situations
              */
+            decompression_state.privilege = packet->privilege;
             pc = packet->address;
 
             /* since we are abruptly changing the pc we have to check if we
@@ -875,15 +939,24 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             int size = disassemble_at_pc(&dunit, pc, &status);
             if (status != 0)
                 goto fail;
+
+            uint64_t instr_at_pc = 0;
+            if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
+                LOG_ERR("Reading instr at pc failed\n");
+                goto fail;
+            }
+
             pc += size;
 
             switch (dinfo.insn_type) {
             case dis_nonbranch:
-                /* We just normally advance the pc */
-                break;
-            case dis_dref: /* TODO: is this useful? */
-                break;
-
+                /* TODO: we need this hack since {m,s,u} ret are not
+                 * classified
+                 */
+                if (!is_unpred_discontinuity(instr_at_pc)) {
+                    break;
+                }
+                LOG_INFO("Detected mret, uret or sret\n");
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
                 if (dinfo.target == 0)
@@ -899,7 +972,8 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     pc = dinfo.target;
                 }
                 break;
-
+            case dis_dref: /* TODO: is this useful? */
+                break;
             case dis_dref2:
             case dis_condjsr:
             case dis_noninsn:
@@ -958,16 +1032,24 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 if (!search_discontinuity && pc == packet->address)
                     hit_address = true;
 
+                uint64_t instr_at_pc = 0;
+                if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
+                    LOG_ERR("Reading instr at pc failed\n");
+                    goto fail;
+                }
+
                 /* advance pc */
                 pc += size;
 
                 switch (dinfo.insn_type) {
                 case dis_nonbranch:
-                    /* We just normally advance the pc */
-                    break;
-                case dis_dref: /* TODO: is this useful? */
-                    break;
-
+                    /* TODO: we need this hack since {m,s,u} ret are not
+                     * classified
+                     */
+                    if (!is_unpred_discontinuity(instr_at_pc)) {
+                        break;
+                    }
+                    LOG_INFO("Detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     if (dinfo.target) {
@@ -987,6 +1069,8 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                         "We shouldn't hit conditional branches with F_ADDRESS_ONLY\n");
                     break;
 
+                case dis_dref: /* TODO: is this useful? */
+                    break;
                 case dis_dref2:
                 case dis_condjsr:
                 case dis_noninsn:
@@ -1219,16 +1303,18 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
     uint32_t priv = 0;
     uint32_t iaddr = 0;
     uint32_t instr = 0;
+    int compressed = 0;
 
     size_t size = 128;
     *samples = malloc(size * sizeof(**samples));
-    while ((ret = fscanf(fp,
-                         "valid= %d exception= %d interrupt= %d cause= %" SCNx32
-                         " tval= %" SCNx32 " priv= %" SCNx32 " addr= %" SCNx32
-                         " instr= %" SCNx32 " \n",
-                         &valid, &exception, &interrupt, &cause, &tval, &priv,
-                         &iaddr, &instr))
-           != EOF) {
+    while (
+        (ret = fscanf(fp,
+                      "valid= %d exception= %d interrupt= %d cause= %" SCNx32
+                      " tval= %" SCNx32 " priv= %" SCNx32
+                      " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
+                      &valid, &exception, &interrupt, &cause, &tval, &priv,
+                      &compressed, &iaddr, &instr))
+        != EOF) {
         if (!valid) {
             continue;
         }
@@ -1249,6 +1335,7 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
         (*samples)[scnt].priv = priv;
         (*samples)[scnt].iaddr = iaddr;
         (*samples)[scnt].instr = instr;
+        (*samples)[scnt].compressed = compressed;
         scnt++;
     }
 

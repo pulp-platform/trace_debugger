@@ -49,6 +49,21 @@ struct disassembler_unit {
     struct disassemble_info *dinfo;
 };
 
+
+static inline unsigned int riscv_instr_len(uint64_t instr)
+{
+    if ((instr & 0x3) != 0x3) /* RVC.  */
+        return 2;
+    if ((instr & 0x1f) != 0x1f) /* Base ISA and extensions in 32-bit space.  */
+        return 4;
+    if ((instr & 0x3f) == 0x1f) /* 48-bit extensions.  */
+        return 6;
+    if ((instr & 0x7f) == 0x3f) /* 64-bit extensions.  */
+        return 8;
+    /* Longer instructions not supported at the moment.  */
+    return 2;
+}
+
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
 
 int init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
@@ -77,6 +92,7 @@ void disassemble_section(bfd *, asection *, void *);
 
 void disassemble_block(bfd_byte *, size_t, struct disassembler_unit *);
 
-void disassemble_single_instruction(uint32_t, uint32_t, struct disassembler_unit *);
+void disassemble_single_instruction(uint32_t, uint32_t,
+                                    struct disassembler_unit *);
 
 #endif
