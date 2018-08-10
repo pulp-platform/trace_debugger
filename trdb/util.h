@@ -23,8 +23,15 @@
  */
 #include <stdio.h>
 #include <inttypes.h>
+
+#ifdef NDEBUG
+#define TRDB_LEVEL 1
+#define TRDB_TRACE 0
+#else
 #define TRDB_LEVEL 3
-#define TRDB_TRACE 1 /* TODO: set this for release builds */
+#define TRDB_TRACE 1
+#endif
+
 #define LOG_ERR(format, ...)                                                   \
     do {                                                                       \
         if (TRDB_LEVEL > 0)                                                    \
