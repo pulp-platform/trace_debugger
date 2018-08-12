@@ -266,6 +266,7 @@ static bool test_trdb_write_trace()
     }
 
     /* Read back the file and compare to expected value */
+    uint8_t *buf = NULL;
     FILE *fp = fopen("tmp_for_test", "rb");
     if (!fp) {
         perror("fopen");
@@ -274,7 +275,6 @@ static bool test_trdb_write_trace()
     }
 
     long len = 0;
-    uint8_t *buf = NULL;
     if (!(buf = file_to_char(fp, &len))) {
         LOG_ERR("file_to_char failed\n");
         status = -1;
