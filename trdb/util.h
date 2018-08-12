@@ -32,6 +32,10 @@
 #define TRDB_TRACE 1
 #endif
 
+#ifndef NDEBUG
+#define TRDB_TEST_DEBUG 1
+#endif
+
 #define LOG_ERR(format, ...)                                                   \
     do {                                                                       \
         if (TRDB_LEVEL > 0)                                                    \

@@ -362,7 +362,7 @@ int test_stimuli_to_packet_dump(const char *path)
         LOG_ERR("Compress trace failed\n");
         return 0;
     }
-#ifdef TRDB_TEST_VERBOSE
+#ifdef TRDB_TEST_DEBUG
     trdb_dump_packet_list(&head);
 #endif
 
@@ -397,19 +397,7 @@ int test_disassemble_trace(const char *bin_path, const char *trace_path)
     dunit.dinfo = &dinfo;
     init_disassembler_unit(&dunit, abfd, NULL);
 
-    /* disassemble_info dinfo = {0}; */
-    /* /\* TODO: make this API nicer in disasm.c *\/ */
-    /* init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf); */
-    /* init_disassemble_info_for_pulp(&dinfo); */
-    /* disassemble_init_for_target(&dinfo); */
-    /* struct disassembler_unit dunit = {0}; */
-    /* dunit.dinfo = &dinfo; */
-    /* dunit.disassemble_fn = print_insn_riscv; */
-    /* if (!dunit.disassemble_fn) { */
-    /*     LOG_ERR("No suitable disassembler found\n"); */
-    /*     return 0; */
-    /* } */
-#ifdef TRDB_TEST_VERBOSE
+#ifdef TRDB_TEST_DEBUG
     trdb_disassemble_trace(samplecnt, *samples, &dunit);
 #endif
     free(*samples);
@@ -420,8 +408,6 @@ int test_disassemble_trace(const char *bin_path, const char *trace_path)
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
     trdb_init();
-
-    printf("\n");
 
     bfd_init();
     bfd *abfd = bfd_openr(bin_path, NULL);
@@ -448,15 +434,31 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         LOG_ERR("Compress trace failed\n");
         return 0;
     }
-    LOG_ERR("\nSTARTING_TEST_DUMPING\n");
-
+    LOG_INFO("\nSTARTING_TEST_DUMPING\n");
+#ifdef TRDB_TEST_DEBUG
     trdb_dump_packet_list(&packet_head);
+#endif
     trdb_decompress_trace(abfd, &packet_head, &instr_head);
 
+    /* We compare whether the reconstruction matches the original sequence, only
+     * the pc for now
+     */
     struct tr_instr *instr;
+    int i = 0;
     list_for_each_entry_reverse(instr, &instr_head, list)
     {
-	printf("%s", instr->str);
+        /* the reconstruction doesn't show the trapped instruction, so we skip
+         */
+        if ((*samples)[i].exception) {
+            i++;
+        }
+        if (instr->iaddr != (*samples)[i].iaddr) {
+            LOG_ERR("%s", instr->str);
+            LOG_ERR("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
+            LOG_ERR("reconst. instr: %" PRIx32 "\n", instr->iaddr);
+            return 0;
+        }
+        i++;
     }
 
     free(*samples);

@@ -511,6 +511,12 @@ static int disassemble_at_pc(bfd_vma pc, struct tr_instr *instr,
         *status = -1;
         return 0;
     }
+
+    instr->iaddr = pc;
+    /* TODO: add more data */
+    /* instr->instr = */
+    /* instr->compressed */
+    /* instr->priv = 0 */
     return instr_size;
 }
 
