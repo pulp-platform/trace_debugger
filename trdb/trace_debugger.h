@@ -36,9 +36,10 @@
 #define PRIVLEN 5
 #define ILEN 32
 
+#define INSTR_STR_LEN 128
 /* Sample captured by the interface to the RISC-V CPU.*/
 struct tr_instr {
-    /* bool valid; */
+    /* bool valid; */ /* implicitely true */
     bool exception;
     bool interrupt;
     uint32_t cause : CAUSELEN; /* CAUSELEN */
@@ -47,6 +48,10 @@ struct tr_instr {
     uint32_t iaddr : XLEN;     /* XLEN */
     uint32_t instr : ILEN;     /* ILEN */
     bool compressed;
+    /* Disassembled name, only sometimes valid */
+    char str[INSTR_STR_LEN];
+
+    struct list_head list;
 };
 
 /* TODO: maybe make enums */

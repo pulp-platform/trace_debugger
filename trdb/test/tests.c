@@ -453,9 +453,15 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     trdb_dump_packet_list(&packet_head);
     trdb_decompress_trace(abfd, &packet_head, &instr_head);
 
+    struct tr_instr *instr;
+    list_for_each_entry_reverse(instr, &instr_head, list)
+    {
+	printf("%s", instr->str);
+    }
+
     free(*samples);
     trdb_free_packet_list(&packet_head);
-    trdb_free_packet_list(&instr_head);
+    trdb_free_instr_list(&instr_head);
 
     return 1;
 }

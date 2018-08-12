@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <string.h>
+#include <stdarg.h>
 #include "trace_debugger.h"
 #include "disasm.h"
 #include "list.h"
@@ -101,7 +102,7 @@ struct trdb_dec_state {
     uint32_t privilege : PRIVLEN;
 };
 
-static struct trdb_dec_state decompression_state = {0};
+
 /* TODO: interrupt stack (nested interrupts) for decompression? */
 
 /* Responsible to hold current branch state, that is the sequence of taken/not
@@ -189,8 +190,6 @@ void trdb_init()
     nextc = (struct trdb_state){0};
     branch_map = (struct branch_map_state){0};
     filter = (struct filter_state){0};
-
-    decompression_state = (struct trdb_dec_state){0};
 }
 
 
@@ -482,17 +481,25 @@ fail_malloc:
 }
 
 
-static int disassemble_at_pc(struct disassembler_unit *dunit, bfd_vma pc,
-                             int *status)
+static int disassemble_at_pc(bfd_vma pc, struct tr_instr *instr,
+                             struct disassembler_unit *dunit, int *status)
 {
     *status = 0;
+    /* make sure start froma a clean slate */
+    *instr = (struct tr_instr){0};
+
     struct disassemble_info *dinfo = dunit->dinfo;
+    /* Important to set for internal calls to fprintf */
+    dinfo->stream = instr;
+
     /* print instr address */
-    (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ", (uintmax_t)pc);
+    (*dinfo->fprintf_func)(instr, "0x%016jx  ", (uintmax_t)pc);
+
     /* check if insn_info works */
     dinfo->insn_info_valid = 0;
+
     int instr_size = (*dunit->disassemble_fn)(pc, dinfo);
-    (*dinfo->fprintf_func)(dinfo->stream, "\n");
+    (*dinfo->fprintf_func)(instr, "\n");
     if (instr_size <= 0) {
         LOG_ERR("Encountered instruction with %d bytes, stopping\n",
                 instr_size);
@@ -505,6 +512,34 @@ static int disassemble_at_pc(struct disassembler_unit *dunit, bfd_vma pc,
         return 0;
     }
     return instr_size;
+}
+
+
+static int build_instr_fprintf(void *stream, const char *format, ...)
+{
+    struct tr_instr *instr = stream;
+    char tmp[INSTR_STR_LEN];
+    /* ugly hack around libopcodes fprintf-only output */
+    va_list args;
+    va_start(args, format);
+    int rv = vsnprintf(tmp, INSTR_STR_LEN - 1, format, args);
+    if (rv >= INSTR_STR_LEN) {
+        LOG_ERR("build_instr_fprintf output truncated, adjust buffer size\n");
+    }
+    if (rv < 0) {
+        LOG_ERR("Encountered an error in vsnprintf\n");
+    }
+    va_end(args);
+    if (strlen(instr->str) + rv + 1 > INSTR_STR_LEN) {
+        LOG_ERR("Can't append to buffer, truncating string\n");
+        strncat(instr->str, tmp, INSTR_STR_LEN - 1 - strlen(instr->str));
+    } else {
+        strncat(instr->str, tmp, rv);
+    }
+    /* TODO: make this maybe a debug print */
+    /* printf("%s", instr->str); */
+
+    return rv;
 }
 
 
@@ -549,6 +584,7 @@ static int alloc_section_for_debugging(bfd *abfd, asection *section,
     return 0;
 }
 
+
 static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
                              struct disassemble_info *dinfo)
 {
@@ -572,6 +608,19 @@ static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
         (*instr) |= ((uint64_t)bfd_getl16(packet)) << (8 * n);
     }
     return status;
+}
+
+
+static int add_to_trace(struct list_head *instr_list, struct tr_instr *instr)
+{
+    struct tr_instr *add = malloc(sizeof(*add));
+    if (!add) {
+        perror("malloc");
+        return -1;
+    }
+    memcpy(add, instr, sizeof(*add));
+    list_add(&add->list, instr_list);
+    return 0;
 }
 
 
@@ -606,8 +655,14 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
+    struct trdb_dec_state decompression_context = {0};
+    struct tr_instr dis_instr = {0};
+
     dunit.dinfo = &dinfo;
     init_disassembler_unit(&dunit, abfd, conf.no_aliases ? "no-aliases" : NULL);
+    /* advanced fprintf output handling */
+    dunit.dinfo->fprintf_func = build_instr_fprintf;
+    /* dunit.dinfo->stream = &instr; */
 
     /* Alloc and config section data for disassembler */
     bfd_vma stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
@@ -627,6 +682,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
     struct tr_packet *next_packet = NULL;
 
     struct list_head *p;
+
     list_for_each_prev(p, packet_list)
     {
         packet = list_entry(p, typeof(*packet), list);
@@ -680,6 +736,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             LOG_ERR("Unimplemented\n");
             goto fail;
         }
+
         /* TODO: change this behaviour */
         if (TRDB_TRACE)
             trdb_print_packet(packet);
@@ -720,7 +777,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             }
 
             int status = 0;
-            int size = disassemble_at_pc(&dunit, pc, &status);
+            int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
             if (status != 0)
                 goto fail;
 
@@ -729,6 +786,8 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 LOG_ERR("Reading instr at pc failed\n");
                 goto fail;
             }
+
+            add_to_trace(instr_list, &dis_instr);
 
             pc += size; /* normal case */
 
@@ -805,7 +864,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 !(branch_map.cnt == 0 && (hit_discontinuity || hit_address))) {
 
                 int status = 0;
-                int size = disassemble_at_pc(&dunit, pc, &status);
+                int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
                 if (status != 0)
                     goto fail;
 
@@ -818,6 +877,8 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 if (!search_discontinuity && branch_map.cnt == 0
                     && pc == packet->address)
                     hit_address = true;
+
+                add_to_trace(instr_list, &dis_instr);
 
                 /* advance pc */
                 pc += size;
@@ -910,7 +971,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
              * (empty branch map) and context change. For now we dont allow both
              * situations
              */
-            decompression_state.privilege = packet->privilege;
+            decompression_context.privilege = packet->privilege;
             pc = packet->address;
 
             /* since we are abruptly changing the pc we have to check if we
@@ -936,7 +997,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             }
 
             int status = 0;
-            int size = disassemble_at_pc(&dunit, pc, &status);
+            int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
             if (status != 0)
                 goto fail;
 
@@ -945,6 +1006,8 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 LOG_ERR("Reading instr at pc failed\n");
                 goto fail;
             }
+
+            add_to_trace(instr_list, &dis_instr);
 
             pc += size;
 
@@ -1019,7 +1082,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
             while (!(hit_address || hit_discontinuity)) {
                 int status = 0;
-                int size = disassemble_at_pc(&dunit, pc, &status);
+                int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
                 if (status != 0)
                     goto fail;
 
@@ -1037,6 +1100,8 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     LOG_ERR("Reading instr at pc failed\n");
                     goto fail;
                 }
+
+                add_to_trace(instr_list, &dis_instr);
 
                 /* advance pc */
                 pc += size;
@@ -1440,5 +1505,16 @@ void trdb_free_packet_list(struct list_head *packet_list)
     list_for_each_entry_safe(packet, packet_next, packet_list, list)
     {
         free(packet);
+    }
+}
+
+
+void trdb_free_instr_list(struct list_head *instr_list)
+{
+    struct tr_instr *instr;
+    struct tr_instr *instr_next;
+    list_for_each_entry_safe(instr, instr_next, instr_list, list)
+    {
+        free(instr);
     }
 }
