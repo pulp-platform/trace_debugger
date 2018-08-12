@@ -30,62 +30,7 @@
 #include <stdlib.h>
 
 
-void other_print_address(bfd_vma addr, struct disassemble_info *dinfo)
-{
-    (*dinfo->fprintf_func)(dinfo->stream, "addr: 0x%08jx target: 0x%08lx",
-                           (uintmax_t)addr, dinfo->target);
-}
-
-
 int main(int argc, char *argv[argc + 1])
 {
-    bfd *abfd = NULL;
-    disassemble_info dinfo = {0};
-
-    bfd_init();
-
-    abfd = bfd_openr("data/interrupt", NULL);
-
-    if (!(abfd && bfd_check_format(abfd, bfd_object)))
-        return EXIT_FAILURE;
-
-    /* Override the stream the disassembler outputs to */
-    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
-    dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.print_address_func = riscv32_print_address;
-
-    dinfo.flavour = bfd_get_flavour(abfd);
-    dinfo.arch = bfd_get_arch(abfd);
-    dinfo.mach = bfd_get_mach(abfd);
-    dinfo.endian = abfd->xvec->byteorder;
-    disassemble_init_for_target(&dinfo);
-
-    /* Tests for trace_debugger.h */
-    struct tr_instr sample = {0};
-    struct tr_instr sample_arr[1];
-    sample_arr[0] = sample;
-    LIST_HEAD(packet_list);
-    trdb_compress_trace(&packet_list, 1, sample_arr);
-
-    /* Tests for disassembly functions */
-    dump_target_list();
-    dump_bin_info(abfd);
-
-    /* set up disassembly context */
-    struct disassembler_unit dunit = {0};
-    dunit.dinfo = &dinfo;
-    dunit.disassemble_fn = disassembler(abfd);
-    if (!dunit.disassemble_fn) {
-        fprintf(stderr, "No suitable disassembler found\n");
-        return EXIT_FAILURE;
-    }
-    /* TODO: bfd_count_sections */
-    dump_section_names(abfd);
-    printf("num_sections: %d\n", bfd_count_sections(abfd));
-    disassemble_single_instruction(0x10, 0, &dunit);
-    bfd_map_over_sections(abfd, disassemble_section, &dunit);
-
-    bfd_close(abfd);
-
     return EXIT_SUCCESS;
 }

@@ -71,6 +71,56 @@ static void shiftl_array(uint8_t arr[], size_t len, uint32_t shift)
 }
 
 
+bool test_disasm_bfd()
+{
+    bfd *abfd = NULL;
+    disassemble_info dinfo = {0};
+
+    bfd_init();
+
+    abfd = bfd_openr("data/interrupt", NULL);
+
+    if (!(abfd && bfd_check_format(abfd, bfd_object)))
+        return 1;
+
+    /* Override the stream the disassembler outputs to */
+    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
+    dinfo.fprintf_func = (fprintf_ftype)fprintf;
+    dinfo.print_address_func = riscv32_print_address;
+
+    dinfo.flavour = bfd_get_flavour(abfd);
+    dinfo.arch = bfd_get_arch(abfd);
+    dinfo.mach = bfd_get_mach(abfd);
+    dinfo.endian = abfd->xvec->byteorder;
+    disassemble_init_for_target(&dinfo);
+
+    /* Tests for disassembly functions */
+#ifdef TRDB_TEST_DEBUG
+    dump_target_list();
+    dump_bin_info(abfd);
+#endif
+
+    /* set up disassembly context */
+    struct disassembler_unit dunit = {0};
+    dunit.dinfo = &dinfo;
+    dunit.disassemble_fn = disassembler(abfd);
+    if (!dunit.disassemble_fn) {
+        LOG_ERR("No suitable disassembler found\n");
+        return 1;
+    }
+/* TODO: use this path also in relase mode, but less noisy */
+#ifdef TRDB_TEST_DEBUG
+    dump_section_names(abfd);
+
+    LOG_INFO("num_sections: %d\n", bfd_count_sections(abfd));
+    disassemble_single_instruction(0x10, 0, &dunit);
+    bfd_map_over_sections(abfd, disassemble_section, &dunit);
+#endif
+    bfd_close(abfd);
+    return 1;
+}
+
+
 bool test_packet_to_char(uint32_t shift)
 {
     bool status = true;
@@ -476,6 +526,7 @@ int main(int argc, char *argv[argc + 1])
     for (size_t i = 0; i < 8; i++)
         RUN_TEST(test_packet_to_char, i);
 
+    RUN_TEST(test_disasm_bfd);
     RUN_TEST(test_trdb_write_trace);
     RUN_TEST(test_parse_stimuli_line);
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
