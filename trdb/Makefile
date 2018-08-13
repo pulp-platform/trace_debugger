@@ -27,6 +27,7 @@ TEST_BIN	= tests
 
 
 CTAGS		= ctags
+VALGRIND	= valgrind
 
 
 all: $(BIN) $(TEST_BIN)
@@ -56,6 +57,14 @@ TAGS:
 .PHONY: test
 test:
 	./$(TEST_BIN)
+
+.PHONY: valgrind-test
+valgrind-test: debug
+	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(TEST_BIN)
+
+.PHONY: valgrind-main
+valgrind-main: debug
+	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BIN)
 
 .PHONY: clean
 clean:
