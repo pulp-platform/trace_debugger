@@ -123,7 +123,7 @@ bool test_disasm_bfd()
 }
 
 
-bool test_packet_to_char(uint32_t shift)
+bool test_serialize_packet(uint32_t shift)
 {
     bool status = true;
     trdb_init();
@@ -151,7 +151,7 @@ bool test_packet_to_char(uint32_t shift)
     }
 
     size_t bitcnt = 0;
-    if (packet_to_char(&packet, &bitcnt, shift, bin)) {
+    if (serialize_packet(&packet, &bitcnt, shift, bin)) {
         LOG_ERR("Packet conversion failed\n");
         status = false;
     }
@@ -178,7 +178,7 @@ bool test_packet_to_char(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
         LOG_ERR("Packet conversion failed\n");
         status = false;
     }
@@ -200,7 +200,7 @@ bool test_packet_to_char(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
         LOG_ERR("Packet conversion failed\n");
         status = false;
     }
@@ -227,7 +227,7 @@ bool test_packet_to_char(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
         LOG_ERR("Packet conversion failed\n");
         status = false;
     }
@@ -258,7 +258,7 @@ bool test_packet_to_char(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (packet_to_char(&packet, &bitcnt, 0, bin)) {
+    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
         LOG_ERR("Packet conversion failed\n");
         status = false;
     }
@@ -528,7 +528,7 @@ int main(int argc, char *argv[argc + 1])
     bool _trdb_test_result = true;
 
     for (size_t i = 0; i < 8; i++)
-        RUN_TEST(test_packet_to_char, i);
+        RUN_TEST(test_serialize_packet, i);
 
     RUN_TEST(test_disasm_bfd);
     RUN_TEST(test_trdb_write_trace);

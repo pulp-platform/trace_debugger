@@ -1189,8 +1189,8 @@ union pack {
 
 
 /* bin must be an all zeros array */
-static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
-                          uint8_t align, uint8_t bin[])
+static int serialize_packet(struct tr_packet *packet, size_t *bitcnt,
+                            uint8_t align, uint8_t bin[])
 {
     if (packet->msg_type != 0x2) {
         LOG_ERR("trace packet message type not supported: %d\n",
@@ -1236,7 +1236,7 @@ static int packet_to_char(struct tr_packet *packet, size_t *bitcnt,
     }
 
     case F_BRANCH_DIFF:
-        LOG_ERR("F_BRANCH_DIFF packet_to_char not implemented yet\n");
+        LOG_ERR("F_BRANCH_DIFF serialize_packet not implemented yet\n");
         *bitcnt = 0;
         return -1;
 
@@ -1316,7 +1316,7 @@ int trdb_write_trace(const char *path, struct list_head *packet_list)
     /* TODO: do we need the rever version? I think we do*/
     list_for_each_entry(packet, packet_list, list)
     {
-        if (packet_to_char(packet, &bitcnt, alignment, bin)) {
+        if (serialize_packet(packet, &bitcnt, alignment, bin)) {
             status = -1;
             goto fail;
         }
@@ -1447,7 +1447,7 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
 }
 
 
-void trdb_dump_packet_list(FILE* stream, struct list_head *packet_list)
+void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list)
 {
     struct tr_packet *packet;
     list_for_each_entry_reverse(packet, packet_list, list)
