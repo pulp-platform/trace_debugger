@@ -745,7 +745,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
         /* TODO: change this behaviour */
         if (TRDB_TRACE)
-            trdb_print_packet(packet);
+            trdb_print_packet(stdout, packet);
         if (last_packet && last_packet->format == F_SYNC
             && last_packet->subformat == SF_EXCEPTION) {
             /* exceptions come with three packets: flush, F_SYNC, and
@@ -1359,7 +1359,7 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
     *status = 0;
     FILE *fp = fopen(path, "r");
     if (!fp) {
-        perror("trdb_stimuli_to_tr_instr");
+        perror("fopen");
         *status = -1;
         goto fail;
     }
@@ -1411,7 +1411,7 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
         scnt++;
     }
     /* initialize the remaining unitialized memory */
-    memset((*samples)+scnt, 0, size - scnt);
+    memset((*samples) + scnt, 0, size - scnt);
 
     if (ferror(fp)) {
         perror("fscanf");

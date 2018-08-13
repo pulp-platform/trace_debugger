@@ -263,7 +263,6 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
     }
 
     size_t len = 8;
-    /* size_t pc = 0; */
     bfd_byte *data = malloc(len * sizeof(*data));
     if (!data) {
         perror("disassemble_single_instruction:");
