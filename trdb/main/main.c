@@ -120,8 +120,11 @@ int main(int argc, char *argv[argc + 1])
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-    /* prepare output */
+
     FILE *output_fp = NULL;
+    bfd *abfd = NULL;
+
+    /* prepare output */
     if (arguments.output_file[0] != '-') {
         output_fp = fopen(arguments.output_file, "w");
         if (!output_fp) {
@@ -135,7 +138,6 @@ int main(int argc, char *argv[argc + 1])
 
     /* commands that can use a bfd */
     bfd_init();
-    bfd *abfd = NULL;
     if (arguments.has_elf) {
         abfd = bfd_openr(arguments.elf_file, NULL);
         if (!(abfd && bfd_check_format(abfd, bfd_object))) {

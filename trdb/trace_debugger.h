@@ -30,6 +30,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "bfd.h"
+#include "disassembly.h"
 #include "list.h"
 
 #define XLEN 32
@@ -135,6 +136,11 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                                         struct list_head *packet_list,
                                         struct list_head *instr_list);
 
+/* Outputs disassembled trace using fprintf_func in dunit->dinfo */
+void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
+                            struct disassembler_unit *dunit);
+
+
 /* Prints a list of tr_packets in a formatted manner to stdout. */
 void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list);
 
@@ -151,6 +157,9 @@ void trdb_free_packet_list(struct list_head *packet_list);
  */
 int trdb_write_trace(const char *path, struct list_head *packet_list);
 
+/* Read a stimuli file at path into an array of tr_instr. Return -1 on failure
+ * and 0 on succes.
+ */
 size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
                                 int *status);
 
