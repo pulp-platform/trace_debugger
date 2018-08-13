@@ -5,3 +5,5 @@ TAGS
 gmon.out
 *.o
 /trdb/scratch
+/trdb/trdb
+/trdb/tests
