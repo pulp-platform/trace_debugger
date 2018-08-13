@@ -28,6 +28,7 @@
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
 #include <stdbool.h>
 #include <inttypes.h>
+#include <stdio.h>
 #include "bfd.h"
 #include "list.h"
 
@@ -108,6 +109,9 @@ struct tr_packet {
 /* Call this function before any other */
 void trdb_init();
 
+/* Call this function to cleanup */
+void trdb_close();
+
 /* Given a tr_instr array of length len and a list_head
  * trdb_compress_trace returns the list_head with a number of packets
  * added to it. These packets should allow trdb_decompress_trace to
@@ -131,10 +135,10 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                                         struct list_head *instr_list);
 
 /* Prints a list of tr_packets in a formatted manner to stdout. */
-void trdb_dump_packet_list(struct list_head *packet_list);
+void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list);
 
 /* Prints a single packet in a formatted manner to stdout */
-void trdb_print_packet(struct tr_packet *packet);
+void trdb_print_packet(FILE *stream, struct tr_packet *packet);
 
 /* Free the entries of a list of tr_packets. Used to dealloacte the
  * list returned by trdb_compress_trace.

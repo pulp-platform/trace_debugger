@@ -1447,60 +1447,58 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
 }
 
 
-void trdb_dump_packet_list(struct list_head *packet_list)
+void trdb_dump_packet_list(FILE* stream, struct list_head *packet_list)
 {
     struct tr_packet *packet;
     list_for_each_entry_reverse(packet, packet_list, list)
     {
-        if (packet->msg_type != 0x2) {
-            LOG_ERR("Unsupported message type %" PRIu32 "\n", packet->msg_type);
-            break;
-        }
-        trdb_print_packet(packet);
+        trdb_print_packet(stream, packet);
     }
 }
 
 
-void trdb_print_packet(struct tr_packet *packet)
+void trdb_print_packet(FILE *stream, struct tr_packet *packet)
 {
     switch (packet->format) {
     case F_BRANCH_FULL:
     case F_BRANCH_DIFF:
-        printf("PACKET ");
-        packet->format == F_BRANCH_FULL ? printf("0: F_BRANCH_FULL\n")
-                                        : printf("1: F_BRANCH_DIFF\n");
-        printf("    branches  : %" PRIu32 "\n", packet->branches);
-        printf("    branch_map: 0x%" PRIx32 "\n", packet->branch_map);
-        printf("    address   : 0x%" PRIx32 "\n", packet->address);
+        fprintf(stream, "PACKET ");
+        packet->format == F_BRANCH_FULL ? fprintf(stream, "0: F_BRANCH_FULL\n")
+                                        : fprintf(stream, "1: F_BRANCH_DIFF\n");
+        fprintf(stream, "    branches  : %" PRIu32 "\n", packet->branches);
+        fprintf(stream, "    branch_map: 0x%" PRIx32 "\n", packet->branch_map);
+        fprintf(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
         /* TODO: that special full branch map behaviour */
         break;
 
     case F_ADDR_ONLY:
-        printf("PACKET 2: F_ADDR_ONLY\n");
-        printf("    address   : 0x%" PRIx32 "\n", packet->address);
+        fprintf(stream, "PACKET 2: F_ADDR_ONLY\n");
+        fprintf(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
         break;
     case F_SYNC:
-        printf("PACKET 3: F_SYNC\n");
+        fprintf(stream, "PACKET 3: F_SYNC\n");
         const char *subf[4];
         subf[0] = "SF_START";
         subf[1] = "SF_EXCEPTION";
         subf[2] = "SF_CONTEXT";
         subf[3] = "RESERVED";
-        printf("    subformat : %s\n", subf[packet->subformat]);
+        fprintf(stream, "    subformat : %s\n", subf[packet->subformat]);
 
         switch (packet->subformat) {
         case SF_CONTEXT:
             /* TODO fix this */
-            printf("    context   :\n");
-            printf("    privilege : 0x%" PRIx32 "\n", packet->privilege);
+            fprintf(stream, "    context   :\n");
+            fprintf(stream, "    privilege : 0x%" PRIx32 "\n",
+                    packet->privilege);
         case SF_START:
-            printf("    branch    : %s\n", packet->branch ? "true" : "false");
-            printf("    address   : 0x%" PRIx32 "\n", packet->address);
+            fprintf(stream, "    branch    : %s\n",
+                    packet->branch ? "true" : "false");
+            fprintf(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
         case SF_EXCEPTION:
-            printf("    ecause    : 0x%" PRIx32 "\n", packet->ecause);
-            printf("    interrupt : %s\n",
-                   packet->interrupt ? "true" : "false");
-            printf("    tval      : 0x%" PRIx32 "\n", packet->tval);
+            fprintf(stream, "    ecause    : 0x%" PRIx32 "\n", packet->ecause);
+            fprintf(stream, "    interrupt : %s\n",
+                    packet->interrupt ? "true" : "false");
+            fprintf(stream, "    tval      : 0x%" PRIx32 "\n", packet->tval);
         }
         break;
     }

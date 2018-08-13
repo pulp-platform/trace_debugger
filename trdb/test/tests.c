@@ -415,7 +415,7 @@ int test_stimuli_to_packet_dump(const char *path)
         return 0;
     }
 #ifdef TRDB_TEST_DEBUG
-    trdb_dump_packet_list(&head);
+    trdb_dump_packet_list(stdout, &head);
 #endif
 
     free(*samples);
@@ -453,6 +453,7 @@ int test_disassemble_trace(const char *bin_path, const char *trace_path)
     trdb_disassemble_trace(samplecnt, *samples, &dunit);
 #endif
     free(*samples);
+    bfd_close(abfd);
     return 1;
 }
 
@@ -488,7 +489,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
     LOG_INFO("\nSTARTING_TEST_DUMPING\n");
 #ifdef TRDB_TEST_DEBUG
-    trdb_dump_packet_list(&packet_head);
+    trdb_dump_packet_list(stdout, &packet_head);
 #endif
     trdb_decompress_trace(abfd, &packet_head, &instr_head);
 
@@ -516,6 +517,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     free(*samples);
     trdb_free_packet_list(&packet_head);
     trdb_free_instr_list(&instr_head);
+    bfd_close(abfd);
 
     return 1;
 }
