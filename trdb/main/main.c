@@ -245,7 +245,9 @@ static int disassemble_trace(FILE *output_fp, bfd *abfd,
 
     trdb_disassemble_trace(samplecnt, *samples, &dunit);
 
+
 fail:
+    trdb_close();
     free(*samples);
     return status;
 }
