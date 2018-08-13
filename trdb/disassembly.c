@@ -23,11 +23,6 @@
  */
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
-#include "disassembly.h"
-#include "util.h"
-#include "bfd.h"
-#include "dis-asm.h"
-#include "libiberty.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,11 +31,18 @@
 #include <ctype.h>
 #include <limits.h>
 #include <inttypes.h>
+#include "disassembly.h"
+#include "util.h"
+#include "bfd.h"
+#include "dis-asm.h"
+#include "libiberty.h"
 
 
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
 {
     const bfd_arch_info_type *riscv32_arch = bfd_scan_arch("riscv:rv32");
+    dinfo->fprintf_func = (fprintf_ftype)fprintf;
+    dinfo->print_address_func = riscv32_print_address;
     dinfo->flavour = bfd_target_elf_flavour; /* TODO: const */
     dinfo->arch = riscv32_arch->arch;
     dinfo->mach = riscv32_arch->mach;
@@ -48,8 +50,8 @@ void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
 }
 
 
-int init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
-                                   char *options)
+void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
+                                    char *options)
 {
     init_disassemble_info(dinfo, stdout, (fprintf_ftype)fprintf);
     dinfo->fprintf_func = (fprintf_ftype)fprintf;
@@ -61,7 +63,6 @@ int init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
     dinfo->endian = abfd->xvec->byteorder;
     dinfo->disassembler_options = options;
     disassemble_init_for_target(dinfo);
-    return 0;
 }
 
 
@@ -137,6 +138,7 @@ bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma)
 }
 
 
+
 asection *get_section_for_vma(bfd *abfd, bfd_vma vma)
 {
     asection *p;
@@ -147,6 +149,7 @@ asection *get_section_for_vma(bfd *abfd, bfd_vma vma)
     }
     return NULL;
 }
+
 
 void disassemble_section(bfd *abfd, asection *section, void *inf)
 {
@@ -214,7 +217,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 }
 
 
-void disassemble_block(bfd_byte *data, size_t len,
+void disassemble_block(size_t len, bfd_byte data[len],
                        struct disassembler_unit *dunit)
 {
     if (!dunit) {

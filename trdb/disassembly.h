@@ -23,8 +23,8 @@
  */
 
 
-#ifndef __DISASM_H__
-#define __DISASM_H__
+#ifndef __DISASSEMBLY_H__
+#define __DISASSEMBLY_H__
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
 #include <stdbool.h>
@@ -44,12 +44,14 @@
 #include "riscv_encoding.h"
 #undef DECLARE_INSN
 
+/* Struct used to capture all information and functions needed to disassemble */
 struct disassembler_unit {
     disassembler_ftype disassemble_fn;
     struct disassemble_info *dinfo;
 };
 
 
+/* Returns the length of a the given RISC-V instruction instr.*/
 static inline unsigned int riscv_instr_len(uint64_t instr)
 {
     if ((instr & 0x3) != 0x3) /* RVC.  */
@@ -64,35 +66,68 @@ static inline unsigned int riscv_instr_len(uint64_t instr)
     return 2;
 }
 
+/* Initialize disassemble_info from libopcodes with hardcoded values for
+ * the PULP platform.
+ */
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
 
-int init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
-                                   char *options);
+/* Initialize disassemble_info from libopcodes by grabbing data out of the given
+ * bfd. The options string can be non-NULL to pass disassembler specific
+ * settings to libopcodes.
+ */
+void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
+                                    char *options);
 
+/* Initialize disassembler_unit. Aside from calling
+ * init_disassembler_info_from_bfd, it also sets disassemble_fn to the
+ * architecture matching abfd.
+ */
 int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
                            char *options);
 
-void dump_section_header(bfd *, asection *, void *);
+/* Print the bfd section header to stdout.
+ */
+void dump_section_header(bfd *abfd, asection *section, void *ignored);
 
-void dump_bin_info(bfd *);
+/* Print bfd architecuture information to stdout.
+ */
+void dump_bin_info(bfd *abfd);
 
-void riscv32_print_address(bfd_vma, struct disassemble_info *);
+/* Print all section names of bfd to stdout.*/
+void dump_section_names(bfd *abfd);
 
-asymbol *find_symbol_at_address(bfd_vma, struct disassemble_info *);
-
-void dump_section_names(bfd *);
-
+/* Print all supported targets of the used  libopcodes to stdout. */
 void dump_target_list();
 
+/* Default fprintf_func used in disassemble_info, set by
+ * init_disassemble_info_*.
+ */
+void riscv32_print_address(bfd_vma vma, struct disassemble_info *dinfo);
+
+/* Returns true if vma is contained in the given section of abfd */
 bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma);
 
+/* Return the section of abfd that contains the given vma or NULL*/
 asection *get_section_for_vma(bfd *abfd, bfd_vma vma);
 
-void disassemble_section(bfd *, asection *, void *);
+/* TODO: not implemented yet*/
+asymbol *find_symbol_at_address(bfd_vma vma, struct disassemble_info *dinfo);
 
-void disassemble_block(bfd_byte *, size_t, struct disassembler_unit *);
+/* Print the section belonging to bfd to stdout. The void pointer inf must point
+ * to a disassembler_unit struct.
+ */
+void disassemble_section(bfd *abfd, asection *section, void *inf);
 
-void disassemble_single_instruction(uint32_t, uint32_t,
-                                    struct disassembler_unit *);
+/* Disassemble len bytes of data pointed to by bfd_byte with the given
+ * disassembler_unit.
+ */
+void disassemble_block(size_t len, bfd_byte data[len],
+                       struct disassembler_unit *dunit);
+
+/* Disassembler the given instr with the pretended address addr and
+ * disassembler_unit dunit.
+ */
+void disassemble_single_instruction(uint32_t instr, uint32_t addr,
+                                    struct disassembler_unit *dunit);
 
 #endif
