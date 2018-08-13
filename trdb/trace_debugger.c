@@ -1295,12 +1295,12 @@ static int serialize_packet(struct tr_packet *packet, size_t *bitcnt,
 }
 
 
-int trdb_write_trace(const char *path, struct list_head *packet_list)
+int trdb_write_packets(const char *path, struct list_head *packet_list)
 {
     int status = 0;
     FILE *fp = fopen(path, "wb");
     if (!fp) {
-        perror("trdb_write_trace");
+        perror("trdb_write_packets");
         status = -1;
         goto fail;
     }
@@ -1353,7 +1353,7 @@ fail:
 
 
 /* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
-size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
+size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
                                 int *status)
 {
     *status = 0;

@@ -175,9 +175,9 @@ static int compress_trace(FILE *output_fp, struct arguments *arguments)
     struct tr_instr **samples = &tmp;
     int success = 0;
     size_t samplecnt =
-        trdb_stimuli_to_tr_instr(arguments->args[0], samples, &success);
+        trdb_stimuli_to_trace(arguments->args[0], samples, &success);
     if (success != 0) {
-        LOG_ERR("trdb_stimuli_to_tr_instr failed\n");
+        LOG_ERR("trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }
@@ -232,9 +232,9 @@ static int disassemble_trace(FILE *output_fp, bfd *abfd,
     struct tr_instr **samples = &tmp;
     int success = 0;
     size_t samplecnt =
-        trdb_stimuli_to_tr_instr(arguments->args[0], samples, &success);
+        trdb_stimuli_to_trace(arguments->args[0], samples, &success);
     if (success != 0) {
-        LOG_ERR("trdb_stimuli_to_tr_instr failed\n");
+        LOG_ERR("trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }

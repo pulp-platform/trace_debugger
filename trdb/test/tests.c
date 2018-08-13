@@ -276,7 +276,7 @@ fail:
     return status;
 }
 
-static bool test_trdb_write_trace()
+static bool test_trdb_write_packets()
 {
     bool status = true;
     trdb_init();
@@ -312,8 +312,8 @@ static bool test_trdb_write_trace()
     list_add(&packet1.list, &head);
     list_add(&packet0.list, &head);
 
-    if (trdb_write_trace("tmp_for_test", &head)) {
-        LOG_ERR("trdb_write_trace failed\n");
+    if (trdb_write_packets("tmp_for_test", &head)) {
+        LOG_ERR("trdb_write_packets failed\n");
         status = false;
     }
 
@@ -386,7 +386,7 @@ int test_stimuli_to_tr_instr(const char *path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    trdb_stimuli_to_tr_instr(path, samples, &status);
+    trdb_stimuli_to_trace(path, samples, &status);
     if (status != 0) {
         LOG_ERR("Stimuli to tr_instr failed\n");
         return 0;
@@ -402,7 +402,7 @@ int test_stimuli_to_packet_dump(const char *path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_tr_instr(path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_trace(path, samples, &status);
     if (status != 0) {
         LOG_ERR("Stimuli to tr_instr failed\n");
         return 0;
@@ -430,7 +430,7 @@ int test_disassemble_trace(const char *bin_path, const char *trace_path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_tr_instr(trace_path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_trace(trace_path, samples, &status);
     if (status != 0) {
         LOG_ERR("Stimuli to tr_instr failed\n");
         return 0;
@@ -473,7 +473,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_tr_instr(trace_path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_trace(trace_path, samples, &status);
     if (status != 0) {
         LOG_ERR("Stimuli to tr_instr failed\n");
         return 0;
@@ -531,7 +531,7 @@ int main(int argc, char *argv[argc + 1])
         RUN_TEST(test_serialize_packet, i);
 
     RUN_TEST(test_disasm_bfd);
-    RUN_TEST(test_trdb_write_trace);
+    RUN_TEST(test_trdb_write_packets);
     RUN_TEST(test_parse_stimuli_line);
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");

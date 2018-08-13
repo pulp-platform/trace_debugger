@@ -155,12 +155,12 @@ void trdb_free_packet_list(struct list_head *packet_list);
 /* Write a list of tr_packets to a file located at path. Overwrites old file.
  * Return -1 on failure and 0 on success.
  */
-int trdb_write_trace(const char *path, struct list_head *packet_list);
+int trdb_write_packets(const char *path, struct list_head *packet_list);
 
 /* Read a stimuli file at path into an array of tr_instr. Return -1 on failure
  * and 0 on succes.
  */
-size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
+size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
                                 int *status);
 
 
