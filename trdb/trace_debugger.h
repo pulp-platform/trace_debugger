@@ -72,8 +72,8 @@ struct tr_instr {
  */
 struct tr_packet {
     uint32_t msg_type : 2; /* UltraSoC specific */
-    uint32_t len : 7;
     uint32_t format : 2;
+    uint32_t len : 7;
 
     uint32_t branches : 5;
     uint32_t branch_map;
@@ -166,6 +166,7 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
  * struct packet1 {
  *     uint32_t msg_type : 2;
  *     uint32_t format : 2;   // 01
+ *     uint32_t len: 7;
  *     uint32_t branches : 5;
  *     uint32_t branch_map;
  *     uint32_t address;
@@ -174,6 +175,7 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
  * struct packet2 {
  *     uint32_t msg_type : 2;
  *     uint32_t format : 2;
+ *     uint32_t len: 7;
  *     uint32_t address;
  * };
  *
