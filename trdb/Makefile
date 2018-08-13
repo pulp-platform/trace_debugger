@@ -22,7 +22,7 @@ TEST_OBJS	= $(TEST_SRCS:.c=.o)
 SRCS		= $(wildcard *.c)
 OBJS		= $(SRCS:.c=.o)
 INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
-BIN		= disasm
+BIN		= trdb
 TEST_BIN	= tests
 
 
