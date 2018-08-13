@@ -23,7 +23,7 @@
  */
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
-#include "disasm.h"
+#include "disassembly.h"
 #include "util.h"
 #include "bfd.h"
 #include "dis-asm.h"

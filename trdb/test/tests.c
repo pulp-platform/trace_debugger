@@ -30,8 +30,8 @@
 #include "../list.h"
 #include "../trace_debugger.h"
 #include "../trace_debugger.c"
-#include "../disasm.h"
-#include "../disasm.c"
+#include "../disassembly.h"
+#include "../disassembly.c"
 #include "../util.h"
 #include "../util.c"
 

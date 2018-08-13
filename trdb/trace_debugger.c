@@ -31,7 +31,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include "trace_debugger.h"
-#include "disasm.h"
+#include "disassembly.h"
 #include "list.h"
 #include "util.h"
 
