@@ -22,15 +22,25 @@
  * Description: Running a few tests
  */
 
-#define PACKAGE "foo" /* quick hack for bfd if not using autotools */
-#include "bfd.h"
-#include "../disasm.h"
-#include "../trace_debugger.h"
+/* #define PACKAGE "foo" /\* quick hack for bfd if not using autotools *\/ */
+/* #include "bfd.h" */
+/* #include "../disasm.h" */
+/* #include "../trace_debugger.h" */
 #include <stdio.h>
 #include <stdlib.h>
+#include <argp.h>
+
+
+const char *argp_program_version = "trdb 0.1";
+const char *argp_program_bug_address = "<balasr@student.ethz.ch>";
+
+static char doc[] = "trdb -- trace debugger for the PULP platform";
+
+static struct argp argp = {0, 0, 0, doc};
 
 
 int main(int argc, char *argv[argc + 1])
 {
+    argp_parse(&argp, argc, argv, 0, 0, 0);
     return EXIT_SUCCESS;
 }
