@@ -1399,6 +1399,7 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
             }
             *samples = tmp;
         }
+        (*samples)[scnt] = (struct tr_instr){0};
         (*samples)[scnt].exception = exception;
         (*samples)[scnt].interrupt = interrupt;
         (*samples)[scnt].cause = cause;
@@ -1409,6 +1410,8 @@ size_t trdb_stimuli_to_tr_instr(const char *path, struct tr_instr **samples,
         (*samples)[scnt].compressed = compressed;
         scnt++;
     }
+    /* initialize the remaining unitialized memory */
+    memset((*samples)+scnt, 0, size - scnt);
 
     if (ferror(fp)) {
         perror("fscanf");
