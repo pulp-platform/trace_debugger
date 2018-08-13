@@ -35,7 +35,9 @@
 #include "../util.h"
 #include "../util.c"
 
-#define TRDB_TEST_VERBOSE 1
+/* TODO: replace return values with these */
+#define TRDB_TEST_SUCCESS 1
+#define TRDB_TEST_FAIL 0
 
 /* TODO: and-ing of test results for main return value */
 #define RUN_TEST(fun, ...)                                                     \
