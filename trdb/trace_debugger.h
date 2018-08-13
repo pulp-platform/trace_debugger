@@ -71,7 +71,8 @@ struct tr_instr {
  * list or array of tr_instr.
  */
 struct tr_packet {
-    uint32_t msg_type : 2;
+    uint32_t msg_type : 2; /* UltraSoC specific */
+    uint32_t len : 7;
     uint32_t format : 2;
 
     uint32_t branches : 5;
