@@ -1,7 +1,10 @@
 trace_debugger:
   files: [
+    rtl/trace_debugger_defines.sv,
     rtl/tracer_if.sv,
     rtl/tracer_reg_if.sv,
     rtl/trace_debugger.sv,
     rtl/trace_debugger_stimuli_gen.sv,
+    rtl/trdb_branch_map.sv,
+    rtl/trdb_priority.sv,
   ]
