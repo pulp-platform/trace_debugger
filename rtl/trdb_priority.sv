@@ -47,6 +47,12 @@ module trdb_priority
      output       trdb_format_t packet_format_o,
      output       trdb_subformat_t packet_subformat_o);
 
+    // TODO: temporarily put here to make it compile
+    logic         tc_unhalted_i     = '0;
+    logic         nc_halt_i         = '0;
+    logic         nc_unqualified_i  = '0;
+    logic         tc_context_change = '0;
+
     // TODO: same as in C-code, differential address generation when
     // TODO: assert for X's
     always_comb begin
@@ -62,8 +68,8 @@ module trdb_priority
             // TODO: missing some conditions
         end else if (tc_first_qualified_i || tc_unhalted_i ||
                      tc_privchange_i) begin
-            packet_format_o  = F_SYNC;
-            packet_subformat = SF_START;
+            packet_format_o    = F_SYNC;
+            packet_subformat_o = SF_START;
         end else if (lc_u_discontinuity_i) begin
             if(branch_map_empty_i)
                 packet_format_o = F_ADDR_ONLY;
@@ -77,11 +83,11 @@ module trdb_priority
             else
                 packet_format_o = F_BRANCH_FULL;
         end else if (branch_map_full_i) begin
-            packet_format = F_BRANCH_FULL;
+            packet_format_o = F_BRANCH_FULL;
         end else if (tc_context_change) begin
             packet_format_o    = F_SYNC;
             packet_subformat_o = SF_CONTEXT;
-        end else if begin
+        end else begin
             // no cases are matching so we don't want to emit a packet
             valid_o = '0;
         end

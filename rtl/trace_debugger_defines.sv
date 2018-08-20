@@ -12,6 +12,12 @@
 // Description:
 
 package trace_debugger_defines;
+
+parameter ILEN = 32;
+parameter XLEN = 32;
+parameter PRIVLEN = 3; //TODO: check this
+parameter CAUSELEN = 5;
+
 typedef enum logic[1:0]
 {
  F_BRANCH_FULL = 2'h0,

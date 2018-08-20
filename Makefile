@@ -11,18 +11,37 @@
 # Author: Robert Balas (balasr@student.ethz.ch)
 # Description: All in one
 
-VERILATOR ?= verilator
+VERILATOR		= verilator
 
-LINTER = $(VERILATOR) --lint-only
-MAKE = make
-CTAGS = ctags
+LINTER			= $(VERILATOR) --lint-only
+MAKE			= make
+CTAGS			= ctags
 
-RTLSRC := $(wildcard rtl/*.sv)
+VLIB			= vlib
+VWORK			= work
+
+VLOG			= vlog
+VLOG_FLAGS		=
+
+VOPT			= vopt
+VOPT_FLAGS		= -debugdb -fsmdebug +acc=mnprft
+
+VSIM			= vsim
+VSIM_FLAGS		= -c
+VSIM_DEBUG_FLAGS	= -gui
+
+RTLSRC			:= $(wildcard rtl/*.sv)
+RTLSRC_TB		:= $(wildcard tb/*.sv)
+RTLSRC_TB_TOP		:= tb/trdb_tb_top.sv
+RTLSRC_VLOG_TB_TOP	:= $(basename $(notdir $(RTLSRC_TB_TOP)))
+RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
+
 
 # rtl related targets
 .PHONY: lint
-lint: $(rtlsrcfiles)
+lint: $(RTLSRC)
 	$(LINTER) $(RTLSRC)
+
 
 # driver related targets
 .PHONY: driver-all
@@ -39,21 +58,50 @@ driver-clean:
 	$(MAKE) -C driver/lowlevel clean
 	$(MAKE) -C driver/rt clean
 
+
 # check if environment is setup properly
 check-env:
 ifndef PULP_SDK_HOME
   $(error PULP_SDK_HOME is undefined)
 endif
 
+
+# testbench compilation and optimization
+vlib:
+	$(VLIB) $(VWORK)
+
+vlog: vlib $(RTLSRC_TB)
+	$(VLOG) -work $(VWORK) $(VLOG_FLAGS) $(RTLSRC_TB) $(RTLSRC)
+
+.PHONY: vopt
+vopt: vlog
+	$(VOPT) -work $(VWORK) $(VOPT_FLAGS) $(RTLSRC_VLOG_TB_TOP) -o \
+	$(RTLSRC_VOPT_TB_TOP)
+
+.PHONY: tb
+tb: vopt
+	$(VSIM) -work $(VWORK) $(VSIM_FLAGS) $(RTLSRC_VOPT_TB_TOP)
+
+.PHONY: tb-gui
+tb-gui: VSIM_FLAGS = $VSIM_DEBUG_FLAGS
+tb-gui: tb
+
+.PHONY: tb-clean
+tb-clean:
+	if [ -d $(VWORK) ]; then rm -r $(VWORK); fi
+	rm transcript
+	rm vsim.wlf
+
 # general targets
 TAGS: check-env
-	$(CTAGS) -R -e -h=".c.h" --exclude=$(PULP_SDK_HOME) . $(PULP_PROJECT_HOME)
+	$(CTAGS) -R -e -h=".c.h" --exclude=$(PULP_SDK_HOME) .\
+	$(PULP_PROJECT_HOME)
 
 .PHONY: all
 all: driver-all
 
 .PHONY: clean
-clean: driver-clean
+clean: driver-clean tb-clean
 
 .PHONY: distclean
 distclean: clean
