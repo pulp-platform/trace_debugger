@@ -9,31 +9,27 @@
 // specific language governing permissions and limitations under the License.
 //
 // Author: Robert Balas (balasr@student.ethz.ch)
-// Description: Testbench
+// Description: SV representation of a stimuli file
 
-import trdb_tb_defines::*;
+import trace_debugger_defines::*;
 
-module trdb_tb
-    (trace_debugger_if.tb tb_if);
+class Stimuli;
+    // TODO: make struct instead
+    logic                ivalid[$];
+    logic                iexception[$];
+    logic                interrupt[$];
+    logic [CAUSELEN-1:0] cause[$];
+    logic [XLEN-1:0]     tval[$];
+    logic [PRIVLEN-1:0]  priv[$];
+    logic [XLEN-1:0]     iaddr[$];
+    logic [ILEN-1:0]     instr[$];
+    logic                compressed[$];
 
-    // run test like instantiate a module
-    tb_run i_tb_run();
+    function new();
+    endfunction
 
-program automatic tb_run();
-    Driver driver;
-    Monitor monitor;
-    mailbox #(Stimuli) mail;
+    function void print;
 
-    initial begin
-        driver  = new(tb_if, mail);
-        monitor = new(tb_if, mail);
+    endfunction
 
-        fork
-            driver.run();
-            monitor.run();
-        join
-    end
-
-endprogram
-
-endmodule // trdb_tb
+endclass // Stimuli

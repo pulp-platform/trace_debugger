@@ -9,31 +9,43 @@
 // specific language governing permissions and limitations under the License.
 //
 // Author: Robert Balas (balasr@student.ethz.ch)
-// Description: Testbench
+// Description: Acquisition of output
 
-import trdb_tb_defines::*;
 
-module trdb_tb
-    (trace_debugger_if.tb tb_if);
+class Monitor;
 
-    // run test like instantiate a module
-    tb_run i_tb_run();
-
-program automatic tb_run();
-    Driver driver;
-    Monitor monitor;
+    virtual trace_debugger_if duv_if;
     mailbox #(Stimuli) mail;
 
-    initial begin
-        driver  = new(tb_if, mail);
-        monitor = new(tb_if, mail);
+    function new(virtual trace_debugger_if duv_if, mailbox #(Stimuli) mail);
+        this.duv_if = duv_if;
+        this.mail   = mail;
+    endfunction
 
-        fork
-            driver.run();
-            monitor.run();
-        join
-    end
+    class Statistics;
 
-endprogram
+        function void print();
+        endfunction;
 
-endmodule // trdb_tb
+    endclass // Statistics
+
+
+    task run_golden_model();
+
+    endtask
+
+
+    task run();
+        Statistics stats = new();
+        // TODO: run golden model
+
+        // TODO: read output of rtl model
+        @(posedge this.duv_if.clk_i);
+        #STIM_APPLICATION_DEL;
+
+        repeat(10)
+            @(posedge this.duv_if.clk_i);
+
+    endtask
+
+endclass // Monitor
