@@ -37,6 +37,7 @@
 #define CAUSELEN 5
 #define PRIVLEN 5
 #define ILEN 32
+#define CONTEXTLEN 32
 
 #define INSTR_STR_LEN 128
 /* Sample captured by the interface to the RISC-V CPU.*/
@@ -51,7 +52,7 @@ struct tr_instr {
     uint32_t instr : ILEN;     /* ILEN */
     bool compressed;
     /* Disassembled name, only sometimes valid */
-    char str[INSTR_STR_LEN];
+    char str[INSTR_STR_LEN]; /* Fixed width strings are supposedly bad */
 
     // TODO: put this into trdb_packet instead
     struct list_head list;
@@ -73,7 +74,7 @@ struct tr_instr {
  * basically just need a length field to delimit the payload.
  */
 struct trdb_packet {
-    uint32_t len : 7;
+    uint32_t lenth : 7;
     struct tr_packet *payload;
 };
 
@@ -90,7 +91,7 @@ struct tr_packet {
     uint32_t branch_map;
 
     uint32_t subformat : 2;
-    uint32_t context;
+    uint32_t context : CONTEXTLEN;
     uint32_t privilege : PRIVLEN;
     /* we need this if the first instruction of an exception is a branch, since
      * that won't be reorcded into the branch map
@@ -177,7 +178,7 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
 /* struct packet0 {
  *     uint32_t format : 2;   // 00
  *     uint32_t branches : 5;
- *     uint32_t branch_map;
+ *     uint32_t branch_map; //TODO: fix to 31 bits
  *     uint32_t address;
  * };
  *
