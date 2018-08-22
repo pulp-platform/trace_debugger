@@ -33,12 +33,11 @@ module trace_debugger
      input logic [ILEN-1:0]     instr_i,
      input logic                compressed_i);
 
-    //
-    logic                       interrupt;
-    logic [CAUSELEN-1:0]        cause;
-    logic [PRIVLEN-1:0]         priv;
-    logic [XLEN-1:0]            iaddr;
-    logic [ILEN-1:0]            instr;
+    // unused variables for a more extensive implementation
+    // riscy doesn't have those features
+    logic [XLEN-1:0]            lc_tval;
+    logic [CONTEXTLEN-1:0]      tc_context;
+
 
     // we have three phases, called next cycle (nc), this cycle (tc) and next
     // cycle (nc), based on which we make decision whether we need to emit a
@@ -52,11 +51,18 @@ module trace_debugger
     logic                       tc_branch_taken, nc_branch_taken;
     logic                       tc_qualified, lc_qualified;
     logic                       tc_compressed;
-    logic                       tc_iaddr, nc_iaddr;
+    logic [XLEN-1:0]            tc_iaddr, nc_iaddr;
+
+    // pass delayed data
+    logic [CAUSELEN-1:0]        lc_cause;
+    logic                       lc_interupt;
+
 
     // registers to hold onto the input data for a few phases, mostly one
     logic                       interrupt0_q, interrupt0_d;
+    logic                       interrupt1_q, interruptj_d;
     logic [CAUSELEN-1:0]        cause0_q, cause0_d;
+    logic [CAUSELEN-1:0]        cause1_q, cause1_d;
     logic [PRIVLEN-1:0]         priv0_q, priv0_d;
     logic                       privchange0_q, privchange0_d;
     logic                       exception0_q, exception0_d,
@@ -81,10 +87,18 @@ module trace_debugger
     trdb_format_t               packet_format;
     trdb_subformat_t            packet_subformat;
 
+    // generated packet
+
+    logic [PACKET_LEN-1:0]      packet_bits;
+    logic [6:0]                 packet_len;
+    logic                       packet_gen_valid;
+
 
     // manage their input and outputs
     assign interrupt0_d = interrupt_i;
+    assign interrupt1_d = interrupt1_q;
     assign cause0_d = cause_i;
+    assign cause1_d = cause0_q;
     assign priv0_d = priv_i;
     // assign privchange0_d = ;
     assign exception0_d = iexception_i;
@@ -102,6 +116,8 @@ module trace_debugger
     // Hook phase related variables up to proper register
     assign nc_priv = priv0_d;
     assign tc_priv = priv0_q;
+    assign lc_interrupt = interrupt1_q;
+    assign lc_cause = cause1_q;
     assign nc_privchange = privchange0_d;
     assign tc_privchange = privchange0_q;
     assign nc_exception = exception0_d;
@@ -123,7 +139,7 @@ module trace_debugger
 
     // decide whether we have a branch instruction
     // beq, bne, blt, bge, bltu, bgeu, p_bneimm, p_beqimm
-    always_comb begin
+    always_comb begin: is_branch
         is_branch0_d
             = ((instr_i & MASK_BEQ)      == MATCH_BEQ) &
               ((instr_i & MASK_BNE)      == MATCH_BNE) &
@@ -137,7 +153,7 @@ module trace_debugger
 
     // decide whether we have a unpredictable discontinuity
     // jalr, mret, sret, uret
-    always_comb begin
+    always_comb begin: is_discontinuity
         u_discontinuity0_d
             = ((instr_i & MASK_JALR) == MATCH_JALR) &
               ((instr_i & MASK_MRET) == MATCH_MRET) &
@@ -146,13 +162,13 @@ module trace_debugger
     end
 
     // figure out whether we are dealing with the first qualified instruction
-    always_comb begin
+    always_comb begin: is_qualified
         tc_first_qualified = !lc_qualified && tc_qualified;
     end
 
     // is this branch taken?
     // TODO: change to tc_compressed? 2 :4
-    always_comb begin
+    always_comb begin: is_branch_taken
         tc_branch_taken = tc_compressed ?
                           !(tc_iaddr + 2 == nc_iaddr):
                           !(tc_iaddr + 4 == nc_iaddr);
@@ -163,7 +179,7 @@ module trace_debugger
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
          .valid_i(tc_is_branch),
-         .is_branch_i(tc_is_branch),
+         .branch_taken_i(tc_branch_taken),
          .flush_i(branch_map_flush),
          .map_o(branch_map),
          .branches_o(branch_map_cnt),
@@ -202,11 +218,36 @@ module trace_debugger
      .packet_format_o(packet_format),
      .packet_subformat_o(packet_subformat));
 
+    trdb_packet_emitter i_trdb_packet_emitter
+        (.clk_i(clk_i),
+         .rst_ni(rst_ni),
+         .packet_format_i(packet_format),
+         .packet_subformat_i(packet_subformat),
+         .valid_i(packet_valid),
+         .interrupt_i(lc_interrupt), // get the value of the trapped instr
+         .cause_i(lc_cause),
+         .tval_i(lc_tval),
+         .priv_i(tc_priv),
+         .iaddr_i(tc_iaddr),
+         .context_i(tc_context),
+         .branch_map_i(branch_map),
+         .branch_map_cnt_i(branch_map_cnt),
+         .branch_map_empty_i(branch_map_empty),
+         .is_branch_i(tc_is_branch),
+
+         .packet_bits_o(packet_bits),
+         .packet_len_o(packet_len),
+         .valid_o(packet_gen_valid)
+         );
+
+
     // TODO: assert that we are not dealing with an unsupported instruction
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
             interrupt0_q       <= '0;
+            interrupt1_q       <= '0;
             cause0_q           <= '0;
+            cause1_q           <= '0;
             priv0_q            <= '0;
             exception0_q       <= '0;
             exception1_q       <= '0;
@@ -219,7 +260,9 @@ module trace_debugger
             qualified1_q       <= '0;
         end else begin
             interrupt0_q       <= interrupt0_d;
+            interrupt1_q       <= interrupt1_d;
             cause0_q           <= cause0_d;
+            cause1_q           <= cause1_d;
             priv0_q            <= priv0_d;
             privchange0_q      <= privchange0_d;
             exception0_q       <= exception0_d;

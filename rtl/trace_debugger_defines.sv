@@ -17,6 +17,8 @@ parameter ILEN = 32;
 parameter XLEN = 32;
 parameter PRIVLEN = 3; //TODO: check this
 parameter CAUSELEN = 5;
+parameter CONTEXTLEN = 32; //TODO: currently not used
+parameter PACKET_LEN = 128;
 
 typedef enum logic[1:0]
 {
