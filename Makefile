@@ -24,15 +24,18 @@ VLOG			= vlog
 VLOG_FLAGS		=
 
 VOPT			= vopt
-VOPT_FLAGS		= -debugdb -fsmdebug +acc=mnprft
+VOPT_FLAGS		= -debugdb -fsmdebug +acc #=mnprft
 
 VSIM			= vsim
 VSIM_FLAGS		= -c
 VSIM_DEBUG_FLAGS	= -gui
 
-RTLSRC			:= $(wildcard rtl/*.sv)
-RTLSRC_TB		:= $(wildcard tb/*.sv)
-RTLSRC_TB_TOP		:= tb/trdb_tb_top.sv
+RTLSRC_TB_PKG		:= $(wildcard tb/*_defines.sv)
+RTLSRC_TB_TOP		:= $(wildcard tb/*_top.sv)
+RTLSRC_TB		:= $(filter-out $(RTLSRC_TB_PKG), $(wildcard tb/*.sv))
+RTLSRC_PKG		:= $(wildcard rtl/*_defines.sv)
+RTLSRC			:= $(filter-out $(RTLSRC_PKG), $(wildcard rtl/*.sv))
+
 RTLSRC_VLOG_TB_TOP	:= $(basename $(notdir $(RTLSRC_TB_TOP)))
 RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
@@ -71,7 +74,8 @@ vlib:
 	$(VLIB) $(VWORK)
 
 vlog: vlib $(RTLSRC_TB)
-	$(VLOG) -work $(VWORK) $(VLOG_FLAGS) $(RTLSRC_TB) $(RTLSRC)
+	$(VLOG) -work $(VWORK) $(VLOG_FLAGS) $(RTLSRC_PKG) $(RTLSRC) \
+	$(RTLSRC_TB_PKG) $(RTLSRC_TB)
 
 .PHONY: vopt
 vopt: vlog
@@ -89,8 +93,8 @@ tb-gui: tb
 .PHONY: tb-clean
 tb-clean:
 	if [ -d $(VWORK) ]; then rm -r $(VWORK); fi
-	rm transcript
-	rm vsim.wlf
+	rm -f transcript
+	rm -f vsim.wlf
 
 # general targets
 TAGS: check-env
