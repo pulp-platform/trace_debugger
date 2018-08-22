@@ -17,7 +17,7 @@ module trdb_branch_map
      input logic         rst_ni,
 
      input logic         valid_i,
-     input logic         is_branch_i,
+     input logic         branch_taken_i,
      input logic         flush_i,
 
      output logic [30:0] map_o,
@@ -28,7 +28,7 @@ module trdb_branch_map
     logic [30:0]         map_d, map_q;
     logic [4:0]          branchcnt_d, branchcnt_q;
 
-    // when valid_i then store the new branch value is_branch_i into map_d.
+    // when valid_i then store the new branch value branch_taken_i into map_d.
     // branchcnt_q contains the current number of stored branches.
     always_comb begin
         map_d       = map_q;
@@ -41,10 +41,10 @@ module trdb_branch_map
 
         if(valid_i) begin
             if(flush_i) begin
-                map_d[0]    = is_branch_i;
+                map_d[0]    = branch_taken_i;
                 branchcnt_d = 5'b1;
             end else begin
-                map_d[branchcnt_q] = is_branch_i;
+                map_d[branchcnt_q] = branch_taken_i;
                 branchcnt_d        = branchcnt_q + 1;
             end
         end
