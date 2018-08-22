@@ -21,10 +21,10 @@ VLIB			= vlib
 VWORK			= work
 
 VLOG			= vlog
-VLOG_FLAGS		=
+VLOG_FLAGS		= -pedanticerrors
 
 VOPT			= vopt
-VOPT_FLAGS		= -debugdb -fsmdebug +acc #=mnprft
+VOPT_FLAGS		= -debugdb -fsmdebug -pedanticerrors +acc #=mnprft
 
 VSIM			= vsim
 VSIM_FLAGS		= -c
