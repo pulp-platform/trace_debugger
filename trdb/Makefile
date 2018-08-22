@@ -7,7 +7,8 @@ LIB_PATHS       = /scratch/balasr/pulp-riscv-binutils-gdb/opcodes \
 		/scratch/balasr/pulp-riscv-binutils-gdb/bfd \
 		/scratch/balasr/pulp-riscv-binutils-gdb/libiberty \
 		/scratch/balasr/pulp-riscv-binutils-gdb/zlib
-INCLUDE_PATHS   = /scratch/balasr/pulp-riscv-binutils-gdb/include
+INCLUDE_PATHS   = /scratch/balasr/pulp-riscv-binutils-gdb/include \
+		/usr/include
 MORE_TAG_PATHS  = /scratch/balasr/pulp-riscv-binutils-gdb/bfd
 
 LDFLAGS		= $(addprefix -L, $(LIB_PATHS))

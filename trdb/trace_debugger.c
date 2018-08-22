@@ -1354,7 +1354,7 @@ fail:
 
 /* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
 size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
-                                int *status)
+                             int *status)
 {
     *status = 0;
     FILE *fp = fopen(path, "r");

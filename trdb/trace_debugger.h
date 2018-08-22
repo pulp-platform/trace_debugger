@@ -53,6 +53,7 @@ struct tr_instr {
     /* Disassembled name, only sometimes valid */
     char str[INSTR_STR_LEN];
 
+    // TODO: put this into trdb_packet instead
     struct list_head list;
 };
 
@@ -66,15 +67,24 @@ struct tr_instr {
 #define SF_EXCEPTION 1
 #define SF_CONTEXT 2
 
+/* This is the high level definition of packet with some meta information about
+ * a tr_packet (or any other). This is not part of the riscv-trace-spec.pdf and
+ * specific to the platform. Since we are only handling tr_packets we omit
+ * basically just need a length field to delimit the payload.
+ */
+struct trdb_packet {
+    uint32_t len : 7;
+    struct tr_packet *payload;
+};
+
 /* Canonical trace packet representation. There are four possible
  * packet types. See riscv-trace-spec.pdf for details. A list or array
  * of such packets and a bfd struct represent together a compressed
  * list or array of tr_instr.
  */
 struct tr_packet {
-    uint32_t msg_type : 2; /* UltraSoC specific */
+    uint32_t msg_type : 2; /* UltraSoC specific TODO: remove*/
     uint32_t format : 2;
-    uint32_t len : 7;
 
     uint32_t branches : 5;
     uint32_t branch_map;
@@ -161,11 +171,10 @@ int trdb_write_packets(const char *path, struct list_head *packet_list);
  * and 0 on succes.
  */
 size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
-                                int *status);
+                             int *status);
 
 
 /* struct packet0 {
- *     uint32_t msg_type : 2;
  *     uint32_t format : 2;   // 00
  *     uint32_t branches : 5;
  *     uint32_t branch_map;
@@ -173,23 +182,18 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
  * };
  *
  * struct packet1 {
- *     uint32_t msg_type : 2;
  *     uint32_t format : 2;   // 01
- *     uint32_t len: 7;
  *     uint32_t branches : 5;
  *     uint32_t branch_map;
  *     uint32_t address;
  * };
  *
  * struct packet2 {
- *     uint32_t msg_type : 2;
  *     uint32_t format : 2;
- *     uint32_t len: 7;
  *     uint32_t address;
  * };
  *
  * struct packet3 {
- *     uint32_t msg_type : 2;
  *     uint32_t format : 2;
  *     uint32_t subformat : 2;
  *     uint32_t context;
