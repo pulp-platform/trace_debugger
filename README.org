@@ -1,0 +1,68 @@
+* TRDB -- Trace Debugger For RISC-V Core
+** Overview
+An instruction tracer records the sequence of instructions that the CPU
+executes. Since the required bandwidth to record every instruction directly and
+stream it out through some interface is immense, that's why we employ a few
+compression techniques, most notable a method called branch tracing. In branch
+tracing we only record changes in the control flow which are unpredictable by
+looking at the executed binary. In RISC-V that boils down to branches, jumps
+which depends on some registry value and exceptions. Every time the CPU hits
+such a discontinuity, we emit a packet which contains enough information to
+describe the changes. Such a sequence of packages and the binary which as used
+to produced it can be used to reconstruct the original sequence of executed
+instructions, as long as we don't have any self-modifying code.
+
+If one is interested in not only the instructions but also their operand values,
+such as the read and written data and their address, then one would have to do
+data tracing. Drawbacks are that bandwidth rises dramatically compared to
+plain instruction tracing and that the implementation becomes more complicated,
+but this solves the self-modying code problem.
+
+On the PULP platform we rarely deal with the self-modying code issue except for
+the interrupt vector table, which gets populated during runtime. This problem
+can be solved withouth employing data tracing by emitting additional packets
+during an exception, so as to record the first instruction of the exception
+handler.
+
+This project currently contains an instruction tracer for the RISCY core of
+the PULP platform (RTL model), a C model of the tracer and C routines to
+decompress recorded traces in the packet format.
+
+** Packet Format
+The used packet format is described [[https://github.com/riscv/riscv-trace-spec][here]].
+
+** Organization
+#+BEGIN_EXAMPLE
+.
+|-- doc
+|-- driver           Trace debugger driver for the PULP platform
+|-- include
+|-- rtl              RTL model of the trace debugger
+|-- tb               Testbench, uses the C model as golden model
+|-- trdb             Decompression routine and C model
+|-- waves
+|-- LICENSE
+|-- Makefile
+|-- README.org       This file
+`-- src_files.yml    Configuration file to use it as an IP in the PULP platform
+#+END_EXAMPLE
+
+** Dependencies for TRDB
+   Requires =libbfd.a=, =libopcodes.a=, =libiberty.a= and =libzlib.a= from
+   binutils built using [[https://github.com/pulp-platform/pulp-riscv-gnu-toolchain][this]] with the =trace_dbg_dev= branch. Build it by
+   calling =./configure --enable-targets=riscv32, x86_64-pc-linux-gnu= and then
+   =make all=. TODO: improve this part.
+
+** Building the C model and decompression code
+   Run =make all= in =trdb/= for a release build. Make sure to link the
+   dependencies properly.
+
+** Building the driver for the PULP platform
+   Make sure you have setup the [[https://github.com/pulp-platform/pulp-sdk][PULP SDK]] as described there and have put in in
+   your =$PATH$= environment variable. Then run =make driver-all=.
+
+** Generating tag files
+   Run =make TAGS= to generate etag files for emacs.
+
+** Building the documation
+   TODO: improve this
