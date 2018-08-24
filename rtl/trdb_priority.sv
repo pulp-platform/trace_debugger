@@ -12,7 +12,7 @@
 // Description: Order packet generation request by priority
 
 
-import trace_debugger_defines::*;
+import trdb_pkg::*;
 
 // TODO: add commented out signals
 module trdb_priority

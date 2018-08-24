@@ -11,7 +11,7 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description:
 
-package trace_debugger_defines;
+package trdb_pkg;
 
 parameter ILEN = 32;
 parameter XLEN = 32;

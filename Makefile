@@ -30,11 +30,11 @@ VSIM			= vsim
 VSIM_FLAGS		= -c
 VSIM_DEBUG_FLAGS	= -gui
 
-RTLSRC_TB_PKG		:= $(wildcard tb/*_defines.sv)
+RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
 RTLSRC_TB_TOP		:= $(wildcard tb/*_top.sv)
-RTLSRC_TB		:= $(filter-out $(RTLSRC_TB_PKG), $(wildcard tb/*.sv))
-RTLSRC_PKG		:= $(wildcard rtl/*_defines.sv)
-RTLSRC			:= $(filter-out $(RTLSRC_PKG), $(wildcard rtl/*.sv))
+RTLSRC_TB		:= $(wildcard tb/*.sv)
+RTLSRC_PKG		:= $(wildcard include/trdb_pkg.sv)
+RTLSRC			:= $(wildcard rtl/*.sv)
 
 RTLSRC_VLOG_TB_TOP	:= $(basename $(notdir $(RTLSRC_TB_TOP)))
 RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
@@ -77,18 +77,18 @@ vlog: vlib $(RTLSRC_TB)
 	$(VLOG) -work $(VWORK) $(VLOG_FLAGS) $(RTLSRC_PKG) $(RTLSRC) \
 	$(RTLSRC_TB_PKG) $(RTLSRC_TB)
 
-.PHONY: vopt
-vopt: vlog
+.PHONY: tb-all
+tb-all: vlog
 	$(VOPT) -work $(VWORK) $(VOPT_FLAGS) $(RTLSRC_VLOG_TB_TOP) -o \
 	$(RTLSRC_VOPT_TB_TOP)
 
-.PHONY: tb
-tb: vopt
+.PHONY: tb-run
+tb-run: tb-all
 	$(VSIM) -work $(VWORK) $(VSIM_FLAGS) $(RTLSRC_VOPT_TB_TOP)
 
-.PHONY: tb-gui
-tb-gui: VSIM_FLAGS = $VSIM_DEBUG_FLAGS
-tb-gui: tb
+.PHONY: tb-run-gui
+tb-run-gui: VSIM_FLAGS = $VSIM_DEBUG_FLAGS
+tb-run-gui: tb
 
 .PHONY: tb-clean
 tb-clean:

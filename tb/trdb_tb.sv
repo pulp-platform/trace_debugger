@@ -11,7 +11,7 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: Testbench
 
-import trdb_tb_defines::*;
+import trdb_tb_pkg::*;
 
 module trdb_tb
     (trace_debugger_if.tb tb_if);

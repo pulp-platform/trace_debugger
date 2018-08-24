@@ -15,7 +15,7 @@ interface trace_debugger_if
     (input logic                clk_i,
      input logic                rst_ni);
 
-    import trace_debugger_defines::*;
+    import trdb_pkg::*;
 
     logic                ivalid;
     logic                iexception;

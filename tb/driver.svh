@@ -11,8 +11,8 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: Push stimuli to duv
 
-import trace_debugger_defines::*;
-import trdb_tb_defines::*;
+import trdb_pkg::*;
+import trdb_tb_pkg::*;
 
 class Driver;
 

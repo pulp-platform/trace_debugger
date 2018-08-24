@@ -12,7 +12,7 @@
 // Description: Compress instruction traces and filter them
 
 
-import trace_debugger_defines::*;
+import trdb_pkg::*;
 
 module trace_debugger
     #(parameter ILEN = 32,

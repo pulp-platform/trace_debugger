@@ -12,7 +12,7 @@
 // Description: Generate packet on output on request
 
 
-import trace_debugger_defines::*;
+import trdb_pkg::*;
 
 
 module trdb_packet_emitter

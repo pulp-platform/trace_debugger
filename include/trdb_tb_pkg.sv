@@ -10,9 +10,9 @@
 //
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: Testbench settings
-package trdb_tb_defines;
+package trdb_tb_pkg;
 
-    import trace_debugger_defines::*;
+    import trdb_pkg::*;
     
     parameter int DEBUG = 1;
 
@@ -42,10 +42,10 @@ package trdb_tb_defines;
         logic            compressed;
     } trdb_instr;
 
-`include "stimuli.svh"
-`include "driver.svh"
-`include "monitor.svh"
+`include "../tb/stimuli.svh"
+`include "../tb/driver.svh"
+`include "../tb/monitor.svh"
 
-endpackage // trdb_tb_defines
+endpackage // trdb_tb_pkg
     
 

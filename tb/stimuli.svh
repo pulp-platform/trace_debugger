@@ -11,7 +11,7 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: SV representation of a stimuli file
 
-import trace_debugger_defines::*;
+import trdb_pkg::*;
 
 class Stimuli;
     // TODO: make struct instead

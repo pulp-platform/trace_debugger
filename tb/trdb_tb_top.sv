@@ -16,7 +16,7 @@
 
 module trdb_tb_top
     ();
-    import trdb_tb_defines::*;
+    import trdb_tb_pkg::*;
 
     // testbench signals to dut
     logic      clk = 'b1;
