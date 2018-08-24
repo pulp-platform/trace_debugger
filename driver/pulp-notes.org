@@ -1,0 +1,89 @@
+* Notes on using the PULP-SDK
+** Flavours
+     ~make conf gui=1 CONFIG_OPT=rt/trace=1 gdb=1~
+
+     ~make conf gui=1 CONFIG_OPT="rt/trace=1 vsim/args=-debugdb" gdb=1~
+
+     ~make conf gui=1 CONFIG_OPT="rt/trace=1 vsim/args=-debugdb vsim/tcl_args=-fsmdebug" clean all run~
+
+** Compiler settings
+   Run =/home/msc18f22/projects/pulp-sdk/pkg/pulp_riscv_gcc/1.0.5/bin/riscv32-unknown-elf-gcc -march=rv32imcxpulpv2 -Q --help=target=
+   The following settings are available
+  + -mComp                      		[disabled]
+  + -mDIE=                      		0
+  + -mEci                       		[disabled]
+  + -mFC=                       		0
+  + -mL1Cl=                     		0
+  + -mL1Fc=                     		0
+  + -mL2=                       		0
+  + -mPE=                       		0
+  + -mWci                       		[disabled]
+  + -mabi=                      		ilp32
+  + -march=                     		rv32imcxpulpv2
+  + -mbranch-cost=N             		0
+  + -mchip=                     		[default]
+  + -mcmodel=                   		medlow
+  + -mconf=                     		all
+  + -mcpu=                      		pulpv2
+  + -mdf                        		[disabled]
+  + -mdiv                       		[disabled]
+  + -mexplicit-relocs           		[disabled]
+  + -mfdiv                      		[disabled]
+  + -mfpdouble=                 		double
+  + -mmemcpy                    		[disabled]
+  + -mnativeomp                 		[disabled]
+  + -mnoabs                     		[disabled]
+  + -mnoaddsubnormround         		[disabled]
+  + -mnobitop                   		[disabled]
+  + -mnoclip                    		[disabled]
+  + -mnofinduct                 		[disabled]
+  + -mnohwloop                  		[disabled]
+  + -mnoindregreg               		[disabled]
+  + -mnomac                     		[disabled]
+  + -mnominmax                  		[disabled]
+  + -mnomulmacnormround         		[disabled]
+  + -mnopartmac                 		[disabled]
+  + -mnopostmod                 		[disabled]
+  + -mnosext                    		[disabled]
+  + -mnoshufflepack             		[disabled]
+  + -mnoslet                    		[disabled]
+  + -mnovect                    		[disabled]
+  + -mplt                       		[enabled]
+  + -mreg=                      		32
+  + -msave-restore              		[disabled]
+  + -msloop                     		[disabled]
+  + -msmall-data-limit=N        		8
+  + -mstrict-align              		[disabled]
+  + -mtune=PROCESSOR
+
+** Code fragments on programming the event unit
+    #+BEGIN_SRC C
+    printf("UDMA base address: 0x%x\n", ARCHI_SOC_PERIPHERALS_ADDR + ARCHI_UDMA_OFFSET);
+    printf("hal_udma_channel_base: %d@0x%x\n", 9, hal_udma_channel_base(9));
+    printf("hal_udma_channel_base: %d@0x%x\n", 8, hal_udma_channel_base(8));
+    printf("hal_udma_channel_base: %d@0x%x\n", 7, hal_udma_channel_base(7));
+    printf("hal_udma_channel_base: %d@0x%x\n", 6, hal_udma_channel_base(6));
+    printf("hal_udma_channel_base: %d@0x%x\n", 5, hal_udma_channel_base(5));
+    printf("hal_udma_channel_base: %d@0x%x\n", 4, hal_udma_channel_base(4));
+    printf("hal_udma_channel_base: %d@0x%x\n", 3, hal_udma_channel_base(3));
+    printf("hal_udma_channel_base: %d@0x%x\n", 2, hal_udma_channel_base(2));
+    printf("hal_udma_channel_base: %d@0x%x\n", 1, hal_udma_channel_base(1));
+    printf("hal_udma_channel_base: %d@0x%x\n", 0, hal_udma_channel_base(0));
+    //((id)<<4)
+    // ARCHI_SOC_PERIPHERALS_ADDR + ARCHI_UDMA_OFFSET +
+    // UDMA_PERIPH_OFFSET(id>>1) + UDMA_CHANNEL_OFFSET(id&1)
+    // UDMA_PERIPH_AREA_SIZE_LOG2  7
+    //((id)<<UDMA_PERIPH_AREA_SIZE_LOG2)
+    // UDMA_PERIPH_OFFSET(id) = ((id) << 7)
+    // ARCHI_SOC_PERIPHERALS_ADDR + ARCHI_UDMA_OFFSET + id << 6 + (id&1) <<4
+    printf("pulp.h macro: 0x%x\n", UDMA_TRACER_RX_ADDR(0));
+    // ARCHI_SOC_PERIPHERALS_ADDR + ARCHI_UDMA_OFFSET + UDMA_TRACER_OFFSET(id) +
+    // UDMA_CHANNEL_RX_OFFSET
+    printf("manual enqueue:\n");
+    plp_udma_enqueue(0x1a102380, (unsigned int)buffers[0], BUFF_SIZE,
+    		     0 | UDMA_CHANNEL_CFG_EN);
+
+    wait_soc_event(ARCHI_SOC_EVENT_TRACER_RX(0));
+    clear_soc_event(ARCHI_SOC_EVENT_TRACER_RX(0));
+    printf("soc event cleared\n");
+    #+END_SRC
