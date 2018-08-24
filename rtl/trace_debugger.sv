@@ -18,8 +18,7 @@ module trace_debugger
     #(parameter ILEN = 32,
       parameter XLEN = 32,
       parameter PRIVLEN = 3, //TODO: check this
-      parameter CAUSELEN = 5
-      )
+      parameter CAUSELEN = 5)
     (input logic                clk_i,
      input logic                rst_ni,
 
@@ -32,6 +31,9 @@ module trace_debugger
      input logic [XLEN-1:0]     iaddr_i,
      input logic [ILEN-1:0]     instr_i,
      input logic                compressed_i);
+
+    // TODO: add dependencies for this
+    // APB_BUS.Slave              apb_slave);
 
     // unused variables for a more extensive implementation
     // riscy doesn't have those features
@@ -188,35 +190,35 @@ module trace_debugger
 
 
     trdb_priority i_trdb_priority
-    (.clk_i(clk_i),
-     .rst_ni(rst_ni),
+        (.clk_i(clk_i),
+         .rst_ni(rst_ni),
 
-     .lc_exception_i(lc_exception),
-     //input logic lc_emitted_exception_sync (hack)
+         .lc_exception_i(lc_exception),
+         //input logic lc_emitted_exception_sync (hack)
 
-     .tc_first_qualified_i(tc_first_qualified),
-     //input logic  tc_unhalted,
-     .tc_privchange_i(tc_privchange),
-     //input logic resync & branch_map_cnt
+         .tc_first_qualified_i(tc_first_qualified),
+         //input logic  tc_unhalted,
+         .tc_privchange_i(tc_privchange),
+         //input logic resync & branch_map_cnt
 
-     .lc_u_discontinuity_i(lc_u_discontinuity),
+         .lc_u_discontinuity_i(lc_u_discontinuity),
 
-     // input logic  resync
-     // input logic  branch_map_nonempty,
+         // input logic  resync
+         // input logic  branch_map_nonempty,
 
-     //input logic  nc_halt,
-     .nc_exception_i(nc_exception),
-     .nc_privchange_i(nc_privchange),
-     //input logic  nc_qualified,
+         //input logic  nc_halt,
+         .nc_exception_i(nc_exception),
+         .nc_privchange_i(nc_privchange),
+         //input logic  nc_qualified,
 
-     .branch_map_full_i(branch_map_full),
+         .branch_map_full_i(branch_map_full),
 
-     //input logic  tc_context_change,
+         //input logic  tc_context_change,
 
-     .branch_map_empty_i(branch_map_empty),
-     .valid_o(packet_valid),
-     .packet_format_o(packet_format),
-     .packet_subformat_o(packet_subformat));
+         .branch_map_empty_i(branch_map_empty),
+         .valid_o(packet_valid),
+         .packet_format_o(packet_format),
+         .packet_subformat_o(packet_subformat));
 
     trdb_packet_emitter i_trdb_packet_emitter
         (.clk_i(clk_i),
