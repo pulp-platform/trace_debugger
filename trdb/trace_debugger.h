@@ -17,9 +17,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- * Author: Robert Balas (balasr@student.ethz.ch)
- * Description: Software model for the hardware trace debugger
+/**
+ * @file trace_debugger.h
+ * @author Robert Balas (balasr@student.ethz.ch)
+ * @date 24 Aug 2018
+ * @brief Software model for the hardware trace debugger.
  */
 
 #ifndef __TRACE_DEBUGGER_H__
@@ -40,25 +42,28 @@
 #define CONTEXTLEN 32
 
 #define INSTR_STR_LEN 128
-/* Sample captured by the interface to the RISC-V CPU.*/
+/**
+ * Retired instruction captured by the interface to the RISC-V CPU, with some
+ * metadata.
+ */
 struct tr_instr {
-    /* bool valid; */ /* implicitely true */
-    bool exception;
-    bool interrupt;
-    uint32_t cause : CAUSELEN; /* CAUSELEN */
-    uint32_t tval : XLEN;      /* XLEN */
-    uint32_t priv : PRIVLEN;   /* PRIVLEN */
-    uint32_t iaddr : XLEN;     /* XLEN */
-    uint32_t instr : ILEN;     /* ILEN */
-    bool compressed;
+    /* bool valid; */          /* implicitely true */
+    bool exception;            /**< instruction trapped */
+    bool interrupt;            /**< exception caused by interrupt */
+    uint32_t cause : CAUSELEN; /**< exception cause */
+    uint32_t tval : XLEN;      /**< not used in PULP, trap value */
+    uint32_t priv : PRIVLEN;   /**< privilege mode */
+    uint32_t iaddr : XLEN;     /**< instruction address */
+    uint32_t instr : ILEN;     /**< raw instruction value */
+    bool compressed;           /**< instruction was originally compressed */
     /* Disassembled name, only sometimes valid */
-    char str[INSTR_STR_LEN]; /* Fixed width strings are supposedly bad */
+    char str[INSTR_STR_LEN]; /**< disassembled instruction string */
 
     // TODO: put this into trdb_packet instead
     struct list_head list;
 };
 
-/* TODO: maybe make enums */
+/* TODO: make enums */
 #define F_BRANCH_FULL 0
 #define F_BRANCH_DIFF 1
 #define F_ADDR_ONLY 2
@@ -68,41 +73,47 @@ struct tr_instr {
 #define SF_EXCEPTION 1
 #define SF_CONTEXT 2
 
-/* This is the high level definition of packet with some meta information about
- * a tr_packet (or any other). This is not part of the riscv-trace-spec.pdf and
+/**
+ * This is the high level definition of packet with some meta information about
+ * a tr_packet (or any other).
+ *
+ * This is not part of the <a
+ * href="https://github.com/riscv/riscv-trace-spec">riscv-trace-spec</a> and
  * specific to the platform. Since we are only handling tr_packets we omit
  * basically just need a length field to delimit the payload.
  */
 struct trdb_packet {
-    uint32_t lenth : 7;
-    struct tr_packet *payload;
+    uint32_t lenth : 7;        /**< length of payload in bits */
+    struct tr_packet *payload; /**< actual packet information */
 };
 
-/* Canonical trace packet representation. There are four possible
- * packet types. See riscv-trace-spec.pdf for details. A list or array
- * of such packets and a bfd struct represent together a compressed
- * list or array of tr_instr.
+/**
+ * Canonical trace packet representation.
+ *
+ * There are four possible packet types. See <a
+ * href="https://github.com/riscv/riscv-trace-spec">riscv-trace-spec</a> for
+ * details. A list or array of such packets and a bfd struct represent together
+ * a compressed list or array of tr_instr.
  */
 struct tr_packet {
-    uint32_t msg_type : 2; /* UltraSoC specific TODO: remove*/
-    uint32_t format : 2;
+    uint32_t msg_type : 2; /**< UltraSoC specific TODO: remove */
+    uint32_t format : 2;   /**< header denoting the packet type */
 
-    uint32_t branches : 5;
-    uint32_t branch_map;
-
-    uint32_t subformat : 2;
-    uint32_t context : CONTEXTLEN;
-    uint32_t privilege : PRIVLEN;
+    uint32_t branches : 5;  /**< number of branches saved in @branch_map */
+    uint32_t branch_map;    /**< bits indicating taken=1 branches */
+    uint32_t subformat : 2; /**< further specifies F_SYNC packets */
+    uint32_t context : CONTEXTLEN; /**< not used in PULP, context switch */
+    uint32_t privilege : PRIVLEN;  /**< current privilege mode */
     /* we need this if the first instruction of an exception is a branch, since
      * that won't be reorcded into the branch map
      */
-    bool branch;
-    uint32_t address : XLEN;
-    uint32_t ecause : CAUSELEN;
-    bool interrupt;
-    uint32_t tval : XLEN;
+    bool branch;                /**< special case for F_SYNC packets */
+    uint32_t address : XLEN;    /**< address of the instruction */
+    uint32_t ecause : CAUSELEN; /**< exception cause */
+    bool interrupt;             /**< exception through interrupt */
+    uint32_t tval : XLEN;       /**< not used in PULP, trap information */
 
-    struct list_head list;
+    struct list_head list; /**< used to make a linked list of @tr_packet */
 };
 
 #define ALLOC_INIT_PACKET(name)                                                \
@@ -113,67 +124,119 @@ struct tr_packet {
     }                                                                          \
     *name = (struct tr_packet){.msg_type = 2};
 
-
 #define INIT_PACKET(p)                                                         \
     do {                                                                       \
         *p = (struct tr_packet){0};                                            \
     } while (false)
 
-/* Call this function before any other */
+/**
+ * Initialize the trace debugger, call before any other functions.
+ */
 void trdb_init();
 
-/* Call this function to cleanup */
+/**
+ * Release resources of the trace debugger, currently a NOP.
+ */
 void trdb_close();
 
-/* Given a tr_instr array of length len and a list_head
- * trdb_compress_trace returns the list_head with a number of packets
- * added to it. These packets should allow trdb_decompress_trace to
- * reconstruct the original sequence of tr_instr. Since the
- * function allocates new entries for list_head, the caller has to
- * deallocate them by calling trdb_free_packet_list. Use the functions
- * provided by list.h to handle list_head entries.
+/**
+ * Compress the given sequence of instruction to a sequence of packets.
+ *
+ * The packets should allow trdb_decompress_trace() to reconstruct the original
+ * sequence of tr_instr. Since the function allocates new entries for list_head,
+ * the caller has to deallocate them by calling trdb_free_packet_list(). Use the
+ * functions provided by list.h to handle list_head entries.
+ *
+ * @param packet_list list to which packets will be appended
+ * @param len number of tr_instr
+ * @param instrs[len]
+ * @return the provided @packet_list
  */
 struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
-                                      struct tr_instr[len]);
+                                      struct tr_instr instrs[len]);
 
 /* packet from bitstream where parse single packet */
 /* packet from bitstream whole decode function */
 
-/* Generate the original instruction sequence from a list of
- * tr_packets, given the binary from which the instruction sequence
- * was produced.
+/**
+ * Generate the original instruction sequence from a list of tr_packet, given
+ * the binary from which the instruction sequence was produced.
+ *
+ * @param abfd the binary from which the trace was captured
+ * @param packet_list the compressed instruction trace
+ * @param instr_list list to which the reconstruction instructions will be
+ * appended
+ * @return the provided @packet_list
  */
 struct list_head *trdb_decompress_trace(bfd *abfd,
                                         struct list_head *packet_list,
                                         struct list_head *instr_list);
 
-/* Outputs disassembled trace using fprintf_func in dunit->dinfo */
+/**
+ * Outputs disassembled trace using fprintf_func() in #dinfo.
+ *
+ * @param len length of trace
+ * @param trace[len] an array of instructions, only #iaddr and #instr are needed
+ * @param dunit the configured disassembler
+ */
 void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                             struct disassembler_unit *dunit);
 
-
-/* Prints a list of tr_packets in a formatted manner to stdout. */
+/**
+ * Prints a list of tr_packet in a formatted manner to @p stream.
+ *
+ * @param stream output to write to
+ * @param packet_list sequence of packets to print
+ */
 void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list);
 
-/* Prints a single packet in a formatted manner to stdout */
+/**
+ *  Prints a single packet in a formatted manner to @p stream.
+ *
+ * @param stream output to write to
+ * @param packet tr_packet to print
+ */
 void trdb_print_packet(FILE *stream, struct tr_packet *packet);
 
-/* Free the entries of a list of tr_packets. Used to dealloacte the
- * list returned by trdb_compress_trace.
+/**
+ * Free the entries of a list of tr_packet, used to deallocate the list returned
+ * by trdb_compress_trace().
+ *
+ * @param packet_list list to free
  */
 void trdb_free_packet_list(struct list_head *packet_list);
 
-/* Write a list of tr_packets to a file located at path. Overwrites old file.
- * Return -1 on failure and 0 on success.
+/**
+ * Free the entries of a list of tr_instr, used to deallocate the list returned
+ * by trdb_decompress_trace().
+ *
+ * @param instr_list list to free
+ */
+void trdb_free_instr_list(struct list_head *instr_list);
+
+/**
+ * Write a list of tr_packets to a file located at @p path.
+ *
+ * This function calls serialize_packet() to tightly align the packets,
+ *which
+ * can have a non-power-of-two size.
+ *
+ * @param path where the file is located at
+ * @param packet_list list of packets to write
+ * @return -1 on failure and 0 on success
  */
 int trdb_write_packets(const char *path, struct list_head *packet_list);
 
-/* Read a stimuli file at path into an array of tr_instr. Return -1 on failure
- * and 0 on succes.
+/**
+ * Read a stimuli file at @p path into an array of tr_instr.
+ *
+ * @param path where the stimuli file is located at
+ * @param samples where to write the read array of tr_instr
+ * @param status will be written with -1 on failure, 0 on success
+ * @return number of read tr_instr
  */
 size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
                              int *status);
-
 
 /* struct packet0 {
  *     uint32_t format : 2;   // 00

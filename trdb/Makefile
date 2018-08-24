@@ -49,7 +49,10 @@ TEST_BIN	= tests
 
 
 CTAGS		= ctags
+
 VALGRIND	= valgrind
+
+DOC		= doxygen
 
 
 all: $(BIN) $(TEST_BIN)
@@ -72,10 +75,6 @@ $(TEST_BIN): $(OBJS) $(TEST_OBJS)
 run:
 	./$(BIN)
 
-TAGS:
-	$(CTAGS) -R -e -h=".c.h" --tag-relative=always . $(LIB_PATHS) \
-	$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
-
 .PHONY: test
 test:
 	./$(TEST_BIN)
@@ -88,6 +87,13 @@ valgrind-test: debug
 valgrind-main: debug
 	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BIN)
 
+TAGS:
+	$(CTAGS) -R -e -h=".c.h" --tag-relative=always . $(LIB_PATHS) \
+	$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
+
+docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
+	$(DOC) doxyfile
+
 .PHONY: clean
 clean:
 	rm -rf $(BIN) $(TEST_BIN) $(OBJS) $(MAIN_OBJS) $(TEST_OBJS)
@@ -95,3 +101,4 @@ clean:
 .PHONY: distclean
 distclean: clean
 	rm -f TAGS
+	rm -rf doc/*

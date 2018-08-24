@@ -18,8 +18,10 @@
  */
 
 /*
- * Author: Robert Balas (balasr@student.ethz.ch)
- * Description: Software model for the hardware trace debugger
+ * @file trace_debugger.c
+ * @author: Robert Balas (balasr@student.ethz.ch)
+ * @date: 24 Aug 2018
+ * @brief: Software model for the hardware trace debugger.
  */
 
 #include <stdio.h>

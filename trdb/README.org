@@ -13,7 +13,8 @@
 
 ** Build
    Run =make all= for a release build or =make debug= for debug symbols and more
-   runtime information printed to stdout.
+   runtime information printed to stdout. Run =make docs= to build the
+   documentation with doxygen. It will be put under =doc/=.
 
 ** Tests
    There are a few tests which can be run through =make test=.
