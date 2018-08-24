@@ -17,11 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- * Author: Robert Balas (balasr@student.ethz.ch)
- * Description: Collection of disassembler routines using libopcodes and libbfd
+/**
+ * @file disassembly.h
+ * @author Robert Balas (balasr@student.ethz.ch)
+ * @date 25 Aug 2018
+ * @brief Collection of disassembly routines using libopcdes and libbfd
  */
-
 
 #ifndef __DISASSEMBLY_H__
 #define __DISASSEMBLY_H__
@@ -44,14 +45,23 @@
 #include "riscv_encoding.h"
 #undef DECLARE_INSN
 
-/* Struct used to capture all information and functions needed to disassemble */
+/**
+ * Used to capture all information and functions needed to disassemble.
+ */
 struct disassembler_unit {
-    disassembler_ftype disassemble_fn;
-    struct disassemble_info *dinfo;
+    disassembler_ftype disassemble_fn; /**< does the actual disassembly */
+    struct disassemble_info *dinfo;    /**< context for disassembly */
 };
 
 
-/* Returns the length of a the given RISC-V instruction instr.*/
+/**
+ * Computes the length of a the given RISC-V instruction instr.
+ *
+ * So far only up to 64 bit instructions are supported.
+ *
+ * @param instr raw instruction value up to 64 bit long
+ * @return number of bytes which make up the instruction
+ */
 static inline unsigned int riscv_instr_len(uint64_t instr)
 {
     if ((instr & 0x3) != 0x3) /* RVC.  */
@@ -66,66 +76,135 @@ static inline unsigned int riscv_instr_len(uint64_t instr)
     return 2;
 }
 
-/* Initialize disassemble_info from libopcodes with hardcoded values for
- * the PULP platform.
+/**
+ * Initialize disassemble_info from libopcodes with hardcoded values for the
+ * PULP platform.
+ * @param dinfo filled with information of the PULP platform
  */
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
 
-/* Initialize disassemble_info from libopcodes by grabbing data out of the given
- * bfd. The options string can be non-NULL to pass disassembler specific
- * settings to libopcodes.
+/**
+ * Initialize disassemble_info from libopcodes by grabbing data out of @p abfd.
+ *
+ * The options string can be non-@c NULL to pass disassembler specific settings
+ * to libopcodes. Currently supported is "no-aliases", which disassembles common
+ * abbreviations for certain instructions.
+ * @param dinfo filled with information from @p abfd
+ * @param abfd the bfd representing the binary
+ * @param options disassembly options passed to libopcodes
  */
 void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
                                     char *options);
 
-/* Initialize disassembler_unit. Aside from calling
- * init_disassembler_info_from_bfd, it also sets disassemble_fn to the
- * architecture matching abfd.
+/**
+ * Initialize disassembler_unit.
+ *
+ * A side from calling init_disassembler_info_from_bfd(), it also sets
+ * #disassemble_fn to the architecture matching @p abfd.
+ * @param dunit filled with information from @p abfd
+ * @param abfd the bfd representing the binary
+ * @param options disassembly options passed to libopcodes
  */
 int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
                            char *options);
 
-/* Print the bfd section header to stdout.
+/**
+ *  Print the bfd section header to stdout.
+ *
+ * @param abfd the bfd representing the binary
+ * @param section which section to print
+ * @param ignored is ignored and only for compatiblity
  */
 void dump_section_header(bfd *abfd, asection *section, void *ignored);
 
-/* Print bfd architecuture information to stdout.
+/**
+ * Print bfd architecuture information to stdout.
+ *
+ * @param abfd the bfd representing the binary
  */
 void dump_bin_info(bfd *abfd);
 
-/* Print all section names of bfd to stdout.*/
+/**
+ * Print all section names of bfd to stdout.
+ *
+ * @param abfd the bfd representing the binary
+ */
 void dump_section_names(bfd *abfd);
 
-/* Print all supported targets of the used  libopcodes to stdout. */
+/**
+ * Print all supported targets of the used libopcodes to stdout.
+ */
 void dump_target_list();
 
-/* Default fprintf_func used in disassemble_info, set by
- * init_disassemble_info_*.
+/**
+ * Default #print_address_func used in disassemble_info, set by
+ * init_disassemble_info_for_pulp() or init_disassemble_info_from_bfd().
+ *
+ * This is a callback function, if registered, called by libopcodes to custom
+ * format addresses. It can also be abused to print other information.
+ *
+ * @param vma the virtual memory address where this instruction is located at
+ * @param dinfo context of disassembly
  */
 void riscv32_print_address(bfd_vma vma, struct disassemble_info *dinfo);
 
-/* Returns true if vma is contained in the given section of abfd */
+/**
+ * Return if vma is contained in the given section of abfd.
+ *
+ * @param abfd the bfd representing the binary
+ * @parma section the section to test against
+ * @param vma the virtual memory address to test for
+ * @return whether @p vma is in contained in @p section
+ */
 bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma);
 
-/* Return the section of abfd that contains the given vma or NULL*/
+/**
+ * Return the section of @p abfd that contains the given @p vma or @c NULL.
+ *
+ * @param abfd the bfd representing the binary
+ * @param vma the virtual memory address to
+ * @return the section which contains @p vma or @c NULL
+ */
 asection *get_section_for_vma(bfd *abfd, bfd_vma vma);
 
-/* TODO: not implemented yet*/
+/**
+ * TODO: not implemented yet
+ *
+ * @param vma the virtual memory address where the symbol is located at
+ * @param dinfo disassembly context, initialized with
+ * init_disassemble_info_from_bfd().
+ * @return the symbol belonging to the @p vma or @c NULL
+ */
 asymbol *find_symbol_at_address(bfd_vma vma, struct disassemble_info *dinfo);
 
-/* Print the section belonging to bfd to stdout. The void pointer inf must point
- * to a disassembler_unit struct.
+/**
+ * Disassemble the given asection and print it calling fprintf_func.
+ *
+ * @p inf must point to a disassembler_unit.
+ *
+ * @param abfd the bfd representing the binary
+ * @param section the section to disassemble
  */
 void disassemble_section(bfd *abfd, asection *section, void *inf);
 
-/* Disassemble len bytes of data pointed to by bfd_byte with the given
- * disassembler_unit.
+/**
+ * Disassemble @p len bytes of data pointed to by @p data with the given
+ * @p dunit and print it calling fprintf_func.
+ *
+ * @param len number of bytes in @p data
+ * @param data raw data block to disassemble
+ * @param dunit disassembly context
  */
 void disassemble_block(size_t len, bfd_byte data[len],
                        struct disassembler_unit *dunit);
 
-/* Disassembler the given instr with the pretended address addr and
- * disassembler_unit dunit.
+/**
+ * Disassemble the given instr with the pretended address and disassembler_unit
+ * and print it calling fprintf_func.
+ *
+ * @param instr the raw instruction value up to 32 bits
+ * @param addr the address where the instruction is located at
+ * @param dunit disassembly context
  */
 void disassemble_single_instruction(uint32_t instr, uint32_t addr,
                                     struct disassembler_unit *dunit);

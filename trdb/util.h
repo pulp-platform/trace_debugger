@@ -17,10 +17,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- * Author: Robert Balas (balasr@student.ethz.ch)
- * Description: Small utility functions
+/**
+ * @file util.h
+ * @author Robert Balas (balasr@student.ethz.ch)
+ * @date 25 Aug 2018
+ * @brief Utility and logging functions/macros
  */
+
 #include <stdio.h>
 #include <inttypes.h>
 
@@ -36,6 +39,10 @@
 #define TRDB_TEST_DEBUG 1
 #endif
 
+/**
+ * Write formatted string to stderr with the filename, linenumber and function
+ * prepended.
+ */
 #define LOG_ERR(format, ...)                                                   \
     do {                                                                       \
         if (TRDB_LEVEL > 0)                                                    \
@@ -44,6 +51,10 @@
     } while (false)
 /* ## is gcc extension */
 
+/**
+ * Write formatted string to stderr with the filename, linenumber and function
+ * prepended.
+ */
 #define LOG_WARN(format, ...)                                                  \
     do {                                                                       \
         if (TRDB_LEVEL > 1)                                                    \
@@ -51,6 +62,10 @@
                     __func__, ##__VA_ARGS__);                                  \
     } while (false)
 
+/**
+ * Write formatted string to stdout with the filename, linenumber and function
+ * prepended.
+ */
 #define LOG_INFO(format, ...)                                                  \
     do {                                                                       \
         if (TRDB_LEVEL > 2)                                                    \
@@ -58,6 +73,10 @@
                     __func__, ##__VA_ARGS__);                                  \
     } while (false)
 
+/**
+ * Write formatted string to stdout with the filename, linenumber and function
+ * prepended.
+ */
 #define LOG_TRACE(format, ...)                                                 \
     do {                                                                       \
         if (TRDB_TRACE)                                                        \
@@ -66,8 +85,24 @@
     } while (false)
 
 /* TODO: make this typesafer */
+/**
+ * Return the size of an array in bytes.
+ */
 #define TRDB_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+/**
+ * Generate a mask with the first @p len bits set. @p len need to be smaller
+ * than 64.
+ */
 #define MASK_FROM(len) ((1ull << len) - 1)
 
+/**
+ * Load a file to a uint8_t array.
+ *
+ * The user is responsible to free the return pointer.
+ *
+ * @param fp the file to load
+ * @param length written with the number of bytes of the file
+ * @return pointer to the loaded file in memory
+ */
 uint8_t *file_to_char(FILE *fp, long *length);

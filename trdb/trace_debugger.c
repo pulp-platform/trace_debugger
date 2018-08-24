@@ -17,13 +17,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- * @file trace_debugger.c
- * @author: Robert Balas (balasr@student.ethz.ch)
- * @date: 24 Aug 2018
- * @brief: Software model for the hardware trace debugger.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>

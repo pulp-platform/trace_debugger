@@ -173,7 +173,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                                         struct list_head *instr_list);
 
 /**
- * Outputs disassembled trace using fprintf_func() in #dinfo.
+ * Outputs disassembled trace using fprintf_func in #disassembler_unit.dinfo.
  *
  * @param len length of trace
  * @param trace[len] an array of instructions, only #iaddr and #instr are needed

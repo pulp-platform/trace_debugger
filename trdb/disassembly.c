@@ -138,7 +138,6 @@ bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma)
 }
 
 
-
 asection *get_section_for_vma(bfd *abfd, bfd_vma vma)
 {
     asection *p;
@@ -207,8 +206,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
         addr_offset += size;
         (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
-            fprintf(stderr, "Encountered instruction with %d bytes, stopping",
-                    size);
+            LOG_ERR("Encountered instruction with %d bytes, stopping", size);
             break;
         }
     }
@@ -242,8 +240,7 @@ void disassemble_block(size_t len, bfd_byte data[len],
         pc += size;
         (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
-            fprintf(stderr, "Encountered instruction with %d bytes, stopping",
-                    size);
+            LOG_ERR("Encountered instruction with %d bytes, stopping", size);
             break;
         }
     }
@@ -292,8 +289,7 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
     int size = (*disassemble_fn)(addr, dinfo);
     (*dinfo->fprintf_func)(dinfo->stream, "\n");
     if (size <= 0) {
-        fprintf(stderr, "Encountered instruction with %d bytes, stopping",
-                size);
+        LOG_ERR("Encountered instruction with %d bytes, stopping", size);
     }
 
     free(data);
