@@ -9,3 +9,5 @@ gmon.out
 /trdb/tests
 work/
 trdb/doc/
+/modelsim.ini
+/driver/wave.do
