@@ -36,8 +36,10 @@ module trace_debugger_stimuli_gen
 
     initial begin
 
-        static string name = "trdb_stimuli";
-        static int fd      = $fopen(name, "w");
+        string name = "trdb_stimuli";
+        int    fd;
+
+        fd = $fopen(name, "w");
 
         if(fd)
             $display("[TRDB] Opening file %s", name);
@@ -45,8 +47,9 @@ module trace_debugger_stimuli_gen
             $fatal("[TRDB] Failed to open file");
 
         forever @(negedge clk_i) begin
-            if (!ivalid_i)
+            if (!ivalid_i) begin
                 continue;
+            end
             $fdisplay(fd,"valid=%h exception=%h interrupt=%h cause=%h",
                       ivalid_i, iexception_i, interrupt_i, cause_i,
                       " tval=%h priv=%h compressed=%h addr=%h instr=%h",
@@ -54,7 +57,7 @@ module trace_debugger_stimuli_gen
         end
         //tval_i is just 'x for now so ignore it
 
-        $fclose(fd);
+        //$fclose(fd);
     end
 
 endmodule // trace_debugger_stimuli_gen

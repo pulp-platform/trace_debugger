@@ -42,8 +42,9 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
 # rtl related targets
 .PHONY: lint
-lint: $(RTLSRC) $(RTLSRC_PKG) $(RTLSRC_TB) $(RTLSRC_TB_PKG)
-	$(LINTER) $(RTLSRC) $(RTLSRC_PKG) $(RTLSRC_TB) $(RTLSRC_TB_PKG)
+lint: $(RTLSRC_PKG) $(RTLSRC) $(RTLSRC_TB_PKG) $(RTLSRC_TB)
+	$(LINTER) -I. -Iinclude/ -Itb/ $(RTLSRC_PKG) $(RTLSRC) \
+		$(RTLSRC_TB_PKG) $(RTLSRC_TB)
 
 
 # driver related targets
