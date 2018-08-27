@@ -42,31 +42,46 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
 # rtl related targets
 .PHONY: lint
-lint: $(RTLSRC)
-	$(LINTER) $(RTLSRC)
+lint: $(RTLSRC) $(RTLSRC_PKG) $(RTLSRC_TB) $(RTLSRC_TB_PKG)
+	$(LINTER) $(RTLSRC) $(RTLSRC_PKG) $(RTLSRC_TB) $(RTLSRC_TB_PKG)
 
 
 # driver related targets
 .PHONY: driver-all
-driver-all:
+driver-all: check-env
 	$(MAKE) -C driver/lowlevel all
 	$(MAKE) -C driver/rt all
 
 .PHONY: driver-run
-driver-run:
+driver-run: check-env
 	$(MAKE) -C driver/lowlevel run
 
 .PHONY: driver-clean
-driver-clean:
+driver-clean: check-env
 	$(MAKE) -C driver/lowlevel clean
 	$(MAKE) -C driver/rt clean
 
 
 # check if environment is setup properly
 check-env:
-ifndef PULP_SDK_HOME
-  $(error PULP_SDK_HOME is undefined)
-endif
+	@if test "$(PULP_SDK_HOME)" = "" ; then \
+		echo "PULP_SDK_HOME not set"; \
+		exit 1; \
+	fi
+
+
+# c model and decompression tools
+.PHONY: c-all
+c-all:
+	$(MAKE) -C trdb all
+
+.PHONY: c-run
+c-run:
+	$(MAKE) -C trdb run
+
+.PHONY: c-clean
+c-clean:
+	$(MAKE) -C trdb clean
 
 
 # testbench compilation and optimization
@@ -83,12 +98,12 @@ tb-all: vlog
 	$(RTLSRC_VOPT_TB_TOP)
 
 .PHONY: tb-run
-tb-run: tb-all
+tb-run:
 	$(VSIM) -work $(VWORK) $(VSIM_FLAGS) $(RTLSRC_VOPT_TB_TOP)
 
 .PHONY: tb-run-gui
 tb-run-gui: VSIM_FLAGS = $VSIM_DEBUG_FLAGS
-tb-run-gui: tb
+tb-run-gui: tb-run
 
 .PHONY: tb-clean
 tb-clean:
@@ -96,16 +111,17 @@ tb-clean:
 	rm -f transcript
 	rm -f vsim.wlf
 
+
 # general targets
 TAGS: check-env
 	$(CTAGS) -R -e -h=".c.h" --exclude=$(PULP_SDK_HOME) .\
 	$(PULP_PROJECT_HOME)
 
 .PHONY: all
-all: driver-all
+all: driver-all tb-all c-all
 
 .PHONY: clean
-clean: driver-clean tb-clean
+clean: driver-clean tb-clean c-clean
 
 .PHONY: distclean
 distclean: clean

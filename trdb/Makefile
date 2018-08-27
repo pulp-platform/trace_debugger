@@ -80,13 +80,14 @@ test:
 	./$(TEST_BIN)
 
 .PHONY: valgrind-test
-valgrind-test: debug
+valgrind-test:
 	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(TEST_BIN)
 
 .PHONY: valgrind-main
-valgrind-main: debug
+valgrind-main:
 	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BIN)
 
+.PHONY: TAGS
 TAGS:
 	$(CTAGS) -R -e -h=".c.h" --tag-relative=always . $(LIB_PATHS) \
 	$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
