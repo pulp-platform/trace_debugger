@@ -37,7 +37,7 @@
 
 #define XLEN 32
 #define CAUSELEN 5
-#define PRIVLEN 5
+#define PRIVLEN 5 //TODO: fix this to 3 or 2
 #define ILEN 32
 #define CONTEXTLEN 32
 
@@ -99,7 +99,7 @@ struct tr_packet {
     uint32_t msg_type : 2; /**< UltraSoC specific TODO: remove */
     uint32_t format : 2;   /**< header denoting the packet type */
 
-    uint32_t branches : 5;  /**< number of branches saved in @branch_map */
+    uint32_t branches : 5;  /**< number of branches saved in branch_map */
     uint32_t branch_map;    /**< bits indicating taken=1 branches */
     uint32_t subformat : 2; /**< further specifies F_SYNC packets */
     uint32_t context : CONTEXTLEN; /**< not used in PULP, context switch */
@@ -113,7 +113,7 @@ struct tr_packet {
     bool interrupt;             /**< exception through interrupt */
     uint32_t tval : XLEN;       /**< not used in PULP, trap information */
 
-    struct list_head list; /**< used to make a linked list of @tr_packet */
+    struct list_head list; /**< used to make a linked list of tr_packet */
 };
 
 #define ALLOC_INIT_PACKET(name)                                                \
@@ -244,6 +244,7 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
  *     uint32_t branch_map; //TODO: fix to 31 bits
  *     uint32_t address;
  * };
+ * 2 + 5 + (1 to 31) + (1 to 32) = 9 to 70
  *
  * struct packet1 {
  *     uint32_t format : 2;   // 01
@@ -251,11 +252,13 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
  *     uint32_t branch_map;
  *     uint32_t address;
  * };
+ * 2 + 5 + (1 to 31) + (1 to 32) = 9 to 70
  *
  * struct packet2 {
  *     uint32_t format : 2;
  *     uint32_t address;
  * };
+ * 2 + (1 to 32) = 3 to 34
  *
  * struct packet3 {
  *     uint32_t format : 2;
@@ -268,6 +271,8 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
  *     bool interrupt : 1;
  *     uint32_t tval : XLEN;
  * };
+ *
+ * 2 + 2 + 2 + 1 + 32 + 5 + 1 = 45
  */
 
 #endif
