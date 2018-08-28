@@ -1,0 +1,3 @@
+[submodule "y"]
+	path = rtl/common_cells
+	url = git@github.com:pulp-platform/common_cells.git
