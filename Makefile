@@ -105,7 +105,7 @@ tb-run:
 	$(VSIM) -work $(VWORK) $(VSIM_FLAGS) $(RTLSRC_VOPT_TB_TOP)
 
 .PHONY: tb-run-gui
-tb-run-gui: VSIM_FLAGS = $VSIM_DEBUG_FLAGS
+tb-run-gui: VSIM_FLAGS = $(VSIM_DEBUG_FLAGS)
 tb-run-gui: tb-run
 
 .PHONY: tb-clean
