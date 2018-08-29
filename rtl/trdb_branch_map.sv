@@ -34,6 +34,7 @@ module trdb_branch_map
         map_d       = map_q;
         branchcnt_d = branchcnt_q;
 
+        // TODO: do a case here?
         if(flush_i) begin
             map_d       = '0;
             branchcnt_d = '0;

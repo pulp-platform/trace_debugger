@@ -90,11 +90,14 @@ module trace_debugger
     trdb_subformat_t            packet_subformat;
 
     // generated packet
-
     logic [PACKET_LEN-1:0]      packet_bits;
     logic [6:0]                 packet_len;
     logic                       packet_gen_valid;
 
+    // packet to word
+    logic                       packet_is_read;
+    logic [XLEN-1:0]            packet_word;
+    logic                       packet_word_valid;
 
     // manage their input and outputs
     assign interrupt0_d = interrupt_i;
@@ -239,8 +242,19 @@ module trace_debugger
 
          .packet_bits_o(packet_bits),
          .packet_len_o(packet_len),
-         .valid_o(packet_gen_valid)
-         );
+         .valid_o(packet_gen_valid),
+         .grant_i(packet_is_read));
+
+    trdb_stream_align i_trdb_stream_align
+        (.clk_i(clk_i),
+         .rst_ni(rst_ni),
+         .packet_bits_i(packet_bits),
+         .packet_len_i(packet_len),
+         .valid_i(packet_gen_valid),
+         .grant_o(packet_is_read),
+         .data_o(packet_word),
+         .valid_o(packet_word_valid));
+
 
 
     // TODO: assert that we are not dealing with an unsupported instruction

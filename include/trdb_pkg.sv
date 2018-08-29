@@ -18,7 +18,13 @@ parameter XLEN = 32;
 parameter PRIVLEN = 3; //TODO: check this
 parameter CAUSELEN = 5;
 parameter CONTEXTLEN = 32; //TODO: currently not used
-parameter PACKET_LEN = 128;
+parameter PACKET_LEN = 128; //adjust to about 70
+parameter PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
+parameter PACKET_TOTAL = PACKET_LEN + PACKET_HEADER_LEN;
+
+parameter PACKET_BUFFER_STAGES = 3;
+
+
 
 typedef enum logic[1:0]
 {
