@@ -9,7 +9,7 @@
 // specific language governing permissions and limitations under the License.
 //
 // Author: Robert Balas (balasr@student.ethz.ch)
-// Description: Generate packet on output on request
+// Description: Generate packet on output and buffer
 
 
 import trdb_pkg::*;
@@ -36,16 +36,21 @@ module trdb_packet_emitter
 
      output logic [PACKET_LEN-1:0] packet_bits_o, //TODO: adjust sizes
      output logic [6:0]            packet_len_o,
-     output logic                  valid_o
+     output logic                  valid_o,
+     input logic                   grant_i
      );
 
-    logic [PACKET_LEN-1:0]         packet_bits_q, packet_bits_d;
-    logic [6:0]                    packet_len_q, packet_len_d;
-    logic                          packet_gen_valid_q, packet_gen_valid_d;
+    logic [PACKET_LEN-1:0]         packet_bits;
+    logic [PACKET_HEADER_LEN-1:0]  packet_len;
+    logic                          packet_gen_valid;
+    logic                          packet_fifo_not_full;
+
+    logic                          clear_fifo;
 
     logic [4:0]                    branch_packet_off ;
 
-    assign valid_o = packet_gen_valid_q;
+
+    assign packet_gen_valid = valid_i;
 
     always_comb begin: branch_map_offset
         assert (branch_map_cnt_i < 31);
@@ -64,44 +69,41 @@ module trdb_packet_emitter
     end
 
     always_comb begin: set_packet_bits
-        packet_bits_d      = '0;
-        packet_len_d       = '0;
-        packet_gen_valid_d = 1'b0;
+        packet_bits      = '0;
+        packet_len       = '0;
 
         // TODO: implement this
         assert (packet_format_i != F_BRANCH_DIFF);
 
         if(valid_i) begin
-            // signal that next clock we have a valid packet on the output
-            packet_gen_valid_d = '1;
 
             // packet format
-            packet_bits_d[1:0] = packet_format_i;
+            packet_bits[1:0] = packet_format_i;
 
             case(packet_format_i)
 
             F_BRANCH_FULL: begin
-                packet_bits_d[6:2] = branch_map_cnt_i;
+                packet_bits[6:2] = branch_map_cnt_i;
 
                 if(branch_packet_off == 1) begin
-                    packet_bits_d[7+:XLEN] = {iaddr_i, branch_map_i[0]};
-                    packet_len_d = 7 + 1 + XLEN;
+                    packet_bits[7+:XLEN] = {iaddr_i, branch_map_i[0]};
+                    packet_len = 7 + 1 + XLEN;
 
                 end else if(branch_packet_off == 9) begin
-                    packet_bits_d[7+:9+XLEN] = {iaddr_i, branch_map_i[8:0]};
-                    packet_len_d = 7 + 9 + XLEN;
+                    packet_bits[7+:9+XLEN] = {iaddr_i, branch_map_i[8:0]};
+                    packet_len = 7 + 9 + XLEN;
 
                 end else if(branch_packet_off == 17) begin
-                    packet_bits_d[7+:17+XLEN] = {iaddr_i, branch_map_i[16:0]};
-                    packet_len_d = 7 + 17 + XLEN;
+                    packet_bits[7+:17+XLEN] = {iaddr_i, branch_map_i[16:0]};
+                    packet_len = 7 + 17 + XLEN;
 
                 end else if(branch_packet_off == 25) begin
-                    packet_bits_d[7+:25+XLEN] = {iaddr_i, branch_map_i[24:0]};
-                    packet_len_d = 7 + 25 + XLEN;
+                    packet_bits[7+:25+XLEN] = {iaddr_i, branch_map_i[24:0]};
+                    packet_len = 7 + 25 + XLEN;
 
                 end else begin
-                    packet_bits_d[7+:31+XLEN] = {iaddr_i, branch_map_i[30:0]};
-                    packet_len_d = 7 + 31 + XLEN;
+                    packet_bits[7+:31+XLEN] = {iaddr_i, branch_map_i[30:0]};
+                    packet_len = 7 + 31 + XLEN;
                 end
             end
 
@@ -110,8 +112,8 @@ module trdb_packet_emitter
             end
 
             F_ADDR_ONLY: begin
-                packet_bits_d[2+:XLEN] = iaddr_i;
-                packet_len_d           = 2 + XLEN; //TODO: variable len add
+                packet_bits[2+:XLEN] = iaddr_i;
+                packet_len           = 2 + XLEN; //TODO: variable len add
             end
 
             F_SYNC: begin
@@ -121,28 +123,38 @@ module trdb_packet_emitter
                 // XLEN: address
                 // CAUSELEN: exception cause
                 // 1: is interrupt?
-                packet_bits_d[2+:2+PRIVLEN+1+XLEN+CAUSELEN+1]
+                packet_bits[2+:2+PRIVLEN+1+XLEN+CAUSELEN+1]
                     = {interrupt_i, cause_i, iaddr_i, is_branch_i, priv_i,
                        packet_subformat_i};
-                packet_len_d = 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+                packet_len = 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
             end
-
             endcase
+
         end
     end
 
+    // always_comb begin:
+    //     assert (packet_fifo_not_full == 1'b1)
+    //         else $error("Packet FIFO is overflowing.");
+    // end
+    //TODO: implement fifo nuking logic
+    //TODO: request resync logic on nuked fifo
 
-    always_ff @(posedge clk_i, negedge rst_ni) begin
-        if(~rst_ni) begin
-            packet_bits_q      <= '0;
-            packet_gen_valid_q <= '0;
-            packet_len_q       <= '0;
-        end else begin
-            packet_bits_q      <= packet_bits_d;
-            packet_gen_valid_q <= packet_gen_valid_d;
-            packet_len_q       <= packet_len_d;
-        end
-    end
+    assign clear_fifo = 1'b0;
 
+    generic_fifo_adv
+        #(.DATA_WIDTH(PACKET_LEN + PACKET_HEADER_LEN),
+          .DATA_DEPTH(PACKET_BUFFER_STAGES))
+    i_packet_fifo
+        (.clk(clk_i),
+         .rst_n(rst_ni),
+         .clear_i(clear_fifo), //nuke fifo if overflowing
+         .data_i({packet_bits, packet_len}),
+         .valid_i(packet_gen_valid),
+         .grant_o(packet_fifo_not_full),
+         .data_o({packet_bits_o, packet_len_o}),
+         .valid_o(valid_o),
+         .grant_i(grant_i),
+         .test_mode_i('0));
 
 endmodule // trdb_packet_emitter
