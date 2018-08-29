@@ -36,7 +36,7 @@ module trace_debugger_stimuli_gen
 
     initial begin
 
-        string name = "trdb_stimuli";
+        automatic string name = "trdb_stimuli";
         int    fd;
 
         fd = $fopen(name, "w");
