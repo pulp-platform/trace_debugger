@@ -29,6 +29,7 @@ VOPT_FLAGS		= -debugdb -fsmdebug -pedanticerrors +acc #=mnprft
 VSIM			= vsim
 VSIM_FLAGS		= -c
 VSIM_DEBUG_FLAGS	= -gui
+VSIM_SCRIPT             = tb/scripts/vsim.tcl
 
 RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
 RTLSRC_TB_TOP		:= $(wildcard tb/*_top.sv)
@@ -102,7 +103,8 @@ tb-all: vlog
 
 .PHONY: tb-run
 tb-run:
-	$(VSIM) -work $(VWORK) $(VSIM_FLAGS) $(RTLSRC_VOPT_TB_TOP)
+	$(VSIM) -work $(VWORK) $(VSIM_FLAGS) $(RTLSRC_VOPT_TB_TOP) \
+		-do $(VSIM_SCRIPT)
 
 .PHONY: tb-run-gui
 tb-run-gui: VSIM_FLAGS = $(VSIM_DEBUG_FLAGS)
