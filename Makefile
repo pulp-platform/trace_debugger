@@ -34,7 +34,9 @@ RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
 RTLSRC_TB_TOP		:= $(wildcard tb/*_top.sv)
 RTLSRC_TB		:= $(wildcard tb/*.sv)
 RTLSRC_PKG		:= $(wildcard include/trdb_pkg.sv)
-RTLSRC			:= $(wildcard rtl/*.sv)
+RTLSRC			:= $(wildcard rtl/*.sv) \
+				$(wildcard rtl/tech_cells_generic/*.sv) \
+				$(wildcard rtl/common_cells/*.sv)
 
 RTLSRC_VLOG_TB_TOP	:= $(basename $(notdir $(RTLSRC_TB_TOP)))
 RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
