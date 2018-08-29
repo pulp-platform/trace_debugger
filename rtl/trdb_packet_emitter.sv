@@ -18,6 +18,7 @@ import trdb_pkg::*;
 module trdb_packet_emitter
     (input logic                   clk_i,
      input logic                   rst_ni,
+
      input                         trdb_format_t packet_format_i,
      input                         trdb_subformat_t packet_subformat_i,
      input logic                   valid_i,
@@ -34,6 +35,7 @@ module trdb_packet_emitter
      input logic                   branch_map_empty_i,
      input logic                   is_branch_i,
 
+     output logic                  branch_map_flush_o,
      output logic [PACKET_LEN-1:0] packet_bits_o, //TODO: adjust sizes
      output logic [6:0]            packet_len_o,
      output logic                  valid_o,
@@ -46,11 +48,13 @@ module trdb_packet_emitter
     logic                          packet_fifo_not_full;
 
     logic                          clear_fifo;
+    logic                          branch_map_flush_q, branch_map_flush_d;
 
     logic [4:0]                    branch_packet_off ;
 
 
     assign packet_gen_valid = valid_i;
+    assign branch_map_flush_o = branch_map_flush_q;
 
     always_comb begin: branch_map_offset
         assert (branch_map_cnt_i < 31);
@@ -69,8 +73,9 @@ module trdb_packet_emitter
     end
 
     always_comb begin: set_packet_bits
-        packet_bits      = '0;
-        packet_len       = '0;
+        packet_bits        = '0;
+        packet_len         = '0;
+        branch_map_flush_d = '0;
 
         // TODO: implement this
         assert (packet_format_i != F_BRANCH_DIFF);
@@ -83,7 +88,12 @@ module trdb_packet_emitter
             case(packet_format_i)
 
             F_BRANCH_FULL: begin
-                packet_bits[6:2] = branch_map_cnt_i;
+                // We shouldn't have an empty branch map if we want to generate
+                // this packet
+                assert(branch_map_cnt_i != 0);
+
+                packet_bits[6:2]   = branch_map_cnt_i;
+                branch_map_flush_d = '1;
 
                 if(branch_packet_off == 1) begin
                     packet_bits[7+:XLEN] = {iaddr_i, branch_map_i[0]};
@@ -142,6 +152,7 @@ module trdb_packet_emitter
 
     assign clear_fifo = 1'b0;
 
+
     generic_fifo_adv
         #(.DATA_WIDTH(PACKET_LEN + PACKET_HEADER_LEN),
           .DATA_DEPTH(PACKET_BUFFER_STAGES))
@@ -156,5 +167,14 @@ module trdb_packet_emitter
          .valid_o(valid_o),
          .grant_i(grant_i),
          .test_mode_i('0));
+
+
+    always_ff @(posedge clk_i, negedge rst_ni) begin
+        if(~rst_ni) begin
+            branch_map_flush_q <= '0;
+        end else begin
+            branch_map_flush_q <= branch_map_flush_d;
+        end
+    end
 
 endmodule // trdb_packet_emitter

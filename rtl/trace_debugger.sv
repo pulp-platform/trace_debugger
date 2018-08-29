@@ -50,7 +50,7 @@ module trace_debugger
     logic                       lc_u_discontinuity;
     logic                       tc_first_qualified;
     logic                       tc_is_branch;
-    logic                       tc_branch_taken, nc_branch_taken;
+    logic                       tc_branch_taken;
     logic                       tc_qualified, lc_qualified;
     logic                       tc_compressed;
     logic [XLEN-1:0]            tc_iaddr, nc_iaddr;
@@ -62,7 +62,7 @@ module trace_debugger
 
     // registers to hold onto the input data for a few phases, mostly one
     logic                       interrupt0_q, interrupt0_d;
-    logic                       interrupt1_q, interruptj_d;
+    logic                       interrupt1_q, interrupt1_d;
     logic [CAUSELEN-1:0]        cause0_q, cause0_d;
     logic [CAUSELEN-1:0]        cause1_q, cause1_d;
     logic [PRIVLEN-1:0]         priv0_q, priv0_d;
@@ -101,7 +101,7 @@ module trace_debugger
 
     // manage their input and outputs
     assign interrupt0_d = interrupt_i;
-    assign interrupt1_d = interrupt1_q;
+    assign interrupt1_d = interrupt0_q;
     assign cause0_d = cause_i;
     assign cause1_d = cause0_q;
     assign priv0_d = priv_i;
@@ -136,6 +136,9 @@ module trace_debugger
     assign tc_compressed = compressed0_q;
     assign nc_iaddr = iaddr0_d;
     assign tc_iaddr = iaddr0_q;
+
+    // TODO: add feature to have selective tracing, add enable with regmap
+    assign qualified0_d = '1;
 
     // decide whether a privilege change occured
     always_comb begin
@@ -239,7 +242,7 @@ module trace_debugger
          .branch_map_cnt_i(branch_map_cnt),
          .branch_map_empty_i(branch_map_empty),
          .is_branch_i(tc_is_branch),
-
+         .branch_map_flush_o(branch_map_flush),
          .packet_bits_o(packet_bits),
          .packet_len_o(packet_len),
          .valid_o(packet_gen_valid),
