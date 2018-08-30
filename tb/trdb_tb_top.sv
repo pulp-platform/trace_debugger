@@ -48,7 +48,7 @@ module trdb_tb_top
             @(posedge clk);
         end
         if(DEBUG)
-            $display("[RESET]: Reset deasserted.");
+            $display("[RESET] @%t: Reset deasserted.", $time);
 
         #RESET_DEL rst_n = 1'b1;
     end: reset_gen

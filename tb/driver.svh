@@ -30,6 +30,7 @@ class Driver;
         string line;
         int    fp, c;
         string err_str;
+        int    linecnt = 0;
 
         logic                ivalid;
         logic                iexception;
@@ -56,7 +57,7 @@ class Driver;
                     tval=%h priv=%h compressed=%h addr=%h instr=%h",
                     ivalid, iexception, interrupt, cause,
                     tval, priv, compressed, iaddr, instr);
-
+            linecnt++;
             stimuli.ivalid.push_front(ivalid);
             stimuli.iexception.push_front(iexception);
             stimuli.interrupt.push_front(interrupt);
@@ -66,10 +67,10 @@ class Driver;
             stimuli.iaddr.push_front(iaddr);
             stimuli.instr.push_front(instr);
             stimuli.compressed.push_front(compressed);
+        end
 
-            if(DEBUG) begin
-                $display("iaddr=%h", iaddr);
-            end
+        if(DEBUG) begin
+            $display("[STIMULI]: Read %d lines.", linecnt);
         end
 
         if ($ferror(fp, err_str)) begin
@@ -120,10 +121,10 @@ class Driver;
             $display("[ERROR]: parse_stimuli() failed.");
 
         // send to monitor
-        mail.put(stimuli);
+        // mail.put(stimuli);
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
-        for(int unsigned i = 0; i < stimuli.ivalid.size() ;i++) begin
+        while(stimuli.ivalid.size() > 0) begin
 
             @(posedge this.duv_if.clk_i);
             #STIM_APPLICATION_DEL;
@@ -138,6 +139,10 @@ class Driver;
             this.duv_if.iaddr      = stimuli.iaddr.pop_back();
             this.duv_if.instr      = stimuli.instr.pop_back();
             this.duv_if.compressed = stimuli.compressed.pop_back();
+
+            if(DEBUG)
+                $display("[DRIVER] @%t: Applying vector with addr=%h.", $time,
+                         this.duv_if.iaddr);
 
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             // take response
