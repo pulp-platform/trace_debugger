@@ -119,7 +119,7 @@ tb-clean:
 
 # general targets
 TAGS: check-env
-	$(CTAGS) -R -e -h=".c.h" --exclude=$(PULP_SDK_HOME) .\
+	$(CTAGS) -R -e -h=".c.h" --exclude=$(PULP_SDK_HOME) . \
 	$(PULP_PROJECT_HOME)
 
 .PHONY: all
