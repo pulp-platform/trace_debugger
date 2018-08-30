@@ -92,10 +92,10 @@ class Driver;
             $display("[DRIVER] @%t: Applying zero stimuli.", $time);
         this.duv_if.ivalid     = 1'b0;
         this.duv_if.iexception = 1'b0;
-        this.duv_if.interrupt = 1'b0;
-        this.duv_if.cause      = 1'b0;
+        this.duv_if.interrupt  = 1'b0;
+        this.duv_if.cause      = 5'b0;
         this.duv_if.tval       = '0;
-        this.duv_if.priv       = '0;
+        this.duv_if.priv       = 3'h7; // PRIVLEN'h7;
         this.duv_if.iaddr      = '0;
         this.duv_if.instr      = '0;
         this.duv_if.compressed = 1'b0;
@@ -112,8 +112,6 @@ class Driver;
             if(DEBUG)
                 $display("[DRIVER] @%t: Reset low.", $time);
 
-        // inputs to zero
-        apply_zero();
 
         // parse stimuli file
         stimuli = new();
@@ -122,6 +120,12 @@ class Driver;
 
         // send to monitor
         // mail.put(stimuli);
+
+        //TODO: fix this hack
+        apply_zero();
+
+        @(posedge this.duv_if.clk_i);
+       apply_zero();
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         while(stimuli.ivalid.size() > 0) begin
@@ -152,8 +156,8 @@ class Driver;
         #STIM_APPLICATION_DEL;
         apply_zero();
 
+        // TODO: raise end of simulation
     endtask;
-
 
 
 endclass // Driver

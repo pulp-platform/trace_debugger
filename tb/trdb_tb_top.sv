@@ -45,12 +45,13 @@ module trdb_tb_top
         rst_n = 1'b0;
         // wait a few cycles
         repeat (RESET_WAIT_CYCLES) begin
-            @(posedge clk);
+            @(posedge clk); //TODO: was posedge, see below
         end
+        //TODO: think about when the reset sould happen
+        #RESET_DEL rst_n = 1'b1;
         if(DEBUG)
             $display("[RESET] @%t: Reset deasserted.", $time);
 
-        #RESET_DEL rst_n = 1'b1;
     end: reset_gen
 
     // set timing format

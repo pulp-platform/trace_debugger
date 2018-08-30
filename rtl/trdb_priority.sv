@@ -19,6 +19,8 @@ module trdb_priority
     (input logic  clk_i,
      input logic  rst_ni,
 
+     input logic  valid_i,
+
      input logic  lc_exception_i,
      //input logic lc_emitted_exception_sync (hack)
 
@@ -57,39 +59,48 @@ module trdb_priority
     // TODO: assert for X's
     always_comb begin
         // TODO: default value for packet_*format_o
-        valid_o            = '1;
+        valid_o            = '0;
         packet_format_o    = F_ADDR_ONLY;
         packet_subformat_o = SF_UNDEF;
 
-        if (lc_exception_i) begin
-            packet_format_o    = F_SYNC;
-            packet_subformat_o = SF_START;
-            // TODO: lc_emitted_exception_sync
-            // TODO: missing some conditions
-        end else if (tc_first_qualified_i || tc_unhalted_i ||
-                     tc_privchange_i) begin
-            packet_format_o    = F_SYNC;
-            packet_subformat_o = SF_START;
-        end else if (lc_u_discontinuity_i) begin
-            if(branch_map_empty_i)
-                packet_format_o = F_ADDR_ONLY;
-            else
+        if(valid_i) begin
+            if (lc_exception_i) begin
+                packet_format_o    = F_SYNC;
+                packet_subformat_o = SF_START;
+                valid_o            = '1;
+                // TODO: lc_emitted_exception_sync
+                // TODO: missing some conditions
+            end else if (tc_first_qualified_i || tc_unhalted_i ||
+                         tc_privchange_i) begin
+                packet_format_o    = F_SYNC;
+                packet_subformat_o = SF_START;
+                valid_o            = '1;
+
+            end else if (lc_u_discontinuity_i) begin
+                if(branch_map_empty_i)
+                    packet_format_o = F_ADDR_ONLY;
+                else
+                    packet_format_o = F_BRANCH_FULL;
+                valid_o            = '1;
+
+                //TODO: resync and branch_map_nonempty clause
+            end else if (nc_halt_i || nc_exception_i || nc_privchange_i ||
+                         nc_unqualified_i) begin
+                if(branch_map_empty_i)
+                    packet_format_o = F_ADDR_ONLY;
+                else
+                    packet_format_o = F_BRANCH_FULL;
+                valid_o            = '1;
+
+            end else if (branch_map_full_i) begin
                 packet_format_o = F_BRANCH_FULL;
-            //TODO: resync and branch_map_nonempty clause
-        end else if (nc_halt_i || nc_exception_i || nc_privchange_i ||
-                     nc_unqualified_i) begin
-            if(branch_map_empty_i)
-                packet_format_o = F_ADDR_ONLY;
-            else
-                packet_format_o = F_BRANCH_FULL;
-        end else if (branch_map_full_i) begin
-            packet_format_o = F_BRANCH_FULL;
-        end else if (tc_context_change) begin
-            packet_format_o    = F_SYNC;
-            packet_subformat_o = SF_CONTEXT;
-        end else begin
-            // no cases are matching so we don't want to emit a packet
-            valid_o = '0;
+                valid_o            = '1;
+
+            end else if (tc_context_change) begin
+                packet_format_o    = F_SYNC;
+                packet_subformat_o = SF_CONTEXT;
+                valid_o            = '1;
+            end
         end
     end
 

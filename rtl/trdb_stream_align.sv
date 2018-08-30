@@ -47,6 +47,7 @@ module trdb_stream_align
         low_ptr_d = low_ptr_q;
         valid_d   = '0;
         data_d    = '0;
+        grant_o   = '0;
         high_ptr  = low_ptr_q + 32;
 
         if(valid_i) begin
@@ -61,7 +62,7 @@ module trdb_stream_align
                 //we are done with the current packet
                 low_ptr_d = '0;
                 // request the next packet
-                grant_o   = '0;
+                grant_o   = '1; //TODO: doesn't cause comb loop with fifo?
             end
         end
     end

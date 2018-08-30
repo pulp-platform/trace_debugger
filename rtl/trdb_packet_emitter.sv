@@ -133,13 +133,31 @@ module trdb_packet_emitter
                 // XLEN: address
                 // CAUSELEN: exception cause
                 // 1: is interrupt?
-                packet_bits[2+:2+PRIVLEN+1+XLEN+CAUSELEN+1]
-                    = {interrupt_i, cause_i, iaddr_i, is_branch_i, priv_i,
-                       packet_subformat_i};
-                packet_len = 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+                assert(packet_subformat_i != SF_CONTEXT);
+                assert(packet_subformat_i != SF_UNDEF);
+
+                case(packet_subformat_i)
+
+                SF_START: begin
+                    packet_bits[2+:2+PRIVLEN+1+XLEN]
+                        = {iaddr_i, is_branch_i, priv_i, packet_subformat_i};
+                    packet_len = 2 + PRIVLEN + 1 + XLEN;
+                end
+
+                SF_EXCEPTION: begin
+                    packet_bits[2+:2+PRIVLEN+1+XLEN+CAUSELEN+1]
+                        = {interrupt_i, cause_i, iaddr_i, is_branch_i, priv_i,
+                           packet_subformat_i};
+                    packet_len = 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+                end
+
+                SF_CONTEXT: begin
+                end
+
+                endcase
+
             end
             endcase
-
         end
     end
 

@@ -15,14 +15,10 @@
 import trdb_pkg::*;
 
 module trace_debugger
-    #(parameter ILEN = 32,
-      parameter XLEN = 32,
-      parameter PRIVLEN = 3, //TODO: check this
-      parameter CAUSELEN = 5)
     (input logic                clk_i,
      input logic                rst_ni,
 
-     input logic                ivalid_i,
+     input logic                ivalid_i, //TODO: pipelined valid
      input logic                iexception_i,
      input logic                interrupt_i,
      input logic [CAUSELEN-1:0] cause_i,
@@ -44,6 +40,7 @@ module trace_debugger
     // we have three phases, called next cycle (nc), this cycle (tc) and next
     // cycle (nc), based on which we make decision whether we need to emit a
     // packet or not.
+    logic                       nc_trace_valid, tc_trace_valid, lc_trace_valid;
     logic [PRIVLEN-1:0]         nc_priv, tc_priv;
     logic                       nc_privchange, tc_privchange;
     logic                       nc_exception, lc_exception;
@@ -59,8 +56,9 @@ module trace_debugger
     logic [CAUSELEN-1:0]        lc_cause;
     logic                       lc_interupt;
 
-
     // registers to hold onto the input data for a few phases, mostly one
+    logic                       trace_valid0_q, trace_valid0_d,
+                                trace_valid1_q, trace_valid1_d;
     logic                       interrupt0_q, interrupt0_d;
     logic                       interrupt1_q, interrupt1_d;
     logic [CAUSELEN-1:0]        cause0_q, cause0_d;
@@ -99,6 +97,10 @@ module trace_debugger
     logic [XLEN-1:0]            packet_word;
     logic                       packet_word_valid;
 
+    // whether the interface got valid data
+    assign trace_valid0_d = ivalid_i;
+    assign trace_valid1_d = trace_valid0_q;
+
     // manage their input and outputs
     assign interrupt0_d = interrupt_i;
     assign interrupt1_d = interrupt0_q;
@@ -119,6 +121,9 @@ module trace_debugger
     assign qualified1_d = qualified0_q;
 
     // Hook phase related variables up to proper register
+    assign nc_trace_valid = trace_valid0_d;
+    assign tc_trace_valid = trace_valid0_q;
+    assign lc_trace_valid = trace_valid1_q;
     assign nc_priv = priv0_d;
     assign tc_priv = priv0_q;
     assign lc_interrupt = interrupt1_q;
@@ -138,7 +143,7 @@ module trace_debugger
     assign tc_iaddr = iaddr0_q;
 
     // TODO: add feature to have selective tracing, add enable with regmap
-    assign qualified0_d = '1;
+    assign qualified0_d = '1 && nc_trace_valid;
 
     // decide whether a privilege change occured
     always_comb begin
@@ -149,13 +154,13 @@ module trace_debugger
     // beq, bne, blt, bge, bltu, bgeu, p_bneimm, p_beqimm
     always_comb begin: is_branch
         is_branch0_d
-            = ((instr_i & MASK_BEQ)      == MATCH_BEQ) &
-              ((instr_i & MASK_BNE)      == MATCH_BNE) &
-              ((instr_i & MASK_BLT)      == MATCH_BLT) &
-              ((instr_i & MASK_BGE)      == MATCH_BGE) &
-              ((instr_i & MASK_BLTU)     == MATCH_BLTU) &
-              ((instr_i & MASK_BGEU)     == MATCH_BGEU) &
-              ((instr_i & MASK_P_BNEIMM) == MATCH_P_BNEIMM) &
+            = ((instr_i & MASK_BEQ)      == MATCH_BEQ) ||
+              ((instr_i & MASK_BNE)      == MATCH_BNE) ||
+              ((instr_i & MASK_BLT)      == MATCH_BLT) ||
+              ((instr_i & MASK_BGE)      == MATCH_BGE) ||
+              ((instr_i & MASK_BLTU)     == MATCH_BLTU) ||
+              ((instr_i & MASK_BGEU)     == MATCH_BGEU) ||
+              ((instr_i & MASK_P_BNEIMM) == MATCH_P_BNEIMM) ||
               ((instr_i & MASK_P_BEQIMM) == MATCH_P_BEQIMM);
     end
 
@@ -163,9 +168,9 @@ module trace_debugger
     // jalr, mret, sret, uret
     always_comb begin: is_discontinuity
         u_discontinuity0_d
-            = ((instr_i & MASK_JALR) == MATCH_JALR) &
-              ((instr_i & MASK_MRET) == MATCH_MRET) &
-              ((instr_i & MASK_SRET) == MATCH_SRET) &
+            = ((instr_i & MASK_JALR) == MATCH_JALR) ||
+              ((instr_i & MASK_MRET) == MATCH_MRET) ||
+              ((instr_i & MASK_SRET) == MATCH_SRET) ||
               ((instr_i & MASK_URET) == MATCH_URET);
     end
 
@@ -186,7 +191,7 @@ module trace_debugger
     trdb_branch_map i_trdb_branch_map
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-         .valid_i(tc_is_branch),
+         .valid_i(tc_is_branch && tc_trace_valid),
          .branch_taken_i(tc_branch_taken),
          .flush_i(branch_map_flush),
          .map_o(branch_map),
@@ -194,11 +199,10 @@ module trace_debugger
          .is_full_o(branch_map_full),
          .is_empty_o(branch_map_empty));
 
-
     trdb_priority i_trdb_priority
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-
+         .valid_i(tc_trace_valid),
          .lc_exception_i(lc_exception),
          //input logic lc_emitted_exception_sync (hack)
 
@@ -259,10 +263,11 @@ module trace_debugger
          .valid_o(packet_word_valid));
 
 
-
     // TODO: assert that we are not dealing with an unsupported instruction
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
+            trace_valid0_q     <= '0;
+            trace_valid1_q     <= '0;
             interrupt0_q       <= '0;
             interrupt1_q       <= '0;
             cause0_q           <= '0;
@@ -278,6 +283,8 @@ module trace_debugger
             qualified0_q       <= '0;
             qualified1_q       <= '0;
         end else begin
+            trace_valid0_q     <= trace_valid0_d;
+            trace_valid1_q     <= trace_valid1_d;
             interrupt0_q       <= interrupt0_d;
             interrupt1_q       <= interrupt1_d;
             cause0_q           <= cause0_d;
