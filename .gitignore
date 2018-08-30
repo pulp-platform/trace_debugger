@@ -12,3 +12,5 @@ trdb/doc/
 /modelsim.ini
 /driver/wave.do
 /transcript
+/vsim.wlf
+/vsim.dbg
