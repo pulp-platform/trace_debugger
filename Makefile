@@ -28,7 +28,8 @@ VOPT_FLAGS		= -debugdb -fsmdebug -pedanticerrors +acc #=mnprft
 
 VSIM			= vsim
 VSIM_FLAGS		= -c
-VSIM_DEBUG_FLAGS	= -gui
+VSIM_DEBUG_FLAGS	= -debugdb
+VSIM_GUI_FLAGS          = -gui -debugdb
 VSIM_SCRIPT             = tb/scripts/vsim.tcl
 
 RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
@@ -107,7 +108,7 @@ tb-run:
 		-do $(VSIM_SCRIPT)
 
 .PHONY: tb-run-gui
-tb-run-gui: VSIM_FLAGS = $(VSIM_DEBUG_FLAGS)
+tb-run-gui: VSIM_FLAGS = $(VSIM_GUI_FLAGS)
 tb-run-gui: tb-run
 
 .PHONY: tb-clean
