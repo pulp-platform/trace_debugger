@@ -118,9 +118,14 @@ tb-clean:
 
 
 # general targets
+.PHONY: TAGS
 TAGS: check-env
-	$(CTAGS) -R -e -h=".c.h" --exclude=$(PULP_SDK_HOME) . \
-	$(PULP_PROJECT_HOME)
+	echo "Generating TAGS for driver..."
+	$(CTAGS) -R -e -h=".c.h" --tag-relative=always \
+	--exclude=$(PULP_SDK_HOME) . $(PULP_PROJECT_HOME)
+	echo "Generating TAGS for RTL..."
+	$(CTAGS) -R -e -h=".sv.svh" --tag-relative=always \
+	rtl/ tb/
 
 .PHONY: all
 all: driver-all tb-all c-all
