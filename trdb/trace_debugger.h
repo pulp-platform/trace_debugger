@@ -73,22 +73,13 @@ struct tr_instr {
 #define SF_EXCEPTION 1
 #define SF_CONTEXT 2
 
-/**
- * This is the high level definition of packet with some meta information about
- * a tr_packet (or any other).
- *
- * This is not part of the <a
- * href="https://github.com/riscv/riscv-trace-spec">riscv-trace-spec</a> and
- * specific to the platform. Since we are only handling tr_packets we omit
- * basically just need a length field to delimit the payload.
- */
-struct trdb_packet {
-    uint32_t lenth : 7;        /**< length of payload in bits */
-    struct tr_packet *payload; /**< actual packet information */
-};
 
 /**
- * Canonical trace packet representation.
+ * Canonical trace packet representation. This is the high level definition of a
+ * packet with some meta information (first part of tr_packet) about the payload
+ * (second part). The meta information is specific to the transportation
+ * mechanism on the hardware. For the PULP platform there is just a small packet
+ * length indicator
  *
  * There are four possible packet types. See <a
  * href="https://github.com/riscv/riscv-trace-spec">riscv-trace-spec</a> for
@@ -96,6 +87,9 @@ struct trdb_packet {
  * a compressed list or array of tr_instr.
  */
 struct tr_packet {
+    /* transport layer header */
+    uint32_t length: 7;
+    /* actual payload of spec */
     uint32_t msg_type : 2; /**< UltraSoC specific TODO: remove */
     uint32_t format : 2;   /**< header denoting the packet type */
 
