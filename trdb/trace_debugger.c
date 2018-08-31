@@ -253,6 +253,311 @@ void trdb_free_state(struct trdb_comp_state *state)
     free(state->nextc);
     free(state);
 }
+
+
+/* int trdb_compress_trace_single(struct trdb_comp_state *state, */
+/*                                struct trdb_config *config, */
+/*                                struct list_head *packet_list, */
+/*                                struct tr_instr* instr) */
+/* { */
+/*     if (!state || !config || !packet_list || !instr_list) { */
+/*         LOG_ERR("Passed a nullpointer, invalid argument\n"); */
+/*         return -1; */
+/*     } */
+
+/*     bool full_address = config->full_address; */
+/*     struct trdb_state *lastc = state->lastc; */
+/*     struct trdb_state *thisc = state->thisc; */
+/*     struct trdb_state *nextc = state->nextc; */
+
+/*     /\* for each cycle *\/ */
+/*     for (size_t i = 0; i < len; i++) { */
+/*         thisc.halt = false; */
+/*         /\* test for qualification by filtering *\/ */
+/*         thisc.qualified = true; /\* TODO: implement filtering logic *\/ */
+/*         nextc.qualified = true; */
+
+/*         thisc.unqualified = !thisc.qualified; */
+/*         nextc.unqualified = !nextc.qualified; */
+
+/*         /\* Update state TODO: maybe just ignore last sample instead?*\/ */
+/*         thisc.exception = instrs[i].exception; */
+/*         nextc.exception = i < len ? instrs[i + 1].exception :
+ * thisc.exception; */
+
+/*         thisc.unpred_disc = is_unpred_discontinuity(instrs[i].instr); */
+/*         nextc.unpred_disc = */
+/*             i < len ? is_unpred_discontinuity(instrs[i + 1].instr) : false;
+ */
+
+/*         thisc.privilege = instrs[i].priv; */
+/*         nextc.privilege = i < len ? instrs[i + 1].priv : thisc.privilege; */
+
+/*         thisc.privilege_change = (thisc.privilege != lastc.privilege); */
+/*         nextc.privilege_change = (thisc.privilege != nextc.privilege); */
+/*         /\* TODO: clean this up, proper initial state per round required *\/
+ */
+/*         thisc.emitted_exception_sync = false; */
+
+/*         bool firstc_qualified = !lastc.qualified && thisc.qualified; */
+
+/*         /\* Start of one cycle *\/ */
+/*         if (!thisc.qualified) { */
+/*             /\* check if we even need to record anything *\/ */
+/*             lastc = thisc; */
+/*             continue; /\* end of cycle *\/ */
+/*         } */
+
+/*         if (is_unsupported(instrs[i].instr)) { */
+/*             LOG_ERR("Instruction is not supported for compression: 0x%"
+ * PRIx32 */
+/*                     " at addr: 0x%" PRIx32 "\n", */
+/*                     instrs[i].instr, instrs[i].iaddr); */
+/*             goto fail; */
+/*         } */
+
+/*         if (filter.resync_cnt++ == conf.resync_max) { */
+/*             filter.resync_pend = true; */
+/*             filter.resync_cnt = 0; */
+/*         } */
+
+/*         if (is_branch(instrs[i].instr)) { */
+/*             /\* update branch map *\/ */
+/*             /\* in hardware maybe mask and compare is better ? *\/ */
+/*             if ((i + 1 < len) && branch_taken(instrs[i], instrs[i + 1])) */
+/*                 branch_map.bits = branch_map.bits | (1u << branch_map.cnt);
+ */
+/*             branch_map.cnt++; */
+/*             if (branch_map.cnt == 31) { */
+/*                 branch_map.full = true; */
+/*             } */
+/*         } */
+/*         /\* We trace the packet before the trapped instruction and the */
+/*          * first one of the exception handler */
+/*          *\/ */
+/*         if (lastc.exception) { */
+/*             /\* Send te_inst: */
+/*              * format 3 */
+/*              * subformat 1 (exception -> all fields present) */
+/*              * resync_pend = 0 */
+/*              *\/ */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             tr->format = F_SYNC; /\* sync *\/ */
+/*             tr->subformat = 1;   /\* exception *\/ */
+/*             tr->context = 0;     /\* TODO: what comes here? *\/ */
+/*             tr->privilege = instrs[i].priv; */
+/*             /\* TODO: actually we should clear the branch map if we really */
+/*              * fill out this entry, else we have recorded twice (in the next
+ */
+/*              * packet) */
+/*              *\/ */
+/*             if (is_branch(instrs[i].instr) */
+/*                 && !branch_taken(instrs[i], instrs[i + 1])) */
+/*                 tr->branch = 1; */
+/*             else */
+/*                 tr->branch = 0; */
+
+/*             tr->address = instrs[i].iaddr; */
+/*             /\* With this packet we record last cycles exception */
+/*              * information. It's not possible for (i==0 && */
+/*              * lastc_exception) to be true since it takes one cycle */
+/*              * for lastc_exception to change */
+/*              *\/ */
+/*             assert(i != 0); */
+/*             tr->ecause = instrs[i - 1].cause; */
+/*             tr->interrupt = instrs[i - 1].interrupt; */
+/*             tr->tval = instrs[i - 1].tval; */
+/*             list_add(&tr->list, packet_list); */
+
+/*             thisc.emitted_exception_sync = true; */
+/*             filter.resync_pend = false; /\* TODO: how to handle this *\/ */
+/*             /\* end of cycle *\/ */
+
+/*         } else if (lastc.emitted_exception_sync) { */
+/*             /\* First we assume that the vector table entry is a jump. Since
+ * that */
+/*              * entry can change during runtime, we need to emit the jump */
+/*              * destination address, which is the second instruction of the
+ * trap */
+/*              * handler. This a bit hacky and made to work for the PULP. If */
+/*              * someone puts something else than a jump instruction there then
+ */
+/*              * all bets are off. This is a custom change. */
+/*              * TODO: merge this with lastc.unpred_discon */
+/*              *\/ */
+/*             /\* Send te_inst: */
+/*              * format 0/1/2 */
+/*              *\/ */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             /\* TODO: for now only full address *\/ */
+/*             if (!full_address) { */
+/*                 LOG_ERR("full_address false: Not implemented yet\n"); */
+/*                 goto fail; */
+/*             } */
+/*             if (branch_map.cnt == 0) { */
+/*                 tr->format = F_ADDR_ONLY; */
+/*                 tr->address = full_address ? instrs[i].iaddr : 0; */
+
+/*                 assert(branch_map.bits == 0); */
+/*             } else { */
+/*                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF; */
+/*                 tr->branches = branch_map.cnt; */
+/*                 tr->branch_map = branch_map.bits; */
+/*                 tr->address = full_address ? instrs[i].iaddr : 0; */
+
+/*                 branch_map = (struct branch_map_state){0}; */
+/*             } */
+/*             list_add(&tr->list, packet_list); */
+
+/*             /\* end of cycle *\/ */
+
+/*         } else if (firstc_qualified || thisc.unhalted ||
+ * thisc.privilege_change */
+/*                    || (filter.resync_pend && branch_map.cnt == 0)) { */
+
+/*             /\* Start packet *\/ */
+/*             /\* Send te_inst: */
+/*              * format 3 */
+/*              * subformat 0 (start, no ecause, interrupt and tval) */
+/*              * resync_pend = 0 */
+/*              *\/ */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             tr->format = F_SYNC; /\* sync *\/ */
+/*             tr->subformat = 0;   /\* start *\/ */
+/*             tr->context = 0;     /\* TODO: what comes here? *\/ */
+/*             tr->privilege = instrs[i].priv; */
+/*             if (is_branch(instrs[i].instr) */
+/*                 && !branch_taken(instrs[i], instrs[i + 1])) */
+/*                 tr->branch = 1; */
+/*             else */
+/*                 tr->branch = 0; */
+/*             tr->address = instrs[i].iaddr; */
+/*             list_add(&tr->list, packet_list); */
+
+/*             filter.resync_pend = false; */
+/*             /\* end of cycle *\/ */
+
+/*         } else if (lastc.unpred_disc) { */
+/*             /\* Send te_inst: */
+/*              * format 0/1/2 */
+/*              *\/ */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             /\* TODO: for now only full address *\/ */
+/*             if (!full_address) { */
+/*                 LOG_ERR("full_address false: Not implemented yet\n"); */
+/*                 goto fail; */
+/*             } */
+/*             if (branch_map.cnt == 0) { */
+/*                 tr->format = F_ADDR_ONLY; */
+/*                 tr->address = full_address ? instrs[i].iaddr : 0; */
+
+/*                 assert(branch_map.bits == 0); */
+/*             } else { */
+/*                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF; */
+/*                 tr->branches = branch_map.cnt; */
+/*                 tr->branch_map = branch_map.bits; */
+/*                 tr->address = instrs[i].iaddr; */
+
+/*                 branch_map = (struct branch_map_state){0}; */
+/*             } */
+/*             list_add(&tr->list, packet_list); */
+
+/*             /\* end of cycle *\/ */
+
+/*         } else if (filter.resync_pend && branch_map.cnt > 0) { */
+/*             /\* we treat resync_pend && branches == 0 before *\/ */
+/*             /\* Send te_inst: */
+/*              * format 0/1/2 */
+/*              *\/ */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             /\* TODO: for now only full address *\/ */
+/*             if (!full_address) { */
+/*                 LOG_ERR("full_address false: Not implemented yet\n"); */
+/*                 goto fail; */
+/*             } */
+/*             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF; */
+/*             tr->branches = branch_map.cnt; */
+/*             tr->branch_map = branch_map.bits; */
+/*             tr->address = full_address ? instrs[i].iaddr : 0; */
+/*             list_add(&tr->list, packet_list); */
+
+/*             branch_map = (struct branch_map_state){0}; */
+/*             /\* end of cycle *\/ */
+
+/*         } else if (nextc.halt || nextc.exception || nextc.privilege_change */
+/*                    || nextc.unqualified) { */
+/*             /\* Send te_inst: */
+/*              * format 0/1/2 */
+/*              *\/ */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             /\* TODO: for now only full address *\/ */
+/*             if (!full_address) { */
+/*                 LOG_ERR("full_address false: Not implemented yet\n"); */
+/*                 goto fail; */
+/*             } */
+/*             if (branch_map.cnt == 0) { */
+/*                 tr->format = F_ADDR_ONLY; */
+/*                 tr->address = full_address ? instrs[i].iaddr : 0; */
+
+/*                 assert(branch_map.bits == 0); */
+/*             } else { */
+/*                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF; */
+/*                 tr->branches = branch_map.cnt; */
+/*                 tr->branch_map = branch_map.bits; */
+/*                 tr->address = full_address ? instrs[i].iaddr : 0; */
+
+/*                 branch_map = (struct branch_map_state){0}; */
+/*             } */
+/*             list_add(&tr->list, packet_list); */
+
+/*             /\* end of cycle *\/ */
+
+/*         } else if (branch_map.full) { */
+/*             /\* Send te_inst: */
+/*              * format 0 */
+/*              * no address */
+/*              *\/ */
+/*             assert(branch_map.cnt == 31); */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             tr->format = F_BRANCH_FULL; */
+/*             tr->branches = branch_map.cnt; */
+/*             tr->branch_map = branch_map.bits; */
+/*             /\* tr->address  TODO: no address, study explanation *\/ */
+/*             list_add(&tr->list, packet_list); */
+
+/*             branch_map = (struct branch_map_state){0}; */
+/*             /\* end of cycle *\/ */
+
+/*         } else if (thisc.context_change) { */
+/*             /\* TODO: don't understand how to detect context change *\/ */
+/*             /\* Send te_inst: */
+/*              * format 3 */
+/*              * subformat 2 */
+/*              *\/ */
+/*             ALLOC_INIT_PACKET(tr); */
+/*             tr->format = F_SYNC; */
+/*             tr->subformat = 2; */
+/*             tr->context = 0; /\* TODO: what comes here? *\/ */
+/*             tr->privilege = instrs[i].priv; */
+/*             /\* tr->branch *\/ */
+/*             /\* tr->address *\/ */
+/*             /\* tr->ecause *\/ */
+/*             /\* tr->interrupt *\/ */
+/*             /\* tr->tval *\/ */
+/*             list_add(&tr->list, packet_list); */
+/*         } */
+
+/*         /\* update last cycle state *\/ */
+/*         lastc = thisc; */
+/*     } */
+/*     return packet_list; */
+/* fail: */
+/* fail_malloc: */
+/*     trdb_free_packet_list(packet_list); */
+/*     return NULL; */
+/* } */
+
+
 struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
                                       struct tr_instr instrs[len])
 {
