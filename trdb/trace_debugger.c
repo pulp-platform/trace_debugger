@@ -230,6 +230,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
         if (!thisc.qualified) {
             /* check if we even need to record anything */
             lastc = thisc;
+            thisc = nextc;
             continue; /* end of cycle */
         }
 
@@ -467,6 +468,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
 
         /* update last cycle state */
         lastc = thisc;
+        thisc = nextc;
     }
     return packet_list;
 fail:
