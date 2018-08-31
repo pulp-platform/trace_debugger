@@ -65,11 +65,20 @@ struct trdb_state {
 
     uint32_t privilege;
     bool privilege_change;
+
+    uint32_t instr;
 };
 
 static struct trdb_state lastc = {0};
 static struct trdb_state thisc = {0};
 static struct trdb_state nextc = {0};
+
+/* Current state and context of the decompression. */
+struct trdb_comp_state {
+    struct trdb_state *lastc;
+    struct trdb_state *thisc;
+    struct trdb_state *nextc;
+};
 
 /* Current state of the cpu during decompression. Allows one to
  * precisely emit a sequence  tr_instr. Handles the exception stack
@@ -168,6 +177,7 @@ static bool is_unpred_discontinuity(uint32_t instr)
 }
 
 
+/* Just crash and error if we hit one of those */
 static bool is_unsupported(uint32_t instr)
 {
     return is_lp_setup_instr(instr) || is_lp_counti_instr(instr)
@@ -193,6 +203,56 @@ void trdb_close()
 }
 
 
+struct trdb_config *trdb_alloc_config()
+{
+    struct trdb_config *config = malloc(sizeof(*config));
+    if (!config) {
+        perror("malloc");
+        return NULL;
+    }
+    *config = (struct trdb_config){
+        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
+    return config;
+}
+
+
+void trdb_free_config(struct trdb_config *config)
+{
+    free(config);
+}
+
+
+struct trdb_comp_state *trdb_alloc_state()
+{
+    struct trdb_comp_state *state = malloc(sizeof(*state));
+    struct trdb_state *nextc = malloc(sizeof(*nextc));
+    struct trdb_state *thisc = malloc(sizeof(*thisc));
+    struct trdb_state *lastc = malloc(sizeof(*lastc));
+    if (!state || !nextc || !thisc || !lastc) {
+        perror("malloc");
+        return NULL;
+    }
+    *state = (struct trdb_comp_state){0};
+    *lastc = (struct trdb_state){0};
+    *thisc = (struct trdb_state){0};
+    *nextc = (struct trdb_state){0};
+    state->lastc = lastc;
+    state->thisc = thisc;
+    state->nextc = nextc;
+    return state;
+}
+
+
+void trdb_free_state(struct trdb_comp_state *state)
+{
+    /* lets not dereference a potential nullpointer */
+    if (!state)
+        return;
+    free(state->lastc);
+    free(state->thisc);
+    free(state->nextc);
+    free(state);
+}
 struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
                                       struct tr_instr instrs[len])
 {
@@ -202,7 +262,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
     for (size_t i = 0; i < len; i++) {
         thisc.halt = false;
         /* test for qualification by filtering */
-        thisc.qualified = true; /* TODO: implement filtering logic */
+        /* TODO: implement filtering logic */
+
+        thisc.qualified = true;
         nextc.qualified = true;
 
         thisc.unqualified = !thisc.qualified;
