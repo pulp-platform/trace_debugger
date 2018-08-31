@@ -25,6 +25,7 @@ program automatic tb_run();
     mailbox #(Stimuli) mail;
 
     initial begin
+        mail    = new();
         driver  = new(tb_if, mail);
         monitor = new(tb_if, mail);
 

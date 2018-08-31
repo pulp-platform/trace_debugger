@@ -119,7 +119,7 @@ class Driver;
             $display("[ERROR]: parse_stimuli() failed.");
 
         // send to monitor
-        // mail.put(stimuli);
+        mail.put(stimuli);
 
         //TODO: fix this hack
         apply_zero();
