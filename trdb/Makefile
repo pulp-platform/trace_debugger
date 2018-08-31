@@ -21,8 +21,10 @@
 
 CC		= gcc
 CPPFLAGS	=
-CFLAGS		= -std=gnu11 -Wall -O2 -fno-strict-aliasing -Wno-unused-function -DNDEBUG
-CFLAGS_DEBUG	= -std=gnu11 -Wall -g -fno-strict-aliasing -Wno-unused-function
+override CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
+			-Wno-unused-function -DNDEBUG
+override CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
+			-Wno-unused-function
 
 LIB_PATHS       = /scratch/balasr/pulp-riscv-binutils-gdb/opcodes \
 		/scratch/balasr/pulp-riscv-binutils-gdb/bfd \
@@ -61,7 +63,8 @@ debug: CFLAGS = $(CFLAGS_DEBUG)
 debug: all
 
 $(BIN): $(OBJS) $(MAIN_OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(MAIN_OBJS) $(OBJS) $(LDLIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(MAIN_OBJS) $(OBJS) \
+		$(LDLIBS)
 
 $(TEST_BIN): $(OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)

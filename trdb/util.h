@@ -30,14 +30,23 @@
 #ifdef NDEBUG
 #define TRDB_LEVEL 1
 #define TRDB_TRACE 0
+#define TRDB_TEST_DEBUG 0
+
+#else
+
+/* Sometimes we want quiet debug builds */
+#ifdef QUIET
+#define TRDB_LEVEL 1
+#define TRDB_TRACE 0
+#define TRDB_TEST_DEBUG 0
 #else
 #define TRDB_LEVEL 3
 #define TRDB_TRACE 1
-#endif
-
-#ifndef NDEBUG
 #define TRDB_TEST_DEBUG 1
 #endif
+
+#endif
+
 
 /**
  * Write formatted string to stderr with the filename, linenumber and function

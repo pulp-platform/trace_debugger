@@ -97,10 +97,10 @@ bool test_disasm_bfd()
     disassemble_init_for_target(&dinfo);
 
     /* Tests for disassembly functions */
-#ifdef TRDB_TEST_DEBUG
-    dump_target_list();
-    dump_bin_info(abfd);
-#endif
+    if (TRDB_TEST_DEBUG) {
+        dump_target_list();
+        dump_bin_info(abfd);
+    }
 
     /* set up disassembly context */
     struct disassembler_unit dunit = {0};
@@ -110,14 +110,14 @@ bool test_disasm_bfd()
         LOG_ERR("No suitable disassembler found\n");
         return 1;
     }
-/* TODO: use this path also in relase mode, but less noisy */
-#ifdef TRDB_TEST_DEBUG
-    dump_section_names(abfd);
+    /* TODO: use this path also in relase mode, but less noisy */
+    if (TRDB_TEST_DEBUG) {
+        dump_section_names(abfd);
 
-    LOG_INFO("num_sections: %d\n", bfd_count_sections(abfd));
-    disassemble_single_instruction(0x10, 0, &dunit);
-    bfd_map_over_sections(abfd, disassemble_section, &dunit);
-#endif
+        LOG_INFO("num_sections: %d\n", bfd_count_sections(abfd));
+        disassemble_single_instruction(0x10, 0, &dunit);
+        bfd_map_over_sections(abfd, disassemble_section, &dunit);
+    }
     bfd_close(abfd);
     return 1;
 }
@@ -414,9 +414,8 @@ int test_stimuli_to_packet_dump(const char *path)
         LOG_ERR("Compress trace failed\n");
         return 0;
     }
-#ifdef TRDB_TEST_DEBUG
-    trdb_dump_packet_list(stdout, &head);
-#endif
+    if (TRDB_TEST_DEBUG)
+        trdb_dump_packet_list(stdout, &head);
 
     free(*samples);
     trdb_free_packet_list(&head);
@@ -449,9 +448,9 @@ int test_disassemble_trace(const char *bin_path, const char *trace_path)
     dunit.dinfo = &dinfo;
     init_disassembler_unit(&dunit, abfd, NULL);
 
-#ifdef TRDB_TEST_DEBUG
-    trdb_disassemble_trace(samplecnt, *samples, &dunit);
-#endif
+    if (TRDB_TEST_DEBUG)
+        trdb_disassemble_trace(samplecnt, *samples, &dunit);
+
     free(*samples);
     bfd_close(abfd);
     return 1;
@@ -488,9 +487,10 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         return 0;
     }
     LOG_INFO("\nSTARTING_TEST_DUMPING\n");
-#ifdef TRDB_TEST_DEBUG
-    trdb_dump_packet_list(stdout, &packet_head);
-#endif
+
+    if (TRDB_TEST_DEBUG)
+        trdb_dump_packet_list(stdout, &packet_head);
+
     trdb_decompress_trace(abfd, &packet_head, &instr_head);
 
     /* We compare whether the reconstruction matches the original sequence, only

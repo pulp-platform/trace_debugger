@@ -37,7 +37,7 @@
 
 #define XLEN 32
 #define CAUSELEN 5
-#define PRIVLEN 5 //TODO: fix this to 3 or 2
+#define PRIVLEN 3 //TODO: fix this to 3 or 2
 #define ILEN 32
 #define CONTEXTLEN 32
 
@@ -243,7 +243,7 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
  *     uint32_t branches : 5;
  *     uint32_t branch_map; //TODO: fix to 31 bits
  *     uint32_t address;
- * };
+ *
  * 2 + 5 + (1 to 31) + (1 to 32) = 9 to 70
  *
  * struct packet1 {

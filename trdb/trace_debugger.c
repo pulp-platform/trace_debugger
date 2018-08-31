@@ -1246,7 +1246,7 @@ static int serialize_packet(struct tr_packet *packet, size_t *bitcnt,
         return 0;
 
     case F_SYNC:
-        assert(PRIVLEN == 5);
+        assert(PRIVLEN == 3);
         /* check for enough space to the packing */
         assert(128 > 2 + 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN);
         /* TODO: for now we ignore the context field since we have
