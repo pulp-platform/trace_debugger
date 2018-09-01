@@ -514,6 +514,11 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         i++;
     }
 
+    if(i==0){
+	LOG_ERR("Empty instruction list.\n");
+	return 0;
+    }
+
     free(*samples);
     trdb_free_packet_list(&packet_head);
     trdb_free_instr_list(&instr_head);
