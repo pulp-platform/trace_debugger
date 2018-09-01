@@ -66,9 +66,7 @@ struct trdb_state {
     uint32_t privilege;
     bool privilege_change;
 
-    uint32_t instr;
-    uint32_t addr;
-    bool compressed;
+    struct tr_instr instr;
 };
 
 static struct trdb_state lastc = {0};
@@ -572,25 +570,39 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
         /* test for qualification by filtering */
         /* TODO: implement filtering logic */
 
-        thisc.qualified = true;
+        nextc.instr = instrs[i];
+
+        struct tr_instr *nc_instr = &nextc.instr;
+        struct tr_instr *tc_instr = &thisc.instr;
+        struct tr_instr *lc_instr = &lastc.instr;
+
+        /* nextc.qualified = true; */
+        /* thisc.qualified = true; */
         nextc.qualified = true;
 
-        thisc.unqualified = !thisc.qualified;
+        /* thisc.unqualified = !thisc.qualified; */
+        /* nextc.unqualified = !nextc.qualified; */
         nextc.unqualified = !nextc.qualified;
 
         /* Update state TODO: maybe just ignore last sample instead?*/
-        thisc.exception = instrs[i].exception;
-        nextc.exception = i < len ? instrs[i + 1].exception : thisc.exception;
+        /* thisc.exception = instrs[i].exception; */
+        /* nextc.exception = i < len ? instrs[i + 1].exception :
+         * thisc.exception; */
+        nextc.exception = instrs[i].exception;
 
-        thisc.unpred_disc = is_unpred_discontinuity(instrs[i].instr);
-        nextc.unpred_disc =
-            i < len ? is_unpred_discontinuity(instrs[i + 1].instr) : false;
+        /* thisc.unpred_disc = is_unpred_discontinuity(instrs[i].instr); */
+        /* nextc.unpred_disc = */
+        /* i < len ? is_unpred_discontinuity(instrs[i + 1].instr) : false; */
+        nextc.unpred_disc = is_unpred_discontinuity(instrs[i].instr);
 
-        thisc.privilege = instrs[i].priv;
-        nextc.privilege = i < len ? instrs[i + 1].priv : thisc.privilege;
+        /* thisc.privilege = instrs[i].priv; */
+        /* nextc.privilege = i < len ? instrs[i + 1].priv : thisc.privilege; */
+        nextc.privilege = instrs[i].priv;
 
-        thisc.privilege_change = (thisc.privilege != lastc.privilege);
+        /* thisc.privilege_change = (thisc.privilege != lastc.privilege); */
+        /* nextc.privilege_change = (thisc.privilege != nextc.privilege); */
         nextc.privilege_change = (thisc.privilege != nextc.privilege);
+
         /* TODO: clean this up, proper initial state per round required */
         thisc.emitted_exception_sync = false;
 
@@ -604,10 +616,10 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             continue; /* end of cycle */
         }
 
-        if (is_unsupported(instrs[i].instr)) {
+        if (is_unsupported(tc_instr->instr)) {
             LOG_ERR("Instruction is not supported for compression: 0x%" PRIx32
                     " at addr: 0x%" PRIx32 "\n",
-                    instrs[i].instr, instrs[i].iaddr);
+                    tc_instr->instr, tc_instr->iaddr);
             goto fail;
         }
 
@@ -616,12 +628,12 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             filter.resync_cnt = 0;
         }
 
-        if (is_branch(instrs[i].instr)) {
+        if (is_branch(tc_instr->instr)) {
             /* update branch map */
             /* in hardware maybe mask and compare is better ? */
             if ((i + 1 < len)
-                && branch_taken(instrs[i].compressed, instrs[i].iaddr,
-                                instrs[i + 1].iaddr))
+                && branch_taken(tc_instr->compressed, tc_instr->iaddr,
+                                nc_instr->iaddr))
                 branch_map.bits = branch_map.bits | (1u << branch_map.cnt);
             branch_map.cnt++;
             if (branch_map.cnt == 31) {
@@ -641,28 +653,28 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             tr->format = F_SYNC; /* sync */
             tr->subformat = 1;   /* exception */
             tr->context = 0;     /* TODO: what comes here? */
-            tr->privilege = instrs[i].priv;
+            tr->privilege = tc_instr->priv;
             /* TODO: actually we should clear the branch map if we really
              * fill out this entry, else we have recorded twice (in the next
              * packet)
              */
-            if (is_branch(instrs[i].instr)
-                && !branch_taken(instrs[i].compressed, instrs[i].iaddr,
-                                 instrs[i + 1].iaddr))
+            if (is_branch(tc_instr->instr)
+                && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
+                                 nc_instr->iaddr))
                 tr->branch = 1;
             else
                 tr->branch = 0;
 
-            tr->address = instrs[i].iaddr;
+            tr->address = tc_instr->iaddr;
             /* With this packet we record last cycles exception
              * information. It's not possible for (i==0 &&
              * lastc_exception) to be true since it takes one cycle
              * for lastc_exception to change
              */
             assert(i != 0);
-            tr->ecause = instrs[i - 1].cause;
-            tr->interrupt = instrs[i - 1].interrupt;
-            tr->tval = instrs[i - 1].tval;
+            tr->ecause = lc_instr->cause;
+            tr->interrupt = lc_instr->interrupt;
+            tr->tval = lc_instr->tval;
             list_add(&tr->list, packet_list);
 
             thisc.emitted_exception_sync = true;
@@ -689,14 +701,14 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             }
             if (branch_map.cnt == 0) {
                 tr->format = F_ADDR_ONLY;
-                tr->address = full_address ? instrs[i].iaddr : 0;
+                tr->address = full_address ? tc_instr->iaddr : 0;
 
                 assert(branch_map.bits == 0);
             } else {
                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
                 tr->branches = branch_map.cnt;
                 tr->branch_map = branch_map.bits;
-                tr->address = full_address ? instrs[i].iaddr : 0;
+                tr->address = full_address ? tc_instr->iaddr : 0;
 
                 branch_map = (struct branch_map_state){0};
             }
@@ -717,14 +729,14 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             tr->format = F_SYNC; /* sync */
             tr->subformat = 0;   /* start */
             tr->context = 0;     /* TODO: what comes here? */
-            tr->privilege = instrs[i].priv;
-            if (is_branch(instrs[i].instr)
-                && !branch_taken(instrs[i].compressed, instrs[i].iaddr,
-                                 instrs[i + 1].iaddr))
+            tr->privilege = tc_instr->priv;
+            if (is_branch(tc_instr->instr)
+                && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
+                                 nc_instr->iaddr))
                 tr->branch = 1;
             else
                 tr->branch = 0;
-            tr->address = instrs[i].iaddr;
+            tr->address = tc_instr->iaddr;
             list_add(&tr->list, packet_list);
 
             filter.resync_pend = false;
@@ -742,14 +754,14 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             }
             if (branch_map.cnt == 0) {
                 tr->format = F_ADDR_ONLY;
-                tr->address = full_address ? instrs[i].iaddr : 0;
+                tr->address = full_address ? tc_instr->iaddr : 0;
 
                 assert(branch_map.bits == 0);
             } else {
                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
                 tr->branches = branch_map.cnt;
                 tr->branch_map = branch_map.bits;
-                tr->address = instrs[i].iaddr;
+                tr->address = tc_instr->iaddr;
 
                 branch_map = (struct branch_map_state){0};
             }
@@ -771,7 +783,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
             tr->branches = branch_map.cnt;
             tr->branch_map = branch_map.bits;
-            tr->address = full_address ? instrs[i].iaddr : 0;
+            tr->address = full_address ? tc_instr->iaddr : 0;
             list_add(&tr->list, packet_list);
 
             branch_map = (struct branch_map_state){0};
@@ -790,14 +802,14 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             }
             if (branch_map.cnt == 0) {
                 tr->format = F_ADDR_ONLY;
-                tr->address = full_address ? instrs[i].iaddr : 0;
+                tr->address = full_address ? tc_instr->iaddr : 0;
 
                 assert(branch_map.bits == 0);
             } else {
                 tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
                 tr->branches = branch_map.cnt;
                 tr->branch_map = branch_map.bits;
-                tr->address = full_address ? instrs[i].iaddr : 0;
+                tr->address = full_address ? tc_instr->iaddr : 0;
 
                 branch_map = (struct branch_map_state){0};
             }
@@ -831,7 +843,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             tr->format = F_SYNC;
             tr->subformat = 2;
             tr->context = 0; /* TODO: what comes here? */
-            tr->privilege = instrs[i].priv;
+            tr->privilege = tc_instr->priv;
             /* tr->branch */
             /* tr->address */
             /* tr->ecause */
