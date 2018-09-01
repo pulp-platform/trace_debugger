@@ -67,6 +67,8 @@ struct trdb_state {
     bool privilege_change;
 
     uint32_t instr;
+    uint32_t addr;
+    bool compressed;
 };
 
 static struct trdb_state lastc = {0};
@@ -150,7 +152,8 @@ static bool is_branch(uint32_t instr)
 }
 
 
-static bool branch_taken(struct tr_instr before, struct tr_instr after)
+static bool branch_taken(bool before_compressed, uint32_t addr_before,
+                         uint32_t addr_after)
 {
     /* can this cause issues with RVC + degenerate jump (+2)? -> yes*/
     /* TODO: this definitely doens't work for 64 bit instructions */
@@ -159,8 +162,8 @@ static bool branch_taken(struct tr_instr before, struct tr_instr after)
      * originally was. So we can't tell by looking at the lower two bits of
      * instr.
      */
-    return before.compressed ? !(before.iaddr + 2 == after.iaddr)
-                             : !(before.iaddr + 4 == after.iaddr);
+    return before_compressed ? !(addr_before + 2 == addr_after)
+                             : !(addr_before + 4 == addr_after);
 }
 
 
@@ -616,7 +619,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
         if (is_branch(instrs[i].instr)) {
             /* update branch map */
             /* in hardware maybe mask and compare is better ? */
-            if ((i + 1 < len) && branch_taken(instrs[i], instrs[i + 1]))
+            if ((i + 1 < len)
+                && branch_taken(instrs[i].compressed, instrs[i].iaddr,
+                                instrs[i + 1].iaddr))
                 branch_map.bits = branch_map.bits | (1u << branch_map.cnt);
             branch_map.cnt++;
             if (branch_map.cnt == 31) {
@@ -642,7 +647,8 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
              * packet)
              */
             if (is_branch(instrs[i].instr)
-                && !branch_taken(instrs[i], instrs[i + 1]))
+                && !branch_taken(instrs[i].compressed, instrs[i].iaddr,
+                                 instrs[i + 1].iaddr))
                 tr->branch = 1;
             else
                 tr->branch = 0;
@@ -713,7 +719,8 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             tr->context = 0;     /* TODO: what comes here? */
             tr->privilege = instrs[i].priv;
             if (is_branch(instrs[i].instr)
-                && !branch_taken(instrs[i], instrs[i + 1]))
+                && !branch_taken(instrs[i].compressed, instrs[i].iaddr,
+                                 instrs[i + 1].iaddr))
                 tr->branch = 1;
             else
                 tr->branch = 0;
