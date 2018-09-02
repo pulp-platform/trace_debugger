@@ -36,8 +36,8 @@
 #include "../util.c"
 
 /* TODO: replace return values with these */
-#define TRDB_TEST_SUCCESS 1
-#define TRDB_TEST_FAIL 0
+#define TRDB_SUCCESS 0
+#define TRDB_FAIL -1
 
 /* TODO: and-ing of test results for main return value */
 #define RUN_TEST(fun, ...)                                                     \
@@ -457,6 +457,89 @@ int test_disassemble_trace(const char *bin_path, const char *trace_path)
 }
 
 
+int test_compress_trace(const char *trace_path, const char *packets_path)
+{
+    trdb_init();
+
+    FILE *expected_packets = NULL;
+    FILE *tmp_fp = NULL;
+
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
+    int status = 0;
+    size_t samplecnt = trdb_stimuli_to_trace(trace_path, samples, &status);
+    if (status != 0) {
+        LOG_ERR("Stimuli to tr_instr failed\n");
+        return 0;
+    }
+    status = 1; // TODO: remove this dirty fix
+
+    LIST_HEAD(packet_head);
+    LIST_HEAD(instr_head);
+    struct list_head *ret =
+        trdb_compress_trace(&packet_head, samplecnt, *samples);
+    if (!ret) {
+        LOG_ERR("Compress trace failed\n");
+        return 0;
+    }
+
+    expected_packets = fopen(packets_path, "r");
+    if (!expected_packets) {
+        perror("fopen");
+        status = -1;
+        goto fail;
+    }
+
+    tmp_fp = fopen("tmp2", "r+");
+    if (!tmp_fp) {
+        perror("fopen");
+        status = -1;
+        goto fail;
+    }
+    trdb_dump_packet_list(tmp_fp, &packet_head);
+    rewind(tmp_fp);
+
+    char *compare = NULL;
+    char *expected = NULL;
+    size_t linecnt = 0;
+    size_t len = 0;
+    ssize_t nread_compare;
+    ssize_t nread_expected;
+
+    while ((nread_compare = getline(&compare, &len, tmp_fp)) != -1) {
+        linecnt++;
+        nread_expected = getline(&expected, &len, expected_packets);
+        if (nread_expected == -1) {
+            LOG_ERR("Hit EOF too early in expected packets file\n");
+            return 0;
+        }
+        if (nread_expected != nread_compare) {
+            LOG_ERR("Expected packets line length doesn't not match\n");
+            return 0;
+        }
+        if (strncmp(compare, expected, nread_expected) != 0) {
+            LOG_ERR("Expected packets mismatch on line %d\n", linecnt);
+            LOG_ERR("Expected: %s", expected);
+            LOG_ERR("Received: %s", compare);
+            return 0;
+        }
+    }
+
+fail:
+    free(compare);
+    free(expected);
+    if (tmp_fp)
+        fclose(tmp_fp);
+    if (expected_packets)
+        fclose(expected_packets);
+    free(*samples);
+    trdb_free_packet_list(&packet_head);
+    trdb_free_instr_list(&instr_head);
+    trdb_close();
+    return status;
+}
+
+
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
     trdb_init();
@@ -539,6 +622,7 @@ int main(int argc, char *argv[argc + 1])
      * riscv_subset for each instantiation of a disassembler.
      */
     RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
+    RUN_TEST(test_compress_trace, "data/trdb_stimuli", "data/trdb_packets");
     RUN_TEST(test_decompress_trace, "data/interrupt", "data/trdb_stimuli");
 
     return _trdb_test_result ? EXIT_SUCCESS : EXIT_FAILURE;
