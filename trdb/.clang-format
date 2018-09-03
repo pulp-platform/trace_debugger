@@ -19,3 +19,4 @@ BreakStringLiterals: false
 SortIncludes:    false
 ContinuationIndentWidth: 4
 ColumnLimit: 80
+IndentPPDirectives: AfterHash
