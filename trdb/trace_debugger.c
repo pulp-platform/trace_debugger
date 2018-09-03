@@ -194,7 +194,7 @@ static int log_priority(const char *priority)
 }
 
 
-void trdb_ctx_reset(struct trdb_ctx *ctx)
+void trdb_reset_compression(struct trdb_ctx *ctx)
 {
     ctx->config = (struct trdb_config){
         .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
@@ -202,6 +202,16 @@ void trdb_ctx_reset(struct trdb_ctx *ctx)
     ctx->lastc = (struct trdb_state){0};
     ctx->thisc = (struct trdb_state){0};
     ctx->nextc = (struct trdb_state){0};
+    ctx->branch_map = (struct branch_map_state){0};
+    ctx->filter = (struct filter_state){0};
+}
+
+
+void trdb_reset_decompression(struct trdb_ctx *ctx)
+{
+    ctx->config = (struct trdb_config){
+        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
+
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
 }

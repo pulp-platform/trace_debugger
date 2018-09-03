@@ -683,7 +683,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         trdb_dump_packet_list(stdout, &packet0_head);
 
     trdb_decompress_trace(ctx, abfd, &packet0_head, &instr0_head);
-    trdb_ctx_reset(ctx);
+    trdb_reset_decompression(ctx);
     trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
 
     if (TRDB_VERBOSE_DEBUG) {

@@ -127,29 +127,80 @@ struct tr_packet {
 
 
 /**
- * Library context, needs to be hold by program and passed to quite a few
- * functions.
+ * Library/trace debugger context, needs to be hold by program and passed to
+ * quite a few functions.
  */
 struct trdb_ctx;
 
-void trdb_ctx_reset(struct trdb_ctx *ctx);
+/**
+ * Reset the trace debugger context to a clean state, do this before calling a
+ * sequence of trdb_compress_trace_step.
+ *
+ * @param ctx trace debugger context
+ */
+void trdb_reset_compression(struct trdb_ctx *ctx);
+
+/**
+ * Reset the trace debugger context to a clean state, do this before calling a
+ * trdb_decompress_trace.
+ *
+ * @param ctx trace debugger context
+ */
+void trdb_reset_decompression(struct trdb_ctx *ctx);
+
+/**
+ * Creates trdb library/trace debugger context. Fills in default values. Set
+ * $TRDB_LOG for different default logging level.
+ *
+ * @return a new trdb library context
+ */
 struct trdb_ctx *trdb_new();
+
+/**
+ * Destroys a trdb context.
+ *
+ * @param ctx a trace debugger context to destroy
+ */
 void trdb_free(struct trdb_ctx *ctx);
+
+/**
+ * Hook a custom logging function for the specified trace debugger context. Per
+ * default there is a function that logs to stderr.
+ *
+ * @param ctx a trace debugger context
+ * @param log_fn a custom logging function
+ */
 void trdb_set_log_fn(struct trdb_ctx *ctx,
                      void (*log_fn)(struct trdb_ctx *ctx, int priority,
                                     const char *file, int line, const char *fn,
                                     const char *format, va_list args));
+
+/**
+ * Get the current logging priority. The value controls which messages are
+ * logged.
+ *
+ * @param ctx a trace debugger context
+ * @return the current loggin priority
+ */
 int trdb_get_log_priority(struct trdb_ctx *ctx);
+
+/**
+ * Set the current logging priority. The value controls which messages are
+ * logged.
+ *
+ * @param ctx a trace debugger context
+ * @param priority the new loggint priority
+ */
 void trdb_set_log_priority(struct trdb_ctx *ctx, int priority);
 
 
 /**
- * Initialize the trace debugger, call before any other functions.
+ * Initialize the trace debugger, call before any other functions. TODO: remove
  */
 void trdb_init();
 
 /**
- * Release resources of the trace debugger, currently a NOP.
+ * Release resources of the trace debugger, currently a NOP. TODO: remove
  */
 void trdb_close();
 
