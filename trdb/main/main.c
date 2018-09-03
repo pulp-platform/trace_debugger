@@ -122,13 +122,15 @@ int main(int argc, char *argv[argc + 1])
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
+    FILE *output_fp = NULL;
+    bfd *abfd = NULL;
+
     struct trdb_ctx *ctx = trdb_new();
+
     if (!ctx) {
         status = EXIT_FAILURE;
         goto fail;
     }
-    FILE *output_fp = NULL;
-    bfd *abfd = NULL;
 
     /* prepare output */
     if (arguments.output_file[0] != '-') {
