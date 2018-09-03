@@ -475,7 +475,10 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     trdb_init();
 
     FILE *expected_packets = NULL;
-    FILE *tmp_fp = NULL;
+    FILE *tmp_fp0 = NULL;
+    FILE *tmp_fp1 = NULL;
+
+    struct trdb_ctx *ctx = NULL;
 
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
@@ -487,14 +490,34 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     }
     status = TRDB_SUCCESS;
 
-    LIST_HEAD(packet_head);
+    LIST_HEAD(packet1_head);
+    LIST_HEAD(packet0_head);
     LIST_HEAD(instr_head);
+
+    /* legacy do-it-all-at-once compression. Here for regression testing */
     struct list_head *ret =
-        trdb_compress_trace(&packet_head, samplecnt, *samples);
+        trdb_compress_trace(&packet0_head, samplecnt, *samples);
     if (!ret) {
         LOG_ERR("Compress trace failed\n");
         status = TRDB_FAIL;
         goto fail;
+    }
+
+    ctx = trdb_new();
+    if (!ctx) {
+        LOG_ERR("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    /* step by step compression */
+    for (size_t i = 0; i < samplecnt; i++) {
+        int step = trdb_compress_trace_step(ctx, &packet1_head, &(*samples)[i]);
+        if (step == -1) {
+            LOG_ERR("Compress trace failed.\n");
+            status = TRDB_FAIL;
+            goto fail;
+        }
     }
 
     expected_packets = fopen(packets_path, "r");
@@ -504,14 +527,24 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
         goto fail;
     }
 
-    tmp_fp = fopen("tmp2", "w+");
-    if (!tmp_fp) {
+    tmp_fp0 = fopen("tmp2", "w+");
+    if (!tmp_fp0) {
         perror("fopen");
         status = TRDB_FAIL;
         goto fail;
     }
-    trdb_dump_packet_list(tmp_fp, &packet_head);
-    rewind(tmp_fp);
+    trdb_dump_packet_list(tmp_fp0, &packet0_head);
+    rewind(tmp_fp0);
+
+
+    tmp_fp1 = fopen("tmp3", "w+");
+    if (!tmp_fp1) {
+        perror("fopen");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+    trdb_dump_packet_list(tmp_fp1, &packet1_head);
+    rewind(tmp_fp1);
 
     char *compare = NULL;
     char *expected = NULL;
@@ -520,12 +553,14 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     ssize_t nread_compare;
     ssize_t nread_expected;
 
+    /* test stepwise compression against expected response */
     while ((nread_expected = getline(&expected, &len, expected_packets))
            != -1) {
         linecnt++;
-        nread_compare = getline(&compare, &len, tmp_fp);
+        nread_compare = getline(&compare, &len, tmp_fp1);
         if (nread_compare == -1) {
-            LOG_ERR("Hit EOF too early in expected packets file\n");
+            LOG_ERR(
+                "Hit EOF too early in expected packets file, new compression\n");
             status = TRDB_FAIL;
             goto fail;
         }
@@ -539,15 +574,42 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
         }
     }
 
+    linecnt = 0;
+    /* test legacy against expected response */
+    while ((nread_expected = getline(&expected, &len, expected_packets))
+           != -1) {
+        linecnt++;
+        nread_compare = getline(&compare, &len, tmp_fp0);
+        if (nread_compare == -1) {
+            LOG_ERR(
+                "Hit EOF too early in expected packets file, legacy compression\n");
+            status = TRDB_FAIL;
+            goto fail;
+        }
+        if (nread_expected != nread_compare
+            || strncmp(compare, expected, nread_expected) != 0) {
+            LOG_ERR("Expected packets mismatch on line %zu\n", linecnt);
+            LOG_ERR("Expected: %s", expected);
+            LOG_ERR("Received: %s", compare);
+            status = TRDB_FAIL;
+            goto fail;
+        }
+    }
+
+
 fail:
     free(compare);
     free(expected);
-    if (tmp_fp)
-        fclose(tmp_fp);
+    trdb_free(ctx);
+    if (tmp_fp0)
+        fclose(tmp_fp0);
+    if (tmp_fp1)
+        fclose(tmp_fp1);
     if (expected_packets)
         fclose(expected_packets);
     free(*samples);
-    trdb_free_packet_list(&packet_head);
+    trdb_free_packet_list(&packet0_head);
+    trdb_free_packet_list(&packet1_head);
     trdb_free_instr_list(&instr_head);
     trdb_close();
     return status;

@@ -43,6 +43,11 @@
 
 #define INSTR_STR_LEN 128
 /**
+ * Library context, needs to be hold by program and passed to quite a few functions.
+ */
+struct trdb_ctx;
+
+/**
  * Retired instruction captured by the interface to the RISC-V CPU, with some
  * metadata.
  */
