@@ -504,7 +504,7 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
         goto fail;
     }
 
-    tmp_fp = fopen("tmp2", "r+");
+    tmp_fp = fopen("tmp2", "w+");
     if (!tmp_fp) {
         perror("fopen");
         status = TRDB_FAIL;
@@ -520,20 +520,17 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     ssize_t nread_compare;
     ssize_t nread_expected;
 
-    while ((nread_compare = getline(&compare, &len, tmp_fp)) != -1) {
+    while ((nread_expected = getline(&expected, &len, expected_packets))
+           != -1) {
         linecnt++;
-        nread_expected = getline(&expected, &len, expected_packets);
-        if (nread_expected == -1) {
+        nread_compare = getline(&compare, &len, tmp_fp);
+        if (nread_compare == -1) {
             LOG_ERR("Hit EOF too early in expected packets file\n");
             status = TRDB_FAIL;
             goto fail;
         }
-        if (nread_expected != nread_compare) {
-            LOG_ERR("Expected packets line length doesn't not match\n");
-            status = TRDB_FAIL;
-            goto fail;
-        }
-        if (strncmp(compare, expected, nread_expected) != 0) {
+        if (nread_expected != nread_compare
+            || strncmp(compare, expected, nread_expected) != 0) {
             LOG_ERR("Expected packets mismatch on line %zu\n", linecnt);
             LOG_ERR("Expected: %s", expected);
             LOG_ERR("Received: %s", compare);
@@ -579,6 +576,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         goto fail;
     }
     status = TRDB_SUCCESS;
+    LIST_HEAD(test_head);
+    trdb_compress_trace_legacy(&test_head, samplecnt, *samples);
+    trdb_init();
 
     LIST_HEAD(packet_head);
     LIST_HEAD(instr_head);
@@ -589,8 +589,8 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         status = TRDB_FAIL;
         goto fail;
     }
-    LOG_INFO("\ntest_decompress_trace dump:\n");
 
+    LOG_INFO("\ntest_decompress_trace dump:\n");
     if (TRDB_TEST_DEBUG)
         trdb_dump_packet_list(stdout, &packet_head);
 
@@ -618,9 +618,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         i++;
     }
 
-    if(i==0){
-	LOG_ERR("Empty instruction list.\n");
-	return 0;
+    if (i == 0) {
+        LOG_ERR("Empty instruction list.\n");
+        return 0;
     }
 
 fail:
@@ -636,11 +636,11 @@ fail:
 int main(int argc, char *argv[argc + 1])
 {
     INIT_TESTS();
-    for (size_t i = 0; i < 8; i++)
-        RUN_TEST(test_serialize_packet, i);
+    /* for (size_t i = 0; i < 8; i++) */
+    /*     RUN_TEST(test_serialize_packet, i); */
 
     RUN_TEST(test_disasm_bfd);
-    RUN_TEST(test_trdb_write_packets);
+    /* RUN_TEST(test_trdb_write_packets); */
     RUN_TEST(test_parse_stimuli_line);
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");
