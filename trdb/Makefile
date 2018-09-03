@@ -26,13 +26,19 @@ override CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
 override CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
 			-Wno-unused-function
 
-LIB_PATHS       = /scratch/balasr/pulp-riscv-binutils-gdb/opcodes \
-		/scratch/balasr/pulp-riscv-binutils-gdb/bfd \
-		/scratch/balasr/pulp-riscv-binutils-gdb/libiberty \
-		/scratch/balasr/pulp-riscv-binutils-gdb/zlib
-INCLUDE_PATHS   = /scratch/balasr/pulp-riscv-binutils-gdb/include \
+QUESTASIM_PATH = /usr/pack/modelsim-10.5c-kgf/questasim/
+PULP_BINUTILS_PATH = /scratch/balasr/pulp-riscv-binutils-gdb/
+
+LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
+		$(PULP_BINUTILS_PATH)/bfd \
+		$(PULP_BINUTILS_PATH)/libiberty \
+		$(PULP_BINUTILS_PATH)/zlib
+
+INCLUDE_PATHS   = $(PULP_BINUTILS_PATH)/include \
+		$(QUESTASIM_INCLUDE)/include \
 		/usr/include
-MORE_TAG_PATHS  = /scratch/balasr/pulp-riscv-binutils-gdb/bfd
+
+MORE_TAG_PATHS  = $(PULP_BINUTILS_PATH)/bfd
 
 LDFLAGS		= $(addprefix -L, $(LIB_PATHS))
 LDLIBS		= -l:libbfd.a -l:libopcodes.a -l:libiberty.a -l:libz.a -ldl
