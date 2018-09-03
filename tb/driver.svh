@@ -125,7 +125,7 @@ class Driver;
         apply_zero();
 
         @(posedge this.duv_if.clk_i);
-       apply_zero();
+        apply_zero();
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         while(stimuli.ivalid.size() > 0) begin
@@ -149,7 +149,7 @@ class Driver;
                          this.duv_if.iaddr);
 
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
-            // take response
+            // take response in monitor.svh
         end
 
         @(posedge this.duv_if.clk_i);

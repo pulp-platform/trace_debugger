@@ -30,18 +30,44 @@ class Monitor;
     endclass // Statistics
 
 
-    task run_golden_model();
-
-    endtask
-
-
     task run();
+        automatic logic                ivalid;
+        automatic logic                iexception;
+        automatic logic                interrupt;
+        automatic logic [CAUSELEN-1:0] cause;
+        automatic logic [XLEN-1:0]     tval;
+        automatic logic [PRIVLEN-1:0]  priv;
+        automatic logic [XLEN-1:0]     iaddr;
+        automatic logic [ILEN-1:0]     instr;
+        automatic logic                compressed;
+
         Statistics stats = new();
-        // TODO: run golden model
+
+        // get stimuli
+        Stimuli stimuli;
+        mail.get(stimuli);
+
+
+
+        // // run golden model
+        // while(stimuli.ivalid.size() > 0) begin
+        //     ivalid     = stimuli.ivalid.pop_back();
+        //     iexception = stimuli.iexception.pop_back();
+        //     interrupt  = stimuli.interrupt.pop_back();
+        //     cause      = stimuli.cause.pop_back();
+        //     tval       = stimuli.tval.pop_back();
+        //     priv       = stimuli.priv.pop_back();
+        //     iaddr      = stimuli.iaddr.pop_back();
+        //     instr      = stimuli.instr.pop_back();
+        //     compressed = stimuli.compressed.pop_back();
+
+        // end
 
         // TODO: read output of rtl model
         @(posedge this.duv_if.clk_i);
         #STIM_APPLICATION_DEL;
+
+        #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
 
         repeat(10)
             @(posedge this.duv_if.clk_i);

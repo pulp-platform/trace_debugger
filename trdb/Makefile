@@ -26,8 +26,8 @@ override CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
 override CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
 			-Wno-unused-function -DENABLE_LOGGING -DENABLE_DEBUG
 
-QUESTASIM_PATH = /usr/pack/modelsim-10.5c-kgf/questasim/
-PULP_BINUTILS_PATH = /scratch/balasr/pulp-riscv-binutils-gdb/
+QUESTASIM_PATH = /usr/pack/modelsim-10.5c-kgf/questasim
+PULP_BINUTILS_PATH = /scratch/balasr/pulp-riscv-binutils-gdb
 
 LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
 		$(PULP_BINUTILS_PATH)/bfd \
@@ -35,7 +35,7 @@ LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
 		$(PULP_BINUTILS_PATH)/zlib
 
 INCLUDE_PATHS   = $(PULP_BINUTILS_PATH)/include \
-		$(QUESTASIM_INCLUDE)/include \
+		$(QUESTASIM_PATH)/include \
 		/usr/include
 
 MORE_TAG_PATHS  = $(PULP_BINUTILS_PATH)/bfd
@@ -52,8 +52,11 @@ TEST_OBJS	= $(TEST_SRCS:.c=.o)
 SRCS		= $(wildcard *.c)
 OBJS		= $(SRCS:.c=.o)
 INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
+
 BIN		= trdb
 TEST_BIN	= tests
+# golden model lib for simulator
+GMLIB		= trdb_sv_dpi
 
 
 CTAGS		= ctags
@@ -68,12 +71,20 @@ all: $(BIN) $(TEST_BIN)
 debug: CFLAGS = $(CFLAGS_DEBUG)
 debug: all
 
+lib: CFLAGS += -fPIC
+lib: all
+lib: $(GMLIB).so
+
+
 $(BIN): $(OBJS) $(MAIN_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(MAIN_OBJS) $(OBJS) \
 		$(LDLIBS)
 
 $(TEST_BIN): $(OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)
+
+$(GMLIB).so: $(OBJS)
+	ld -shared -E -o $(GMLIB).so $(OBJS)
 
 # $@ = name of target
 # $< = first dependency

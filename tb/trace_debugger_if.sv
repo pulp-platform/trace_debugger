@@ -17,6 +17,7 @@ interface trace_debugger_if
 
     import trdb_pkg::*;
 
+    // inputs
     logic                ivalid;
     logic                iexception;
     logic                interrupt;
@@ -27,13 +28,19 @@ interface trace_debugger_if
     logic [ILEN-1:0]     instr;
     logic                compressed;
 
+    // outputs
+    logic [XLEN-1:0]     packet_word;
+    logic                packet_word_valid;
+
+
     modport duv
         (input clk_i, rst_ni, ivalid, iexception, interrupt, cause, tval, priv,
-         iaddr, instr, compressed);
+         iaddr, instr, compressed, output packet_word, packet_word_valid);
 
     modport tb
         (input clk_i, rst_ni, output ivalid, iexception, interrupt, cause,
-         tval, priv, iaddr, instr, compressed);
+         tval, priv, iaddr, instr, compressed, input packet_word,
+         packet_word_valid);
 
 
 endinterface

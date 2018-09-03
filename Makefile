@@ -22,6 +22,7 @@ VWORK			= work
 
 VLOG			= vlog
 VLOG_FLAGS		= -pedanticerrors
+VLOG_LOG                = vloggy
 
 VOPT			= vopt
 VOPT_FLAGS		= -debugdb -fsmdebug -pedanticerrors +acc #=mnprft
@@ -43,6 +44,8 @@ RTLSRC			:= $(wildcard rtl/*.sv) \
 RTLSRC_VLOG_TB_TOP	:= $(basename $(notdir $(RTLSRC_TB_TOP)))
 RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
+DPINAME			= trdb/trdb_sv.h
+DPISRC			= $(RTLSRC_TB_PKG)
 
 # rtl related targets
 .PHONY: lint
@@ -101,6 +104,10 @@ vlog: vlib $(RTLSRC_TB)
 tb-all: vlog
 	$(VOPT) -work $(VWORK) $(VOPT_FLAGS) $(RTLSRC_VLOG_TB_TOP) -o \
 	$(RTLSRC_VOPT_TB_TOP)
+
+.PHONY: dpiheader
+dpiheader: tb-all
+	$(VLOG) -work $(VWORK) -l $(VLOG_LOG) -dpiheader $(DPINAME) $(DPISRC)
 
 .PHONY: tb-run
 tb-run:

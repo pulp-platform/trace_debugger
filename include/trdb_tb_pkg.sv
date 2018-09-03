@@ -13,7 +13,7 @@
 package trdb_tb_pkg;
 
     import trdb_pkg::*;
-    
+
     parameter int DEBUG = 1;
 
     // stimuli file
@@ -29,7 +29,7 @@ package trdb_tb_pkg;
 
     const int  RESET_WAIT_CYCLES    = 4;
 
-    // 
+    //
     typedef struct {
         logic      ivalid;
         logic      iexception;
@@ -42,10 +42,16 @@ package trdb_tb_pkg;
         logic            compressed;
     } trdb_instr;
 
+    import "DPI-C" function void trdb_sv_alloc();
+    import "DPI-C" function void trdb_sv_free();
+    import "DPI-C" function void trdb_sv_feed_trace
+        (input logic ivalid, iexception, interrupt,
+         input logic [CAUSELEN-1:0] cause, input logic [XLEN-1:0] tval,
+         input logic [PRIVLEN-1:0]  priv, input logic [XLEN-1:0] iaddr,
+         input logic [ILEN-1:0]     instr, input logic compressed);
+
 `include "../tb/stimuli.svh"
 `include "../tb/driver.svh"
 `include "../tb/monitor.svh"
 
 endpackage // trdb_tb_pkg
-    
-

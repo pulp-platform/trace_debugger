@@ -26,7 +26,11 @@ module trace_debugger
      input logic [PRIVLEN-1:0]  priv_i,
      input logic [XLEN-1:0]     iaddr_i,
      input logic [ILEN-1:0]     instr_i,
-     input logic                compressed_i);
+     input logic                compressed_i,
+
+     output logic [XLEN-1:0]    packet_word_o,
+     output logic               packet_word_valid_o
+);
 
     // TODO: add dependencies for this
     // APB_BUS.Slave              apb_slave);
@@ -262,6 +266,8 @@ module trace_debugger
          .data_o(packet_word),
          .valid_o(packet_word_valid));
 
+    assign packet_word_o = packet_word;
+    assign packet_word_valid_o = packet_word_valid;
 
     // TODO: assert that we are not dealing with an unsupported instruction
     always_ff @(posedge clk_i, negedge rst_ni) begin
