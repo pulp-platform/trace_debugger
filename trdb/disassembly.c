@@ -32,7 +32,7 @@
 #include <limits.h>
 #include <inttypes.h>
 #include "disassembly.h"
-#include "util.h"
+#include "utils.h"
 #include "bfd.h"
 #include "dis-asm.h"
 #include "libiberty.h"
@@ -72,13 +72,13 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
     /* initialize libopcodes disassembler */
     struct disassemble_info *dinfo = dunit->dinfo;
     if (!dinfo) {
-        LOG_ERR("disassemble_info is null\n");
+        LOG_ERRT("disassemble_info is null\n");
         return -1;
     }
     init_disassemble_info_from_bfd(dinfo, abfd, options);
     dunit->disassemble_fn = disassembler(abfd);
     if (!dunit->disassemble_fn) {
-        LOG_ERR("No suitable disassembler found\n");
+        LOG_ERRT("No suitable disassembler found\n");
         return -1;
     }
     return 0;
@@ -159,14 +159,14 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
     }
     struct disassembler_unit *dunit = inf;
     if (!dunit) {
-        LOG_ERR("disassembler_unit is NULL\n");
+        LOG_ERRT("disassembler_unit is NULL\n");
         return;
     }
 
     struct disassemble_info *dinfo = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
-        LOG_ERR("Unitialized member of disassembler_unit");
+        LOG_ERRT("Unitialized member of disassembler_unit");
         return;
     }
 
@@ -206,7 +206,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
         addr_offset += size;
         (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
-            LOG_ERR("Encountered instruction with %d bytes, stopping", size);
+            LOG_ERRT("Encountered instruction with %d bytes, stopping", size);
             break;
         }
     }
@@ -219,14 +219,14 @@ void disassemble_block(size_t len, bfd_byte data[len],
                        struct disassembler_unit *dunit)
 {
     if (!dunit) {
-        LOG_ERR("disassembler_unit is NULL\n");
+        LOG_ERRT("disassembler_unit is NULL\n");
         return;
     }
 
     struct disassemble_info *dinfo = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
-        LOG_ERR("Unitialized member of disassembler_unit");
+        LOG_ERRT("Unitialized member of disassembler_unit");
         return;
     }
 
@@ -240,7 +240,7 @@ void disassemble_block(size_t len, bfd_byte data[len],
         pc += size;
         (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
-            LOG_ERR("Encountered instruction with %d bytes, stopping", size);
+            LOG_ERRT("Encountered instruction with %d bytes, stopping", size);
             break;
         }
     }
@@ -251,14 +251,14 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
                                     struct disassembler_unit *dunit)
 {
     if (!dunit) {
-        LOG_ERR("disassembler_unit is NULL\n");
+        LOG_ERRT("disassembler_unit is NULL\n");
         return;
     }
 
     struct disassemble_info *dinfo = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
-        LOG_ERR("Unitialized member of disassembler_unit\n");
+        LOG_ERRT("Unitialized member of disassembler_unit\n");
         return;
     }
 
@@ -289,7 +289,7 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
     int size = (*disassemble_fn)(addr, dinfo);
     (*dinfo->fprintf_func)(dinfo->stream, "\n");
     if (size <= 0) {
-        LOG_ERR("Encountered instruction with %d bytes, stopping", size);
+        LOG_ERRT("Encountered instruction with %d bytes, stopping", size);
     }
 
     free(data);

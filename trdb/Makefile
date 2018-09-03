@@ -22,9 +22,9 @@
 CC		= gcc
 CPPFLAGS	=
 override CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
-			-Wno-unused-function -DNDEBUG
+			-Wno-unused-function -DENABLE_LOGGING -DNDEBUG
 override CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
-			-Wno-unused-function
+			-Wno-unused-function -DENABLE_LOGGING -DENABLE_DEBUG
 
 QUESTASIM_PATH = /usr/pack/modelsim-10.5c-kgf/questasim/
 PULP_BINUTILS_PATH = /scratch/balasr/pulp-riscv-binutils-gdb/

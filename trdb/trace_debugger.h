@@ -31,21 +31,18 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "bfd.h"
 #include "disassembly.h"
 #include "list.h"
 
 #define XLEN 32
 #define CAUSELEN 5
-#define PRIVLEN 3 //TODO: fix this to 3 or 2
+#define PRIVLEN 3 // TODO: fix this to 3 or 2
 #define ILEN 32
 #define CONTEXTLEN 32
 
 #define INSTR_STR_LEN 128
-/**
- * Library context, needs to be hold by program and passed to quite a few functions.
- */
-struct trdb_ctx;
 
 /**
  * Retired instruction captured by the interface to the RISC-V CPU, with some
@@ -93,7 +90,7 @@ struct tr_instr {
  */
 struct tr_packet {
     /* transport layer header */
-    uint32_t length: 7;
+    uint32_t length : 7;
     /* actual payload of spec */
     uint32_t msg_type : 2; /**< UltraSoC specific TODO: remove */
     uint32_t format : 2;   /**< header denoting the packet type */
@@ -128,6 +125,24 @@ struct tr_packet {
         *p = (struct tr_packet){0};                                            \
     } while (false)
 
+
+/**
+ * Library context, needs to be hold by program and passed to quite a few
+ * functions.
+ */
+struct trdb_ctx;
+
+void trdb_ctx_reset(struct trdb_ctx *ctx);
+struct trdb_ctx *trdb_new();
+void trdb_free(struct trdb_ctx *ctx);
+void trdb_set_log_fn(struct trdb_ctx *ctx,
+                     void (*log_fn)(struct trdb_ctx *ctx, int priority,
+                                    const char *file, int line, const char *fn,
+                                    const char *format, va_list args));
+int trdb_get_log_priority(struct trdb_ctx *ctx);
+void trdb_set_log_priority(struct trdb_ctx *ctx, int priority);
+
+
 /**
  * Initialize the trace debugger, call before any other functions.
  */
@@ -161,13 +176,14 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
  * Generate the original instruction sequence from a list of tr_packet, given
  * the binary from which the instruction sequence was produced.
  *
+ * @param c the context/state of the trace debugger
  * @param abfd the binary from which the trace was captured
  * @param packet_list the compressed instruction trace
  * @param instr_list list to which the reconstruction instructions will be
  * appended
  * @return the provided @packet_list
  */
-struct list_head *trdb_decompress_trace(bfd *abfd,
+struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                                         struct list_head *packet_list,
                                         struct list_head *instr_list);
 
@@ -220,22 +236,25 @@ void trdb_free_instr_list(struct list_head *instr_list);
  *which
  * can have a non-power-of-two size.
  *
+ * @param c the context/state of the trace debugger
  * @param path where the file is located at
  * @param packet_list list of packets to write
  * @return -1 on failure and 0 on success
  */
-int trdb_write_packets(const char *path, struct list_head *packet_list);
+int trdb_write_packets(struct trdb_ctx *c, const char *path,
+                       struct list_head *packet_list);
 
 /**
  * Read a stimuli file at @p path into an array of tr_instr.
  *
+ * @param c the context/state of the trace debugger
  * @param path where the stimuli file is located at
  * @param samples where to write the read array of tr_instr
  * @param status will be written with -1 on failure, 0 on success
  * @return number of read tr_instr
  */
-size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
-                             int *status);
+size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
+                             struct tr_instr **samples, int *status);
 
 /* struct packet0 {
  *     uint32_t format : 2;   // 00

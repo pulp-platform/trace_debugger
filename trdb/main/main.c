@@ -30,7 +30,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "bfd.h"
-#include "../util.h"
+#include "../utils.h"
 #include "../list.h"
 #include "../trace_debugger.h"
 #include "../disassembly.h"
@@ -101,9 +101,11 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 
 static struct argp argp = {options, parse_opt, args_doc, doc};
 
-static int compress_trace(FILE *output_fp, struct arguments *);
+static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
+                          struct arguments *);
 static int decompress_packets_from_bfd_and_file(struct arguments *);
-static int disassemble_trace(FILE *output_fp, bfd *abfd, struct arguments *);
+static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
+                             struct arguments *);
 
 int main(int argc, char *argv[argc + 1])
 {
@@ -120,7 +122,11 @@ int main(int argc, char *argv[argc + 1])
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-
+    struct trdb_ctx *ctx = trdb_new();
+    if (!ctx) {
+        status = EXIT_FAILURE;
+        goto fail;
+    }
     FILE *output_fp = NULL;
     bfd *abfd = NULL;
 
@@ -148,13 +154,14 @@ int main(int argc, char *argv[argc + 1])
     }
 
     if (arguments.compress) {
-        status = compress_trace(output_fp, &arguments);
+        status = compress_trace(ctx, output_fp, &arguments);
     } else if (arguments.disassemble) {
-        status = disassemble_trace(output_fp, abfd, &arguments);
+        status = disassemble_trace(ctx, output_fp, abfd, &arguments);
     }
 
 
 fail:
+    trdb_free(ctx);
     if (output_fp)
         fclose(output_fp);
     if (abfd)
@@ -163,7 +170,8 @@ fail:
 }
 
 /* TODO: compress to binary too */
-static int compress_trace(FILE *output_fp, struct arguments *arguments)
+static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
+                          struct arguments *arguments)
 {
     int status = EXIT_SUCCESS;
 
@@ -175,9 +183,9 @@ static int compress_trace(FILE *output_fp, struct arguments *arguments)
     struct tr_instr **samples = &tmp;
     int success = 0;
     size_t samplecnt =
-        trdb_stimuli_to_trace(arguments->args[0], samples, &success);
+        trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
     if (success != 0) {
-        LOG_ERR("trdb_stimuli_to_trace failed\n");
+        LOG_ERRT("trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }
@@ -187,7 +195,7 @@ static int compress_trace(FILE *output_fp, struct arguments *arguments)
     struct list_head *ret =
         trdb_compress_trace(&packet_list, samplecnt, *samples);
     if (!ret) {
-        LOG_ERR("trdb_compress_trace faile\n");
+        LOG_ERRT("trdb_compress_trace faile\n");
         status = EXIT_FAILURE;
         goto fail;
     }
@@ -214,11 +222,11 @@ static int decompress_packets(FILE *output_file, bfd *abfd,
 }
 
 /* TODO: allow no bfd */
-static int disassemble_trace(FILE *output_fp, bfd *abfd,
+static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *arguments)
 {
     if (!abfd) {
-        LOG_ERR("Disassembling with no bfd is not supporte yet\n");
+        LOG_ERRT("Disassembling with no bfd is not supporte yet\n");
         return EXIT_FAILURE;
     }
 
@@ -232,9 +240,9 @@ static int disassemble_trace(FILE *output_fp, bfd *abfd,
     struct tr_instr **samples = &tmp;
     int success = 0;
     size_t samplecnt =
-        trdb_stimuli_to_trace(arguments->args[0], samples, &success);
+        trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
     if (success != 0) {
-        LOG_ERR("trdb_stimuli_to_trace failed\n");
+        LOG_ERRT("trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }

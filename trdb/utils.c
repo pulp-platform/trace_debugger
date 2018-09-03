@@ -24,13 +24,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "util.h"
+#include "utils.h"
+
+void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...)
+{
+}
 
 uint8_t *file_to_char(FILE *fp, long *length)
 {
     uint8_t *buf = NULL;
     if (!fp) {
-        LOG_ERR("FILE pointer is NULL\n");
+        LOG_ERRT("FILE pointer is NULL\n");
         return NULL;
     }
     if (fseek(fp, 0, SEEK_END)) {

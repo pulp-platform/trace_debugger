@@ -18,7 +18,7 @@
  */
 
 /**
- * @file util.h
+ * @file utils.h
  * @author Robert Balas (balasr@student.ethz.ch)
  * @date 25 Aug 2018
  * @brief Utility and logging functions/macros
@@ -26,33 +26,77 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <syslog.h>
+#include "trace_debugger.h"
 
 #ifdef NDEBUG
-#define TRDB_LEVEL 1
-#define TRDB_TRACE 0
-#define TRDB_TEST_DEBUG 0
-
+#    define TRDB_LEVEL 1
+#    define TRDB_TRACE 0
+#    define TRDB_VERBOSE_DEBUG 0
 #else
-
-/* Sometimes we want quiet debug builds */
-#ifdef QUIET
-#define TRDB_LEVEL 1
-#define TRDB_TRACE 0
-#define TRDB_TEST_DEBUG 0
-#else
-#define TRDB_LEVEL 3
-#define TRDB_TRACE 1
-#define TRDB_TEST_DEBUG 1
+#    ifdef VERBOSE
+#        define TRDB_LEVEL 3
+#        define TRDB_TRACE 1
+#        define TRDB_VERBOSE_DEBUG 1
+#    else
+#        define TRDB_LEVEL 1
+#        define TRDB_TRACE 0
+#        define TRDB_VERBOSE_DEBUG 0
+#    endif
 #endif
 
+/* static inline void __attribute__((always_inline, format(printf, 2, 3))) */
+/* trdb_log_null(struct trdb_ctx *ctx, const char *format, ...) */
+/* { */
+/* } */
+
+void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...);
+
+#define trdb_log_cond(ctx, prio, arg...)                                       \
+    do {                                                                       \
+        if (trdb_get_log_priority(ctx) >= prio)                                \
+            trdb_log(ctx, prio, __FILE__, __LINE__, __FUNCTION__, ##arg);      \
+    } while (0)
+
+
+#ifdef ENABLE_LOGGING
+#    ifdef ENABLE_DEBUG
+#        define dbg(ctx, arg...) trdb_log_cond(ctx, LOG_DEBUG, ##arg)
+#    else
+#        define dbg(ctx, arg...) trdb_log_null(ctx, ##arg)
+#    endif
+#    define info(ctx, arg...) trdb_log_cond(ctx, LOG_INFO, ##arg)
+#    define err(ctx, arg...) trdb_log_cond(ctx, LOG_ERR, ##arg)
+#else
+#    define dbg(ctx, arg...) trdb_log_null(ctx, ##arg)
+#    define info(ctx, arg...) trdb_log_null(ctx, ##arg)
+#    define err(ctx, arg...) trdb_log_null(ctx, ##arg)
 #endif
+
+
+#ifdef HAVE_SECURE_GETENV
+#    ifdef HAVE___SECURE_GETENV
+#        define secure_getenv __secure_getenv
+#    else
+#        error neither secure_getenv nor __secure_getenv is available
+#    endif
+#else
+#    define secure_getenv getenv
+#endif
+
+
+#define TRDB_EXPORT __attribute__((visibility("default")))
+
+void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
+              const char *fn, const char *format, ...)
+    __attribute__((format(printf, 6, 7)));
 
 
 /**
  * Write formatted string to stderr with the filename, linenumber and function
- * prepended.
+ * prepended. Only used for tests.
  */
-#define LOG_ERR(format, ...)                                                   \
+#define LOG_ERRT(format, ...)                                                  \
     do {                                                                       \
         if (TRDB_LEVEL > 0)                                                    \
             fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
@@ -62,9 +106,9 @@
 
 /**
  * Write formatted string to stderr with the filename, linenumber and function
- * prepended.
+ * prepended. Only used for tests.
  */
-#define LOG_WARN(format, ...)                                                  \
+#define LOG_WARNT(format, ...)                                                 \
     do {                                                                       \
         if (TRDB_LEVEL > 1)                                                    \
             fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
@@ -73,9 +117,9 @@
 
 /**
  * Write formatted string to stdout with the filename, linenumber and function
- * prepended.
+ * prepended. Only used for tests.
  */
-#define LOG_INFO(format, ...)                                                  \
+#define LOG_INFOT(format, ...)                                                 \
     do {                                                                       \
         if (TRDB_LEVEL > 2)                                                    \
             fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
@@ -84,9 +128,9 @@
 
 /**
  * Write formatted string to stdout with the filename, linenumber and function
- * prepended.
+ * prepended. Only used for tests.
  */
-#define LOG_TRACE(format, ...)                                                 \
+#define LOG_TRACET(format, ...)                                                \
     do {                                                                       \
         if (TRDB_TRACE)                                                        \
             fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \

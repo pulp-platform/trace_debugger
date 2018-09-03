@@ -25,10 +25,12 @@
 #include <inttypes.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
+#include <errno.h>
 #include "trace_debugger.h"
 #include "disassembly.h"
 #include "list.h"
-#include "util.h"
+#include "utils.h"
 
 struct trdb_config;
 struct trdb_state;
@@ -145,11 +147,125 @@ struct trdb_ctx {
     struct trdb_state nextc;
     struct branch_map_state branch_map;
     struct filter_state filter;
-    /* desired logging level */
+    /* state used for disassembling */
+    struct tr_instr *dis_instr;
+    /* desired logging level and custom logging hook*/
     int log_priority;
-    /* TODO: logging hook */
-    /* TODO: branch map */
+    void (*log_fn)(struct trdb_ctx *ctx, int priority, const char *file,
+                   int line, const char *fn, const char *format, va_list args);
 };
+
+
+void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
+              const char *fn, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    ctx->log_fn(ctx, priority, file, line, fn, format, args);
+    va_end(args);
+}
+
+
+static void log_stderr(struct trdb_ctx *ctx, int priority, const char *file,
+                       int line, const char *fn, const char *format,
+                       va_list args)
+{
+    fprintf(stderr, "trdb: %s:%d:0: %s(): ", file, line, fn);
+    vfprintf(stderr, format, args);
+}
+
+
+static int log_priority(const char *priority)
+{
+    char *endptr;
+    int prio;
+
+    prio = strtol(priority, &endptr, 10);
+    if (endptr[0] == '\0' || isspace(endptr[0]))
+        return prio;
+    if (strncmp(priority, "err", 3) == 0)
+        return LOG_ERR;
+    if (strncmp(priority, "info", 4) == 0)
+        return LOG_INFO;
+    if (strncmp(priority, "debug", 5) == 0)
+        return LOG_DEBUG;
+    return 0;
+}
+
+
+void trdb_ctx_reset(struct trdb_ctx *ctx)
+{
+    ctx->config = (struct trdb_config){
+        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
+
+    ctx->lastc = (struct trdb_state){0};
+    ctx->thisc = (struct trdb_state){0};
+    ctx->nextc = (struct trdb_state){0};
+    ctx->branch_map = (struct branch_map_state){0};
+    ctx->filter = (struct filter_state){0};
+}
+
+
+struct trdb_ctx *trdb_new()
+{
+    const char *env;
+    struct trdb_ctx *ctx = malloc(sizeof(*ctx));
+    if (!ctx)
+        return NULL;
+
+    ctx->config = (struct trdb_config){
+        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
+
+    ctx->lastc = (struct trdb_state){0};
+    ctx->thisc = (struct trdb_state){0};
+    ctx->nextc = (struct trdb_state){0};
+    ctx->branch_map = (struct branch_map_state){0};
+    ctx->filter = (struct filter_state){0};
+
+    ctx->log_fn = log_stderr;
+    ctx->log_priority = LOG_ERR; // TODO: change that
+
+    /* environment overwrites config */
+    env = secure_getenv("TRDB_LOG");
+    if (env != NULL)
+        trdb_set_log_priority(ctx, log_priority(env));
+
+    info(ctx, "ctx %p created\n", ctx);
+    dbg(ctx, "log_priority=%d\n", ctx->log_priority);
+    return ctx;
+}
+
+
+void trdb_free(struct trdb_ctx *ctx)
+{
+    if (!ctx)
+        return;
+    info(ctx, "context %p released\n", ctx);
+    free(ctx);
+}
+
+
+void trdb_set_log_fn(struct trdb_ctx *ctx,
+                     void (*log_fn)(struct trdb_ctx *ctx, int priority,
+                                    const char *file, int line, const char *fn,
+                                    const char *format, va_list args))
+{
+    ctx->log_fn = log_fn;
+    info(ctx, "custom logging function %p registered\n", log_fn);
+}
+
+
+int trdb_get_log_priority(struct trdb_ctx *ctx)
+{
+    return ctx->log_priority;
+}
+
+
+void trdb_set_log_priority(struct trdb_ctx *ctx, int priority)
+{
+    ctx->log_priority = priority;
+}
 
 
 static bool is_branch(uint32_t instr)
@@ -243,48 +359,6 @@ void trdb_close()
 }
 
 
-void trdb_ctx_reset(struct trdb_ctx *ctx)
-{
-    ctx->config = (struct trdb_config){
-        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
-
-    ctx->lastc = (struct trdb_state){0};
-    ctx->thisc = (struct trdb_state){0};
-    ctx->nextc = (struct trdb_state){0};
-    ctx->branch_map = (struct branch_map_state){0};
-    ctx->filter = (struct filter_state){0};
-}
-
-
-struct trdb_ctx *trdb_new()
-{
-    struct trdb_ctx *ctx = malloc(sizeof(*ctx));
-    if (!ctx)
-        return NULL;
-
-    ctx->config = (struct trdb_config){
-        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
-
-    ctx->lastc = (struct trdb_state){0};
-    ctx->thisc = (struct trdb_state){0};
-    ctx->nextc = (struct trdb_state){0};
-    ctx->branch_map = (struct branch_map_state){0};
-    ctx->filter = (struct filter_state){0};
-
-
-    ctx->log_priority = 0; // TODO: change that
-    return ctx;
-}
-
-
-void trdb_free(struct trdb_ctx *ctx)
-{
-    if (!ctx)
-        return;
-    free(ctx);
-}
-
-
 struct list_head *trdb_compress_trace_legacy(struct list_head *packet_list,
                                              size_t len,
                                              struct tr_instr instrs[len])
@@ -328,9 +402,9 @@ struct list_head *trdb_compress_trace_legacy(struct list_head *packet_list,
         }
 
         if (is_unsupported(instrs[i].instr)) {
-            LOG_ERR("Instruction is not supported for compression: 0x%" PRIx32
-                    " at addr: 0x%" PRIx32 "\n",
-                    instrs[i].instr, instrs[i].iaddr);
+            LOG_ERRT("Instruction is not supported for compression: 0x%" PRIx32
+                     " at addr: 0x%" PRIx32 "\n",
+                     instrs[i].instr, instrs[i].iaddr);
             goto fail;
         }
 
@@ -404,7 +478,7 @@ struct list_head *trdb_compress_trace_legacy(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branch_map.cnt == 0) {
@@ -456,7 +530,7 @@ struct list_head *trdb_compress_trace_legacy(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branch_map.cnt == 0) {
@@ -484,7 +558,7 @@ struct list_head *trdb_compress_trace_legacy(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
@@ -504,7 +578,7 @@ struct list_head *trdb_compress_trace_legacy(struct list_head *packet_list,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branch_map.cnt == 0) {
@@ -642,9 +716,10 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     }
 
     if (is_unsupported(tc_instr->instr)) {
-        LOG_ERR("Instruction is not supported for compression: 0x%" PRIx32
-                " at addr: 0x%" PRIx32 "\n",
-                tc_instr->instr, tc_instr->iaddr);
+        err(ctx,
+            "Instruction is not supported for compression: 0x%" PRIx32
+            " at addr: 0x%" PRIx32 "\n",
+            tc_instr->instr, tc_instr->iaddr);
         goto fail;
     }
 
@@ -695,7 +770,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * lastc_exception) to be true since it takes one cycle
          * for lastc_exception to change
          */
-        assert(i != 0); /*TODO: remove */
         tr->ecause = lc_instr->cause;
         tr->interrupt = lc_instr->interrupt;
         tr->tval = lc_instr->tval;
@@ -722,7 +796,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         ALLOC_INIT_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
-            LOG_ERR("full_address false: Not implemented yet\n");
+            err(ctx, "full_address false: Not implemented yet\n");
             goto fail;
         }
         if (branch_map->cnt == 0) {
@@ -777,7 +851,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         ALLOC_INIT_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
-            LOG_ERR("full_address false: Not implemented yet\n");
+            err(ctx, "full_address false: Not implemented yet\n");
             goto fail;
         }
         if (branch_map->cnt == 0) {
@@ -806,7 +880,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         ALLOC_INIT_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
-            LOG_ERR("full_address false: Not implemented yet\n");
+            err(ctx, "full_address false: Not implemented yet\n");
             goto fail;
         }
         tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
@@ -828,7 +902,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         ALLOC_INIT_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
-            LOG_ERR("full_address false: Not implemented yet\n");
+            err(ctx, "full_address false: Not implemented yet\n");
             goto fail;
         }
         if (branch_map->cnt == 0) {
@@ -958,9 +1032,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
         }
 
         if (is_unsupported(tc_instr->instr)) {
-            LOG_ERR("Instruction is not supported for compression: 0x%" PRIx32
-                    " at addr: 0x%" PRIx32 "\n",
-                    tc_instr->instr, tc_instr->iaddr);
+            LOG_ERRT("Instruction is not supported for compression: 0x%" PRIx32
+                     " at addr: 0x%" PRIx32 "\n",
+                     tc_instr->instr, tc_instr->iaddr);
             goto fail;
         }
 
@@ -1037,7 +1111,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branch_map.cnt == 0) {
@@ -1090,7 +1164,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branch_map.cnt == 0) {
@@ -1118,7 +1192,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
@@ -1138,7 +1212,7 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
             ALLOC_INIT_PACKET(tr);
             /* TODO: for now only full address */
             if (!full_address) {
-                LOG_ERR("full_address false: Not implemented yet\n");
+                LOG_ERRT("full_address false: Not implemented yet\n");
                 goto fail;
             }
             if (branch_map.cnt == 0) {
@@ -1204,7 +1278,8 @@ fail_malloc:
     return NULL;
 }
 
-static int disassemble_at_pc(bfd_vma pc, struct tr_instr *instr,
+static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
+                             struct tr_instr *instr,
                              struct disassembler_unit *dunit, int *status)
 {
     *status = 0;
@@ -1213,24 +1288,24 @@ static int disassemble_at_pc(bfd_vma pc, struct tr_instr *instr,
 
     struct disassemble_info *dinfo = dunit->dinfo;
     /* Important to set for internal calls to fprintf */
-    dinfo->stream = instr;
+    c->dis_instr = instr;
+    dinfo->stream = c;
 
     /* print instr address */
-    (*dinfo->fprintf_func)(instr, "0x%016jx  ", (uintmax_t)pc);
+    (*dinfo->fprintf_func)(c, "0x%016jx  ", (uintmax_t)pc);
 
     /* check if insn_info works */
     dinfo->insn_info_valid = 0;
 
     int instr_size = (*dunit->disassemble_fn)(pc, dinfo);
-    (*dinfo->fprintf_func)(instr, "\n");
+    (*dinfo->fprintf_func)(c, "\n");
     if (instr_size <= 0) {
-        LOG_ERR("Encountered instruction with %d bytes, stopping\n",
-                instr_size);
+        err(c, "Encountered instruction with %d bytes, stopping\n", instr_size);
         *status = -1;
         return 0;
     }
     if (!dinfo->insn_info_valid) {
-        LOG_ERR("Encountered invalid instruction info\n");
+        err(c, "Encountered invalid instruction info\n");
         *status = -1;
         return 0;
     }
@@ -1243,23 +1318,25 @@ static int disassemble_at_pc(bfd_vma pc, struct tr_instr *instr,
     return instr_size;
 }
 
+
 static int build_instr_fprintf(void *stream, const char *format, ...)
 {
-    struct tr_instr *instr = stream;
+    struct trdb_ctx *c = stream;
+    struct tr_instr *instr = c->dis_instr;
     char tmp[INSTR_STR_LEN];
     /* ugly hack around libopcodes fprintf-only output */
     va_list args;
     va_start(args, format);
     int rv = vsnprintf(tmp, INSTR_STR_LEN - 1, format, args);
     if (rv >= INSTR_STR_LEN) {
-        LOG_ERR("build_instr_fprintf output truncated, adjust buffer size\n");
+        err(c, "build_instr_fprintf output truncated, adjust buffer size\n");
     }
     if (rv < 0) {
-        LOG_ERR("Encountered an error in vsnprintf\n");
+        err(c, "Encountered an error in vsnprintf\n");
     }
     va_end(args);
     if (strlen(instr->str) + rv + 1 > INSTR_STR_LEN) {
-        LOG_ERR("Can't append to buffer, truncating string\n");
+        err(c, "Can't append to buffer, truncating string\n");
         strncat(instr->str, tmp, INSTR_STR_LEN - 1 - strlen(instr->str));
     } else {
         strncat(instr->str, tmp, rv);
@@ -1269,6 +1346,7 @@ static int build_instr_fprintf(void *stream, const char *format, ...)
 
     return rv;
 }
+
 
 static void free_section_for_debugging(struct disassemble_info *dinfo)
 {
@@ -1280,25 +1358,28 @@ static void free_section_for_debugging(struct disassemble_info *dinfo)
     dinfo->section = NULL;
 }
 
-static int alloc_section_for_debugging(bfd *abfd, asection *section,
+
+static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
+                                       asection *section,
                                        struct disassemble_info *dinfo)
 {
     if (!dinfo || !section) {
-        LOG_ERR("disassemble_info or asection is NULL\n");
+        err(c, "disassemble_info or asection is NULL\n");
         return -1;
     }
 
     bfd_size_type section_size = bfd_get_section_size(section);
 
     bfd_byte *section_data = malloc(section_size);
+
     if (!section_data) {
-        perror("malloc");
+        err(c, "malloc: %s\n", strerror(errno));
         return -1;
     }
 
     if (!bfd_get_section_contents(abfd, section, section_data, 0,
                                   section_size)) {
-        bfd_perror("bfd_get_section_contents");
+        err(c, "bfd_get_section_contents: %s\n", bfd_errmsg(bfd_get_error()));
         free(section_data);
         return -1;
     }
@@ -1352,7 +1433,7 @@ static bfd_vma advance_pc(bfd_vma pc, int step, struct trdb_dec_state state)
     return pc + step;
 }
 
-struct list_head *trdb_decompress_trace(bfd *abfd,
+struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                                         struct list_head *packet_list,
                                         struct list_head *instr_list)
 {
@@ -1370,10 +1451,10 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
     bfd_vma start_address = abfd->start_address;
     asection *section = get_section_for_vma(abfd, start_address);
     if (!section) {
-        LOG_ERR("VMA not pointing to any section\n");
+        err(c, "VMA not pointing to any section\n");
         goto fail;
     }
-    LOG_INFO("Section of start_address:%s\n", section->name);
+    info(c, "Section of start_address:%s\n", section->name);
 
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
@@ -1389,8 +1470,8 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
     /* Alloc and config section data for disassembler */
     bfd_vma stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
 
-    if (alloc_section_for_debugging(abfd, section, &dinfo)) {
-        LOG_ERR("Failed alloc_section_for_debugging\n");
+    if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
+        err(c, "Failed alloc_section_for_debugging\n");
         goto fail;
     }
     bfd_vma pc = start_address; /* TODO: well we get a sync packet anyway... */
@@ -1431,16 +1512,16 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
             section = get_section_for_vma(abfd, pc);
             if (!section) {
-                LOG_ERR("VMA (PC) not pointing to any section\n");
+                err(c, "VMA (PC) not pointing to any section\n");
                 goto fail;
             }
             stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
 
-            if (alloc_section_for_debugging(abfd, section, &dinfo)) {
-                LOG_ERR("Failed alloc_section_for_debugging\n");
+            if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
+                err(c, "Failed alloc_section_for_debugging\n");
                 goto fail;
             }
-            LOG_INFO("Switched to section:%s\n", section->name);
+            info(c, "Switched to section:%s\n", section->name);
         }
 
         switch (packet->format) {
@@ -1455,7 +1536,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
         case F_ADDR_ONLY:
             break;
         default:
-            LOG_ERR("Unimplemented\n");
+            err(c, "Unimplemented\n");
             goto fail;
         }
 
@@ -1472,7 +1553,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             assert(packet->format == F_BRANCH_FULL
                    || packet->format == F_ADDR_ONLY
                    || packet->format == F_BRANCH_DIFF);
-            LOG_INFO("Jumping over vector table\n");
+            info(c, "Jumping over vector table\n");
 
             pc = packet->address;
 
@@ -1485,27 +1566,27 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
                 section = get_section_for_vma(abfd, pc);
                 if (!section) {
-                    LOG_ERR("VMA (PC) not pointing to any section\n");
+                    err(c, "VMA (PC) not pointing to any section\n");
                     goto fail;
                 }
                 stop_offset =
                     bfd_get_section_size(section) / dinfo.octets_per_byte;
 
-                if (alloc_section_for_debugging(abfd, section, &dinfo)) {
-                    LOG_ERR("Failed alloc_section_for_debugging\n");
+                if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
+                    err(c, "Failed alloc_section_for_debugging\n");
                     goto fail;
                 }
-                LOG_INFO("Switched to section:%s\n", section->name);
+                info(c, "Switched to section:%s\n", section->name);
             }
 
             int status = 0;
-            int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
+            int size = disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
             if (status != 0)
                 goto fail;
 
             uint64_t instr_at_pc = 0;
             if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                LOG_ERR("Reading instr at pc failed\n");
+                err(c, "Reading instr at pc failed\n");
                 goto fail;
             }
 
@@ -1520,14 +1601,14 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 if (!is_unpred_discontinuity(instr_at_pc)) {
                     break;
                 }
-                LOG_INFO("Detected mret, uret or sret\n");
+                info(c, "Detected mret, uret or sret\n");
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
                 if (dinfo.target == 0) {
-                    LOG_ERR(
+                    err(c,
                         "First instruction after vector table is unpredictable "
                         "discontinuity\n");
-                    LOG_ERR("TODO: fix this case by looking at next packet\n");
+                    err(c, "TODO: fix this case by looking at next packet\n");
                     goto fail;
                 }
                 pc = dinfo.target;
@@ -1535,11 +1616,11 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
             case dis_condbranch:
                 if (dinfo.target == 0)
-                    LOG_ERR("Can't predict the jump target, never happens\n");
+                    err(c, "Can't predict the jump target, never happens\n");
                 if (packet->branches != 1)
-                    LOG_ERR("Wrong number of branch entries\n");
+                    err(c, "Wrong number of branch entries\n");
                 if (packet->branch_map & 1) {
-                    LOG_ERR(
+                    err(c,
                         "Doing a branch in the first intruction after vector table "
                         "jump\n");
                     pc = dinfo.target;
@@ -1550,7 +1631,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             case dis_dref2:
             case dis_condjsr:
             case dis_noninsn:
-                LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
                 goto fail;
             }
         } else if (packet->format == F_BRANCH_FULL) {
@@ -1576,11 +1657,11 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     && (next_packet->subformat == SF_START
                         || next_packet->subformat == SF_EXCEPTION))) {
                 /* advance until address */
-                LOG_INFO("Searching for address\n");
+                info(c, "Searching for address\n");
                 search_discontinuity = false;
             } else {
                 /* advance until unpredictable discontinuity */
-                LOG_INFO("Searching for discontinuity\n");
+                info(c, "Searching for discontinuity\n");
                 search_discontinuity = true;
             }
 
@@ -1588,13 +1669,14 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 !(branch_map.cnt == 0 && (hit_discontinuity || hit_address))) {
 
                 int status = 0;
-                int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
+                int size =
+                    disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
                 if (status != 0)
                     goto fail;
 
                 uint64_t instr_at_pc = 0;
                 if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                    LOG_ERR("Reading instr at pc failed\n");
+                    err(c, "Reading instr at pc failed\n");
                     goto fail;
                 }
 
@@ -1616,7 +1698,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     if (!is_unpred_discontinuity(instr_at_pc)) {
                         break;
                     }
-                    LOG_INFO("Detected mret, uret or sret\n");
+                    info(c, "Detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
@@ -1627,23 +1709,25 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                      * flush + discontinuity packet.
                      */
                     if (branch_map.cnt > 1 && dinfo.target == 0)
-                        LOG_ERR(
+                        err(c,
                             "Can't predict the jump target, never happens\n");
 
                     if (branch_map.cnt == 1 && dinfo.target == 0) {
                         if (!branch_map.full) {
-                            LOG_INFO(
+                            info(
+                                c,
                                 "We hit the not-full branch_map + address edge case, "
                                 "(branch following discontinuity is included in this "
                                 "packet)\n");
                             if (!search_discontinuity)
-                                LOG_ERR(
+                                err(c,
                                     "Not searching for discontinuity but hit not-full "
                                     "branch + address edge case\n");
                             /* TODO: should I poison addr? */
                             pc = packet->address;
                         } else {
-                            LOG_INFO(
+                            info(
+                                c,
                                 "We hit the full branch_map + address edge case\n");
                             pc = packet->address;
                         }
@@ -1657,11 +1741,11 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                          * thus the information in this packet  is used up
                          */
                         if (!search_discontinuity)
-                            LOG_ERR(
+                            err(c,
                                 "We were searching for an address and not a discontinuity\n");
                         pc = packet->address;
                         hit_discontinuity = true;
-                        LOG_INFO("Found the discontinuity\n");
+                        info(c, "Found the discontinuity\n");
                     }
                     break;
 
@@ -1673,25 +1757,25 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                         branch_map.bits >>= 1;
                         branch_map.cnt--;
                         if (dinfo.target == 0)
-                            LOG_ERR(
+                            err(c,
                                 "Can't predict the jump target, never happens\n");
                         if (branch_taken)
                             pc = dinfo.target;
                         break;
                     }
                 case dis_dref:
-                    /* LOG_ERR("Don't know what to do with this type\n"); */
+                    /* err(c, "Don't know what to do with this type\n"); */
                     break;
 
                 case dis_dref2:
                 case dis_condjsr:
                 case dis_noninsn:
-                    LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                    err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
                     goto fail;
                 }
             }
         } else if (packet->format == F_BRANCH_DIFF) {
-            LOG_ERR("F_BRANCH_DIFF decoding: not implemented yet\n");
+            err(c, "F_BRANCH_DIFF decoding: not implemented yet\n");
 
         } else if (packet->format == F_SYNC) {
             /* Sync pc. As in todo.org described this doesn't work for resync
@@ -1710,27 +1794,27 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
                 section = get_section_for_vma(abfd, pc);
                 if (!section) {
-                    LOG_ERR("VMA (PC) not pointing to any section\n");
+                    err(c, "VMA (PC) not pointing to any section\n");
                     goto fail;
                 }
                 stop_offset =
                     bfd_get_section_size(section) / dinfo.octets_per_byte;
 
-                if (alloc_section_for_debugging(abfd, section, &dinfo)) {
-                    LOG_ERR("Failed alloc_section_for_debugging\n");
+                if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
+                    err(c, "Failed alloc_section_for_debugging\n");
                     goto fail;
                 }
-                LOG_INFO("Switched to section:%s\n", section->name);
+                info(c, "Switched to section:%s\n", section->name);
             }
 
             int status = 0;
-            int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
+            int size = disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
             if (status != 0)
                 goto fail;
 
             uint64_t instr_at_pc = 0;
             if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                LOG_ERR("Reading instr at pc failed\n");
+                err(c, "Reading instr at pc failed\n");
                 goto fail;
             }
 
@@ -1746,19 +1830,19 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 if (!is_unpred_discontinuity(instr_at_pc)) {
                     break;
                 }
-                LOG_INFO("Detected mret, uret or sret\n");
+                info(c, "Detected mret, uret or sret\n");
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
                 if (dinfo.target == 0)
-                    LOG_ERR("Can't predict the jump target, never happens\n");
+                    err(c, "Can't predict the jump target, never happens\n");
                 pc = dinfo.target;
                 break;
 
             case dis_condbranch:
                 if (dinfo.target == 0)
-                    LOG_ERR("Can't predict the jump target, never happens\n");
+                    err(c, "Can't predict the jump target, never happens\n");
                 if (packet->branch == 0) {
-                    LOG_ERR("Doing a branch from a F_SYNC packet\n");
+                    err(c, "Doing a branch from a F_SYNC packet\n");
                     pc = dinfo.target;
                 }
                 break;
@@ -1767,7 +1851,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
             case dis_dref2:
             case dis_condjsr:
             case dis_noninsn:
-                LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
                 goto fail;
             }
         } else if (packet->format == F_ADDR_ONLY) {
@@ -1799,23 +1883,24 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     && (next_packet->subformat == SF_START
                         || next_packet->subformat == SF_EXCEPTION))) {
                 /* advance until address */
-                LOG_INFO("Searching for address\n");
+                info(c, "Searching for address\n");
                 search_discontinuity = false;
             } else {
                 /* advance until unpredictable discontinuity */
-                LOG_INFO("Searching for discontinuity\n");
+                info(c, "Searching for discontinuity\n");
                 search_discontinuity = true;
             }
 
             while (!(hit_address || hit_discontinuity)) {
                 int status = 0;
-                int size = disassemble_at_pc(pc, &dis_instr, &dunit, &status);
+                int size =
+                    disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
                 if (status != 0)
                     goto fail;
 
                 /* TODO: fix */
                 if (!conf.full_address) {
-                    LOG_ERR("full_address false: not implemented yet\n");
+                    err(c, "full_address false: not implemented yet\n");
                     goto fail;
                 }
 
@@ -1824,7 +1909,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
 
                 uint64_t instr_at_pc = 0;
                 if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                    LOG_ERR("Reading instr at pc failed\n");
+                    err(c, "Reading instr at pc failed\n");
                     goto fail;
                 }
 
@@ -1841,23 +1926,23 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                     if (!is_unpred_discontinuity(instr_at_pc)) {
                         break;
                     }
-                    LOG_INFO("Detected mret, uret or sret\n");
+                    info(c, "Detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     if (dinfo.target) {
                         pc = dinfo.target;
                     } else {
                         if (!search_discontinuity)
-                            LOG_ERR(
+                            err(c,
                                 "We were searching for an address and not a discontinuity\n");
-                        LOG_INFO("Found the discontinuity\n");
+                        info(c, "Found the discontinuity\n");
                         pc = packet->address;
                         hit_discontinuity = true;
                     }
                     break;
 
                 case dis_condbranch:
-                    LOG_ERR(
+                    err(c,
                         "We shouldn't hit conditional branches with F_ADDRESS_ONLY\n");
                     break;
 
@@ -1866,7 +1951,7 @@ struct list_head *trdb_decompress_trace(bfd *abfd,
                 case dis_dref2:
                 case dis_condjsr:
                 case dis_noninsn:
-                    LOG_ERR("Invalid insn_type: %d\n", dinfo.insn_type);
+                    err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
                     goto fail;
                 }
             }
@@ -1908,20 +1993,20 @@ union pack {
 } data = {0};
 
 /* bin must be an all zeros array */
-static int serialize_packet(struct tr_packet *packet, size_t *bitcnt,
-                            uint8_t align, uint8_t bin[])
+static int serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
+                            size_t *bitcnt, uint8_t align, uint8_t bin[])
 {
     if (packet->msg_type != 0x2) {
-        LOG_ERR("trace packet message type not supported: %d\n",
-                packet->msg_type);
+        err(c, "trace packet message type not supported: %d\n",
+            packet->msg_type);
         return -1;
     }
     if (!conf.full_address) {
-        LOG_ERR("full_address false: not implemented yet\n");
+        err(c, "full_address false: not implemented yet\n");
         return -1;
     }
     if (align >= 8) {
-        LOG_ERR("bad alignment value: %" PRId8 "\n", align);
+        err(c, "bad alignment value: %" PRId8 "\n", align);
         return -1;
     }
     switch (packet->format) {
@@ -1955,7 +2040,7 @@ static int serialize_packet(struct tr_packet *packet, size_t *bitcnt,
     }
 
     case F_BRANCH_DIFF:
-        LOG_ERR("F_BRANCH_DIFF serialize_packet not implemented yet\n");
+        err(c, "F_BRANCH_DIFF serialize_packet not implemented yet\n");
         *bitcnt = 0;
         return -1;
 
@@ -2013,12 +2098,13 @@ static int serialize_packet(struct tr_packet *packet, size_t *bitcnt,
     return -1;
 }
 
-int trdb_write_packets(const char *path, struct list_head *packet_list)
+int trdb_write_packets(struct trdb_ctx *c, const char *path,
+                       struct list_head *packet_list)
 {
     int status = 0;
     FILE *fp = fopen(path, "wb");
     if (!fp) {
-        perror("trdb_write_packets");
+        err(c, "fopen: %s\n", strerror(errno));
         status = -1;
         goto fail;
     }
@@ -2034,7 +2120,7 @@ int trdb_write_packets(const char *path, struct list_head *packet_list)
     /* TODO: do we need the rever version? I think we do*/
     list_for_each_entry(packet, packet_list, list)
     {
-        if (serialize_packet(packet, &bitcnt, alignment, bin)) {
+        if (serialize_packet(c, packet, &bitcnt, alignment, bin)) {
             status = -1;
             goto fail;
         }
@@ -2050,7 +2136,7 @@ int trdb_write_packets(const char *path, struct list_head *packet_list)
          * intersecting ones
          */
         if (fwrite(bin, 1, good, fp) != good) {
-            perror("fwrite");
+            err(c, "fwrite: %s\n", strerror(errno));
             status = -1;
             goto fail;
         }
@@ -2060,7 +2146,7 @@ int trdb_write_packets(const char *path, struct list_head *packet_list)
     }
     /* done, write remaining carry */
     if (!fwrite(&bin[good], 1, 1, fp)) {
-        perror("fwrite");
+        err(c, "fwrite: %s\n", strerror(errno));
         status = -1;
     }
 fail:
@@ -2070,13 +2156,13 @@ fail:
 }
 
 /* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
-size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
-                             int *status)
+size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
+                             struct tr_instr **samples, int *status)
 {
     *status = 0;
     FILE *fp = fopen(path, "r");
     if (!fp) {
-        perror("fopen");
+        err(c, "fopen: %s\n", strerror(errno));
         *status = -1;
         goto fail;
     }
@@ -2110,7 +2196,7 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
             size = 2 * size;
             struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
             if (!tmp) {
-                perror("realloc");
+                err(c, "realloc: %s\n", strerror(errno));
                 *status = -1;
                 goto fail;
             }
@@ -2131,7 +2217,7 @@ size_t trdb_stimuli_to_trace(const char *path, struct tr_instr **samples,
     memset((*samples) + scnt, 0, size - scnt);
 
     if (ferror(fp)) {
-        perror("fscanf");
+        err(c, "fscanf: %s\n", strerror(errno));
         *status = -1;
         goto fail;
     }

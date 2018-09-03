@@ -32,8 +32,8 @@
 #include "../trace_debugger.c"
 #include "../disassembly.h"
 #include "../disassembly.c"
-#include "../util.h"
-#include "../util.c"
+#include "../utils.h"
+#include "../utils.c"
 
 /* TODO: replace return values with these */
 #define TRDB_SUCCESS 0
@@ -58,7 +58,7 @@
 static void shiftl_array(uint8_t arr[], size_t len, uint32_t shift)
 {
     if (shift >= 8) {
-        LOG_ERR("Shift value too large\n");
+        LOG_ERRT("Shift value too large\n");
         return;
     }
     uint32_t carry_in = 0;
@@ -71,7 +71,7 @@ static void shiftl_array(uint8_t arr[], size_t len, uint32_t shift)
         carry_in = carry_out;
     }
     if (carry_out)
-        LOG_ERR("Non-zero carry after array shifting\n");
+        LOG_ERRT("Non-zero carry after array shifting\n");
     return;
 }
 
@@ -100,7 +100,7 @@ static int test_disasm_bfd()
     disassemble_init_for_target(&dinfo);
 
     /* Tests for disassembly functions */
-    if (TRDB_TEST_DEBUG) {
+    if (TRDB_VERBOSE_DEBUG) {
         dump_target_list();
         dump_bin_info(abfd);
     }
@@ -110,14 +110,14 @@ static int test_disasm_bfd()
     dunit.dinfo = &dinfo;
     dunit.disassemble_fn = disassembler(abfd);
     if (!dunit.disassemble_fn) {
-        LOG_ERR("No suitable disassembler found\n");
+        LOG_ERRT("No suitable disassembler found\n");
         return TRDB_FAIL;
     }
     /* TODO: use this path also in relase mode, but less noisy */
-    if (TRDB_TEST_DEBUG) {
+    if (TRDB_VERBOSE_DEBUG) {
         dump_section_names(abfd);
 
-        LOG_INFO("num_sections: %d\n", bfd_count_sections(abfd));
+        LOG_INFOT("num_sections: %d\n", bfd_count_sections(abfd));
         disassemble_single_instruction(0x10, 0, &dunit);
         bfd_map_over_sections(abfd, disassemble_section, &dunit);
     }
@@ -129,6 +129,7 @@ static int test_disasm_bfd()
 static int test_serialize_packet(uint32_t shift)
 {
     int status = TRDB_SUCCESS;
+    struct trdb_ctx *c = trdb_new();
     trdb_init();
     struct tr_packet packet = {0};
 
@@ -154,16 +155,16 @@ static int test_serialize_packet(uint32_t shift)
     }
 
     size_t bitcnt = 0;
-    if (serialize_packet(&packet, &bitcnt, shift, bin)) {
-        LOG_ERR("Packet conversion failed\n");
+    if (serialize_packet(c, &packet, &bitcnt, shift, bin)) {
+        LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
-        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
         status = TRDB_FAIL;
     }
     if (memcmp(bin, expected0, TRDB_ARRAY_SIZE(expected0))) {
-        LOG_ERR("Packet bits don't match\n");
+        LOG_ERRT("Packet bits don't match\n");
         status = TRDB_FAIL;
     }
 
@@ -181,16 +182,16 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed\n");
+    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+        LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
-        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
         status = TRDB_FAIL;
     }
     if (memcmp(bin, expected1, TRDB_ARRAY_SIZE(expected1))) {
-        LOG_ERR("Packet bits don't match\n");
+        LOG_ERRT("Packet bits don't match\n");
         status = TRDB_FAIL;
     }
 
@@ -203,16 +204,16 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed\n");
+    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+        LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
     if (bitcnt != (2 + 2 + XLEN)) {
-        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
         status = TRDB_FAIL;
     }
     if (memcmp(bin, expected2, TRDB_ARRAY_SIZE(expected2))) {
-        LOG_ERR("Packet bits don't match\n");
+        LOG_ERRT("Packet bits don't match\n");
         status = TRDB_FAIL;
     }
 
@@ -230,16 +231,16 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed\n");
+    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+        LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN)) {
-        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
         status = TRDB_FAIL;
     }
     if (memcmp(bin, expected3, TRDB_ARRAY_SIZE(expected3))) {
-        LOG_ERR("Packet bits don't match\n");
+        LOG_ERRT("Packet bits don't match\n");
         status = TRDB_FAIL;
     }
 
@@ -261,20 +262,21 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(&packet, &bitcnt, 0, bin)) {
-        LOG_ERR("Packet conversion failed\n");
+    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+        LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
     if (bitcnt != (6 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN)) {
-        LOG_ERR("Wrong bit count value: %zu\n", bitcnt);
+        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
         status = TRDB_FAIL;
     }
     if (memcmp(bin, expected4, TRDB_ARRAY_SIZE(expected4))) {
-        LOG_ERR("Packet bits don't match\n");
+        LOG_ERRT("Packet bits don't match\n");
         status = TRDB_FAIL;
     }
 
 fail:
+    trdb_free(c);
     free(bin);
     return status;
 }
@@ -282,7 +284,7 @@ fail:
 static int test_trdb_write_packets()
 {
     int status = TRDB_SUCCESS;
-    trdb_init();
+    struct trdb_ctx *c = trdb_new();
 
     struct tr_packet packet0 = {0};
     struct tr_packet packet1 = {0};
@@ -315,8 +317,8 @@ static int test_trdb_write_packets()
     list_add(&packet1.list, &head);
     list_add(&packet0.list, &head);
 
-    if (trdb_write_packets("tmp_for_test", &head)) {
-        LOG_ERR("trdb_write_packets failed\n");
+    if (trdb_write_packets(c, "tmp_for_test", &head)) {
+        LOG_ERRT("trdb_write_packets failed\n");
         status = TRDB_FAIL;
     }
 
@@ -331,7 +333,7 @@ static int test_trdb_write_packets()
 
     long len = 0;
     if (!(buf = file_to_char(fp, &len))) {
-        LOG_ERR("file_to_char failed\n");
+        LOG_ERRT("file_to_char failed\n");
         status = TRDB_FAIL;
         goto fail;
     }
@@ -340,12 +342,13 @@ static int test_trdb_write_packets()
                           0xce, 0xf8, 0xee, 0xdb, 0xea, 0xed, 0x8d, 0xef, 0xbe,
                           0xad, 0xde, 0x7a, 0xbb, 0xf7, 0xba, 0x3f};
     if (memcmp(buf, expected, len)) {
-        LOG_ERR("Binary data mismatch\n");
+        LOG_ERRT("Binary data mismatch\n");
         status = TRDB_FAIL;
     }
 fail:
     if (fp)
         fclose(fp);
+    trdb_free(c);
     free(buf);
     return status;
 }
@@ -387,15 +390,17 @@ static int test_parse_stimuli_line()
 
 static int test_stimuli_to_tr_instr(const char *path)
 {
-    trdb_init();
+    struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    trdb_stimuli_to_trace(path, samples, &status);
+    trdb_stimuli_to_trace(c, path, samples, &status);
     if (status != 0) {
-        LOG_ERR("Stimuli to tr_instr failed\n");
+        LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
+
+    trdb_free(c);
     free(*samples);
     return TRDB_SUCCESS;
 }
@@ -403,13 +408,14 @@ static int test_stimuli_to_tr_instr(const char *path)
 
 static int test_stimuli_to_packet_dump(const char *path)
 {
-    trdb_init();
+    trdb_init(); // TODO: remove, need for trdb_compress_trace
+    struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_trace(c, path, samples, &status);
     if (status != 0) {
-        LOG_ERR("Stimuli to tr_instr failed\n");
+        LOG_ERRT("Stimuli to tr_instr failed\n");
         status = TRDB_FAIL;
         goto fail;
     }
@@ -418,14 +424,15 @@ static int test_stimuli_to_packet_dump(const char *path)
     LIST_HEAD(head);
     struct list_head *ret = trdb_compress_trace(&head, samplecnt, *samples);
     if (!ret) {
-        LOG_ERR("Compress trace failed\n");
+        LOG_ERRT("Compress trace failed\n");
         status = TRDB_FAIL;
         goto fail;
     }
-    if (TRDB_TEST_DEBUG)
+    if (TRDB_VERBOSE_DEBUG)
         trdb_dump_packet_list(stdout, &head);
 
 fail:
+    trdb_free(c);
     free(*samples);
     trdb_free_packet_list(&head);
     return status;
@@ -434,13 +441,14 @@ fail:
 
 static int test_disassemble_trace(const char *bin_path, const char *trace_path)
 {
-    trdb_init();
+    trdb_init(); // TODO: remove
+    struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(trace_path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_trace(c, trace_path, samples, &status);
     if (status != 0) {
-        LOG_ERR("Stimuli to tr_instr failed\n");
+        LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
 
@@ -460,10 +468,11 @@ static int test_disassemble_trace(const char *bin_path, const char *trace_path)
     dunit.dinfo = &dinfo;
     init_disassembler_unit(&dunit, abfd, NULL);
 
-    if (TRDB_TEST_DEBUG)
+    if (TRDB_VERBOSE_DEBUG)
         trdb_disassemble_trace(samplecnt, *samples, &dunit);
 
 fail:
+    trdb_free(c);
     free(*samples);
     bfd_close(abfd);
     return status;
@@ -483,9 +492,9 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(trace_path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_trace(ctx, trace_path, samples, &status);
     if (status != 0) {
-        LOG_ERR("Stimuli to tr_instr failed\n");
+        LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
     status = TRDB_SUCCESS;
@@ -498,14 +507,14 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     struct list_head *ret =
         trdb_compress_trace(&packet0_head, samplecnt, *samples);
     if (!ret) {
-        LOG_ERR("Compress trace failed\n");
+        LOG_ERRT("Compress trace failed\n");
         status = TRDB_FAIL;
         goto fail;
     }
 
     ctx = trdb_new();
     if (!ctx) {
-        LOG_ERR("Library context allocation failed.\n");
+        LOG_ERRT("Library context allocation failed.\n");
         status = TRDB_FAIL;
         goto fail;
     }
@@ -514,7 +523,7 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     for (size_t i = 0; i < samplecnt; i++) {
         int step = trdb_compress_trace_step(ctx, &packet1_head, &(*samples)[i]);
         if (step == -1) {
-            LOG_ERR("Compress trace failed.\n");
+            LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
             goto fail;
         }
@@ -559,16 +568,16 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
         linecnt++;
         nread_compare = getline(&compare, &len, tmp_fp1);
         if (nread_compare == -1) {
-            LOG_ERR(
+            LOG_ERRT(
                 "Hit EOF too early in expected packets file, new compression\n");
             status = TRDB_FAIL;
             goto fail;
         }
         if (nread_expected != nread_compare
             || strncmp(compare, expected, nread_expected) != 0) {
-            LOG_ERR("Expected packets mismatch on line %zu\n", linecnt);
-            LOG_ERR("Expected: %s", expected);
-            LOG_ERR("Received: %s", compare);
+            LOG_ERRT("Expected packets mismatch on line %zu\n", linecnt);
+            LOG_ERRT("Expected: %s", expected);
+            LOG_ERRT("Received: %s", compare);
             status = TRDB_FAIL;
             goto fail;
         }
@@ -581,16 +590,16 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
         linecnt++;
         nread_compare = getline(&compare, &len, tmp_fp0);
         if (nread_compare == -1) {
-            LOG_ERR(
+            LOG_ERRT(
                 "Hit EOF too early in expected packets file, legacy compression\n");
             status = TRDB_FAIL;
             goto fail;
         }
         if (nread_expected != nread_compare
             || strncmp(compare, expected, nread_expected) != 0) {
-            LOG_ERR("Expected packets mismatch on line %zu\n", linecnt);
-            LOG_ERR("Expected: %s", expected);
-            LOG_ERR("Received: %s", compare);
+            LOG_ERRT("Expected packets mismatch on line %zu\n", linecnt);
+            LOG_ERRT("Expected: %s", expected);
+            LOG_ERRT("Received: %s", compare);
             status = TRDB_FAIL;
             goto fail;
         }
@@ -619,6 +628,7 @@ fail:
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
     trdb_init();
+    struct trdb_ctx *ctx = NULL;
 
     bfd_init();
     bfd *abfd = bfd_openr(bin_path, NULL);
@@ -631,39 +641,66 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(trace_path, samples, &status);
+    size_t samplecnt = trdb_stimuli_to_trace(ctx, trace_path, samples, &status);
     if (status != 0) {
-        LOG_ERR("Stimuli to tr_instr failed\n");
+        LOG_ERRT("Stimuli to tr_instr failed\n");
         status = TRDB_FAIL;
         goto fail;
     }
     status = TRDB_SUCCESS;
-    LIST_HEAD(test_head);
-    trdb_compress_trace_legacy(&test_head, samplecnt, *samples);
-    trdb_init();
 
-    LIST_HEAD(packet_head);
-    LIST_HEAD(instr_head);
+    LIST_HEAD(packet0_head);
+    LIST_HEAD(packet1_head);
+    LIST_HEAD(instr0_head);
+    LIST_HEAD(instr1_head);
     struct list_head *ret =
-        trdb_compress_trace(&packet_head, samplecnt, *samples);
+        trdb_compress_trace(&packet0_head, samplecnt, *samples);
+    // trdb_compress_trace_legacy(&packet_head, samplecnt, *samples);
     if (!ret) {
-        LOG_ERR("Compress trace failed\n");
+        LOG_ERRT("Compress trace failed\n");
         status = TRDB_FAIL;
         goto fail;
     }
 
-    LOG_INFO("\ntest_decompress_trace dump:\n");
-    if (TRDB_TEST_DEBUG)
-        trdb_dump_packet_list(stdout, &packet_head);
+    ctx = trdb_new();
+    if (!ctx) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
 
-    trdb_decompress_trace(abfd, &packet_head, &instr_head);
+    /* step by step compression */
+    for (size_t i = 0; i < samplecnt; i++) {
+        int step = trdb_compress_trace_step(ctx, &packet1_head, &(*samples)[i]);
+        if (step == -1) {
+            LOG_ERRT("Compress trace failed.\n");
+            status = TRDB_FAIL;
+            goto fail;
+        }
+    }
+
+    if (TRDB_VERBOSE_DEBUG)
+        trdb_dump_packet_list(stdout, &packet0_head);
+
+    trdb_decompress_trace(ctx, abfd, &packet0_head, &instr0_head);
+    trdb_ctx_reset(ctx);
+    trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
+
+    if (TRDB_VERBOSE_DEBUG) {
+        LOG_INFOT("Reconstructed trace disassembly:\n");
+        struct tr_instr *instr;
+        list_for_each_entry_reverse(instr, &instr1_head, list)
+        {
+            LOG_INFOT("%s", instr->str);
+        }
+    }
 
     /* We compare whether the reconstruction matches the original sequence, only
-     * the pc for now
+     * the pc for now. Legacy compression.
      */
     struct tr_instr *instr;
     int i = 0;
-    list_for_each_entry_reverse(instr, &instr_head, list)
+    list_for_each_entry_reverse(instr, &instr0_head, list)
     {
         /* the reconstruction doesn't show the trapped instruction, so we skip
          */
@@ -671,9 +708,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
             i++;
         }
         if (instr->iaddr != (*samples)[i].iaddr) {
-            LOG_ERR("%s", instr->str);
-            LOG_ERR("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
-            LOG_ERR("reconst. instr: %" PRIx32 "\n", instr->iaddr);
+            LOG_ERRT("%s", instr->str);
+            LOG_ERRT("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
+            LOG_ERRT("reconst. instr: %" PRIx32 "\n", instr->iaddr);
             status = TRDB_FAIL;
             goto fail;
         }
@@ -681,14 +718,43 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
 
     if (i == 0) {
-        LOG_ERR("Empty instruction list.\n");
+        LOG_ERRT("Empty instruction list.\n");
+        return 0;
+    }
+
+    /* We compare whether the reconstruction matches the original sequence, only
+     * the pc for now. Stepwise compression.
+     */
+    i = 0;
+    list_for_each_entry_reverse(instr, &instr1_head, list)
+    {
+        /* the reconstruction doesn't show the trapped instruction, so we skip
+         */
+        if ((*samples)[i].exception) {
+            i++;
+        }
+        if (instr->iaddr != (*samples)[i].iaddr) {
+            LOG_ERRT("%s", instr->str);
+            LOG_ERRT("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
+            LOG_ERRT("reconst. instr: %" PRIx32 "\n", instr->iaddr);
+            status = TRDB_FAIL;
+            goto fail;
+        }
+        i++;
+    }
+
+    if (i == 0) {
+        LOG_ERRT("Empty instruction list.\n");
         return 0;
     }
 
 fail:
+    trdb_free(ctx);
     free(*samples);
-    trdb_free_packet_list(&packet_head);
-    trdb_free_instr_list(&instr_head);
+    trdb_free_packet_list(&packet0_head);
+    trdb_free_packet_list(&packet1_head);
+    trdb_free_instr_list(&instr0_head);
+    trdb_free_instr_list(&instr1_head);
     bfd_close(abfd);
 
     return status;
