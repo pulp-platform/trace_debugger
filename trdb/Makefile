@@ -24,7 +24,8 @@ CPPFLAGS	=
 CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
 			-Wno-unused-function -DENABLE_LOGGING -DNDEBUG
 CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
-			-Wno-unused-function -DENABLE_LOGGING -DENABLE_DEBUG
+			-Wno-unused-function -fsanitize=address \
+			-DENABLE_LOGGING -DENABLE_DEBUG
 
 QUESTASIM_PATH = /usr/pack/modelsim-10.5c-kgf/questasim
 PULP_BINUTILS_PATH = /scratch/balasr/pulp-riscv-binutils-gdb
