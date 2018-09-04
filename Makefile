@@ -46,6 +46,7 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
 DPINAME			= trdb/trdb_sv.h
 DPISRC			= $(RTLSRC_TB_PKG)
+GMLIB			= trdb/trdb_sv_dpi
 
 # rtl related targets
 .PHONY: lint
@@ -83,6 +84,10 @@ check-env:
 c-all:
 	$(MAKE) -C trdb all
 
+.PHONY: c-lib
+c-lib:
+	$(MAKE) -C trdb lib
+
 .PHONY: c-run
 c-run:
 	$(MAKE) -C trdb run
@@ -114,8 +119,8 @@ dpiheader: tb-all
 
 .PHONY: tb-run
 tb-run:
-	$(VSIM) -work $(VWORK) $(VSIM_FLAGS) $(RTLSRC_VOPT_TB_TOP) \
-		-do $(VSIM_SCRIPT)
+	$(VSIM) -work $(VWORK) -sv_lib $(GMLIB) $(VSIM_FLAGS) \
+	$(RTLSRC_VOPT_TB_TOP) -do $(VSIM_SCRIPT)
 
 .PHONY: tb-run-gui
 tb-run-gui: VSIM_FLAGS = $(VSIM_GUI_FLAGS)

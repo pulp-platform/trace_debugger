@@ -21,9 +21,9 @@
 
 CC		= gcc
 CPPFLAGS	=
-override CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
+CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
 			-Wno-unused-function -DENABLE_LOGGING -DNDEBUG
-override CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
+CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
 			-Wno-unused-function -DENABLE_LOGGING -DENABLE_DEBUG
 
 QUESTASIM_PATH = /usr/pack/modelsim-10.5c-kgf/questasim
@@ -117,7 +117,7 @@ docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
 
 .PHONY: clean
 clean:
-	rm -rf $(BIN) $(TEST_BIN) $(OBJS) $(MAIN_OBJS) $(TEST_OBJS)
+	rm -rf $(BIN) $(TEST_BIN) $(GMLIB).so $(OBJS) $(MAIN_OBJS) $(TEST_OBJS)
 
 .PHONY: distclean
 distclean: clean
