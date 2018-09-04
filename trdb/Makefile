@@ -73,7 +73,6 @@ debug: CFLAGS = $(CFLAGS_DEBUG)
 debug: all
 
 lib: CFLAGS += -fPIC
-lib: all
 lib: $(GMLIB).so
 
 
