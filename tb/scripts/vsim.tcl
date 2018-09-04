@@ -11,6 +11,7 @@
 # Author: Robert Balas (balasr@student.ethz.ch)
 # Description: TCL scripts to facilitate simulations
 
+set NoQuitOnFinish 1
 source waves/trace_debugger.tcl
 run -all
 
