@@ -719,7 +719,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         i++;
     }
 
-    if (i == 0) {
+    if(list_empty(&instr0_head)){
         LOG_ERRT("Empty instruction list.\n");
         return 0;
     }
@@ -745,7 +745,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         i++;
     }
 
-    if (i == 0) {
+    if (list_empty(&instr1_head)) {
         LOG_ERRT("Empty instruction list.\n");
         return 0;
     }
