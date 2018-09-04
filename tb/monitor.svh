@@ -41,27 +41,33 @@ class Monitor;
         automatic logic [ILEN-1:0]     instr;
         automatic logic                compressed;
 
+        automatic logic [PACKET_LEN-1:0] packet_bits;
+        automatic logic                  packet_valid;
+
+
         Statistics stats = new();
 
         // get stimuli
         Stimuli stimuli;
         mail.get(stimuli);
 
+        // reserve memory for golden model
+        trdb_sv_alloc();
 
-
-        // // run golden model
-        // while(stimuli.ivalid.size() > 0) begin
-        //     ivalid     = stimuli.ivalid.pop_back();
-        //     iexception = stimuli.iexception.pop_back();
-        //     interrupt  = stimuli.interrupt.pop_back();
-        //     cause      = stimuli.cause.pop_back();
-        //     tval       = stimuli.tval.pop_back();
-        //     priv       = stimuli.priv.pop_back();
-        //     iaddr      = stimuli.iaddr.pop_back();
-        //     instr      = stimuli.instr.pop_back();
-        //     compressed = stimuli.compressed.pop_back();
-
-        // end
+        // run golden model
+        while(stimuli.ivalid.size() > 0) begin
+            ivalid     = stimuli.ivalid.pop_back();
+            iexception = stimuli.iexception.pop_back();
+            interrupt  = stimuli.interrupt.pop_back();
+            cause      = stimuli.cause.pop_back();
+            tval       = stimuli.tval.pop_back();
+            priv       = stimuli.priv.pop_back();
+            iaddr      = stimuli.iaddr.pop_back();
+            instr      = stimuli.instr.pop_back();
+            compressed = stimuli.compressed.pop_back();
+            trdb_sv_feed_trace(ivalid, iexception, interrupt, cause, tval, priv,
+                               iaddr, instr, compressed, packet_bits, packet_valid);
+        end
 
         // TODO: read output of rtl model
         @(posedge this.duv_if.clk_i);
@@ -71,6 +77,9 @@ class Monitor;
 
         repeat(10)
             @(posedge this.duv_if.clk_i);
+
+        //cleanup
+        trdb_sv_free();
 
     endtask
 
