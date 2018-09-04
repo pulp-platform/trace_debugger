@@ -91,6 +91,9 @@ c-run:
 c-clean:
 	$(MAKE) -C trdb clean
 
+.PHONY: c-docs
+c-docs:
+	$(MAKE) -C trdb docs
 
 # testbench compilation and optimization
 vlib:
@@ -134,6 +137,9 @@ TAGS: check-env
 	echo "Generating TAGS for RTL..."
 	$(CTAGS) -R -e -h=".sv.svh" --tag-relative=always \
 	rtl/ tb/
+
+.PHONY: docs
+docs: c-docs
 
 .PHONY: all
 all: driver-all tb-all c-all
