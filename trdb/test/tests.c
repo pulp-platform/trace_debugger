@@ -125,7 +125,7 @@ static int test_disasm_bfd()
 }
 
 
-static int test_serialize_packet(uint32_t shift)
+static int test_trdb_serialize_packet(uint32_t shift)
 {
     int status = TRDB_SUCCESS;
     struct trdb_ctx *c = trdb_new();
@@ -154,7 +154,7 @@ static int test_serialize_packet(uint32_t shift)
     }
 
     size_t bitcnt = 0;
-    if (serialize_packet(c, &packet, &bitcnt, shift, bin)) {
+    if (trdb_serialize_packet(c, &packet, &bitcnt, shift, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -181,7 +181,7 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -203,7 +203,7 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -230,7 +230,7 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -261,7 +261,7 @@ static int test_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -767,7 +767,7 @@ int main(int argc, char *argv[argc + 1])
 {
     INIT_TESTS();
     /* for (size_t i = 0; i < 8; i++) */
-    /*     RUN_TEST(test_serialize_packet, i); */
+    /*     RUN_TEST(test_trdb_serialize_packet, i); */
 
     RUN_TEST(test_disasm_bfd);
     /* RUN_TEST(test_trdb_write_packets); */

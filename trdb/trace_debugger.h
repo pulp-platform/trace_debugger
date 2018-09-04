@@ -309,12 +309,27 @@ void trdb_free_packet_list(struct list_head *packet_list);
  */
 void trdb_free_instr_list(struct list_head *instr_list);
 
+
+/**
+ * Packs the @p packet into an array @p bin, aligned by @p align and writes the
+ * packet length in bits into @p bitcnt.
+ *
+ * @param c a trace debugger context
+ * @param packet the data to serialize
+ * @param bitcnt written with the number of bits in @p packet
+ * @param align alignment of packet bits in @p bin, larger or equal to zero and
+ * smaller than eight.
+ * @param bin the array where the packet bits will be written into
+ * @return 0 on success, -1 on failure
+ */
+int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
+                          size_t *bitcnt, uint8_t align, uint8_t bin[]);
+
 /**
  * Write a list of tr_packets to a file located at @p path.
  *
- * This function calls serialize_packet() to tightly align the packets,
- *which
- * can have a non-power-of-two size.
+ * This function calls trdb_serialize_packet() to tightly align the packets,
+ * which can have a non-power-of-two size.
  *
  * @param c the context/state of the trace debugger
  * @param path where the file is located at

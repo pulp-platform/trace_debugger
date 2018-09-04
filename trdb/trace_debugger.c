@@ -1373,11 +1373,11 @@ union pack {
                        * mess your shit up. Careful this is also
                        * endian dependent
                        */
-} data = {0};
+};
 
 /* bin must be an all zeros array */
-static int serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
-                            size_t *bitcnt, uint8_t align, uint8_t bin[])
+int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
+                     size_t *bitcnt, uint8_t align, uint8_t bin[])
 {
     if (packet->msg_type != 0x2) {
         err(c, "trace packet message type not supported: %d\n",
@@ -1392,6 +1392,9 @@ static int serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         err(c, "bad alignment value: %" PRId8 "\n", align);
         return -1;
     }
+
+    union pack data = {0};
+
     switch (packet->format) {
     case F_BRANCH_FULL: {
         uint32_t len = branch_map_len(packet->branches);
@@ -1423,7 +1426,7 @@ static int serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     }
 
     case F_BRANCH_DIFF:
-        err(c, "F_BRANCH_DIFF serialize_packet not implemented yet\n");
+        err(c, "F_BRANCH_DIFF trdb_serialize_packet not implemented yet\n");
         *bitcnt = 0;
         return -1;
 
@@ -1503,7 +1506,7 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
     /* TODO: do we need the rever version? I think we do*/
     list_for_each_entry(packet, packet_list, list)
     {
-        if (serialize_packet(c, packet, &bitcnt, alignment, bin)) {
+        if (trdb_serialize_packet(c, packet, &bitcnt, alignment, bin)) {
             status = -1;
             goto fail;
         }
