@@ -4,6 +4,7 @@ build
 TAGS
 gmon.out
 *.o
+*.so
 /trdb/scratch
 /trdb/trdb
 /trdb/tests

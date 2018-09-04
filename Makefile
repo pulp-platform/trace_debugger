@@ -44,7 +44,7 @@ RTLSRC			:= $(wildcard rtl/*.sv) \
 RTLSRC_VLOG_TB_TOP	:= $(basename $(notdir $(RTLSRC_TB_TOP)))
 RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
-DPINAME			= trdb/trdb_sv.h
+DPINAME			= trdb/dpi/trdb_sv.h
 DPISRC			= $(RTLSRC_TB_PKG)
 GMLIB			= trdb/trdb_sv_dpi
 

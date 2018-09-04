@@ -50,6 +50,9 @@ MAIN_OBJS	= $(MAIN_SRCS:.c=.o)
 TEST_SRCS	= $(wildcard test/*.c)
 TEST_OBJS	= $(TEST_SRCS:.c=.o)
 
+DPI_SRCS	= $(wildcard dpi/*.c)
+DPI_OBJS	= $(DPI_SRCS:.c=.o)
+
 SRCS		= $(wildcard *.c)
 OBJS		= $(SRCS:.c=.o)
 INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
@@ -83,13 +86,13 @@ $(BIN): $(OBJS) $(MAIN_OBJS)
 $(TEST_BIN): $(OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)
 
-$(GMLIB).so: $(OBJS)
-	ld -shared -E -o $(GMLIB).so $(OBJS)
+$(GMLIB).so: $(OBJS) $(DPI_OBJS)
+	ld -shared -E -o $(GMLIB).so $(OBJS) $(DPI_OBJS)
 
 # $@ = name of target
 # $< = first dependency
 %.o: %.c
-	$(CC) $(CFLAGS) $(INCLUDES)  $(LDFLAGS) -c $< -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -c $< -o $@ $(LDLIBS)
 
 .PHONY: run
 run:
@@ -117,7 +120,8 @@ docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
 
 .PHONY: clean
 clean:
-	rm -rf $(BIN) $(TEST_BIN) $(GMLIB).so $(OBJS) $(MAIN_OBJS) $(TEST_OBJS)
+	rm -rf $(BIN) $(TEST_BIN) $(GMLIB).so $(OBJS) $(MAIN_OBJS) $(TEST_OBJS) \
+	$(DPI_OBJS)
 
 .PHONY: distclean
 distclean: clean

@@ -29,8 +29,8 @@
 #include <svdpi.h>
 #include <stdint.h>
 #include "trdb_sv.h"
-#include "utils.h"
-#include "trace_debugger.h"
+#include "../utils.h"
+#include "../trace_debugger.h"
 
 LIST_HEAD(packets);
 LIST_HEAD(instructions);
