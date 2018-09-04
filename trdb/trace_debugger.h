@@ -208,6 +208,27 @@ void trdb_close();
  * Compress the given sequence of instruction to a sequence of packets.
  *
  * The packets should allow trdb_decompress_trace() to reconstruct the original
+ * sequence of tr_instr. You can pass one instruction per call to it, simulating
+ * step by step execution. The state of the compression (keeping the previously
+ * fed instructions to make decisions on whether to emit a packet or not and
+ * more) is held in @p ctx, which the caller is responsible for. Since the
+ * function allocates new entries for list_head, the caller has to deallocate
+ * them by calling trdb_free_packet_list(). Use the functions provided by list.h
+ * to handle list_head entries.
+ *
+ * @param ctx trace debugger context/state
+ * @param packet_list list to which packets will be appended
+ * @param instrs[len]
+ * @return the provided @packet_list
+ */
+int trdb_compress_trace_step(struct trdb_ctx *ctx,
+                             struct list_head *packet_list,
+                             struct tr_instr *instr);
+
+/**
+ * Compress the given sequence of instruction to a sequence of packets.
+ *
+ * The packets should allow trdb_decompress_trace() to reconstruct the original
  * sequence of tr_instr. Since the function allocates new entries for list_head,
  * the caller has to deallocate them by calling trdb_free_packet_list(). Use the
  * functions provided by list.h to handle list_head entries.
@@ -254,7 +275,7 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
  * @param stream output to write to
  * @param packet_list sequence of packets to print
  */
-void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list);
+void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list);
 
 /**
  *  Prints a single packet in a formatted manner to @p stream.
@@ -262,7 +283,15 @@ void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list);
  * @param stream output to write to
  * @param packet tr_packet to print
  */
-void trdb_print_packet(FILE *stream, struct tr_packet *packet);
+void trdb_print_packet(FILE *stream, const struct tr_packet *packet);
+
+/**
+ *  Prints a single instruction in a formatted manner to @p stream.
+ *
+ * @param stream output to write to
+ * @param instr tr_instr to print
+ */
+void trdb_print_instr(FILE *stream, const struct tr_instr *packet);
 
 /**
  * Free the entries of a list of tr_packet, used to deallocate the list returned

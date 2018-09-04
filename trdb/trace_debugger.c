@@ -1631,7 +1631,7 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
     }
 }
 
-void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list)
+void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list)
 {
     struct tr_packet *packet;
     list_for_each_entry_reverse(packet, packet_list, list)
@@ -1640,7 +1640,7 @@ void trdb_dump_packet_list(FILE *stream, struct list_head *packet_list)
     }
 }
 
-void trdb_print_packet(FILE *stream, struct tr_packet *packet)
+void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
 {
     switch (packet->format) {
     case F_BRANCH_FULL:
@@ -1685,6 +1685,22 @@ void trdb_print_packet(FILE *stream, struct tr_packet *packet)
         }
         break;
     }
+}
+
+void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
+{
+    fprintf(stream, "INSTR\n");
+    fprintf(stream, "    exception : %s\n",
+            instr->exception ? "true" : "false");
+    fprintf(stream, "    interrupt : %s\n",
+            instr->interrupt ? "true" : "false");
+    fprintf(stream, "    cause     : 0x%" PRIx32 "\n", instr->cause);
+    fprintf(stream, "    tval      : 0x%" PRIx32 "\n", instr->tval);
+    fprintf(stream, "    priv      : 0x%" PRIx32 "\n", instr->priv);
+    fprintf(stream, "    iaddr     : 0x%" PRIx32 "\n", instr->iaddr);
+    fprintf(stream, "    instr     : 0x%" PRIx32 "\n", instr->instr);
+    fprintf(stream, "    compressed: %s\n",
+            instr->compressed ? "true" : "false");
 }
 
 void trdb_free_packet_list(struct list_head *packet_list)
