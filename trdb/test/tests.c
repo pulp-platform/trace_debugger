@@ -35,7 +35,6 @@
 #include "../utils.h"
 #include "../utils.c"
 
-/* TODO: replace return values with these */
 #define TRDB_SUCCESS 0
 #define TRDB_FAIL -1
 
@@ -317,14 +316,14 @@ static int test_trdb_write_packets()
     list_add(&packet1.list, &head);
     list_add(&packet0.list, &head);
 
-    if (trdb_write_packets(c, "tmp_for_test", &head)) {
+    if (trdb_write_packets(c, "tmp0", &head)) {
         LOG_ERRT("trdb_write_packets failed\n");
         status = TRDB_FAIL;
     }
 
     /* Read back the file and compare to expected value */
     uint8_t *buf = NULL;
-    FILE *fp = fopen("tmp_for_test", "rb");
+    FILE *fp = fopen("tmp0", "rb");
     if (!fp) {
         perror("fopen");
         status = TRDB_FAIL;
@@ -348,6 +347,7 @@ static int test_trdb_write_packets()
 fail:
     if (fp)
         fclose(fp);
+    remove("tmp0");
     trdb_free(c);
     free(buf);
     return status;
@@ -616,6 +616,8 @@ fail:
         fclose(tmp_fp1);
     if (expected_packets)
         fclose(expected_packets);
+    remove("tmp2");
+    remove("tmp3");
     free(*samples);
     trdb_free_packet_list(&packet0_head);
     trdb_free_packet_list(&packet1_head);
