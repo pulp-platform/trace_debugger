@@ -55,10 +55,9 @@ module trdb_stream_align
             data_d    = padded_packet_bits[low_ptr_q +: 32];
             valid_d   = '1;
 
+            low_ptr_d = high_ptr;
             // TODO: make this state machine maybe
-            if(low_ptr_q < packet_len_i) begin
-                low_ptr_d = high_ptr;
-            end else begin
+            if(high_ptr >= packet_len_i) begin
                 //we are done with the current packet
                 low_ptr_d = '0;
                 // request the next packet
