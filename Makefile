@@ -132,7 +132,7 @@ tb-run-sh:
 # run tb with simulator gui
 .PHONY: tb-run-gui
 tb-run-gui: VSIM_FLAGS = $(VSIM_GUI_FLAGS)
-tb-run-gui: tb-run
+tb-run-gui: tb-run-sh
 
 .PHONY: tb-clean
 tb-clean:
