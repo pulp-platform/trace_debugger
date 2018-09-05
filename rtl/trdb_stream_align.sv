@@ -52,7 +52,7 @@ module trdb_stream_align
 
         if(valid_i) begin
             // check if we can still output 32 bit words for the current packet
-            data_d    = packet_bits_i[low_ptr_q +: 32];
+            data_d    = padded_packet_bits[low_ptr_q +: 32];
             valid_d   = '1;
 
             // TODO: make this state machine maybe
