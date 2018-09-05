@@ -50,8 +50,13 @@ The used packet format is described [[https://github.com/riscv/riscv-trace-spec]
 ** Dependencies for TRDB
    Requires =libbfd.a=, =libopcodes.a=, =libiberty.a= and =libzlib.a= from
    binutils built using [[https://github.com/pulp-platform/pulp-riscv-gnu-toolchain][this]] with the =trace_dbg_dev= branch. Build it by
-   calling =./configure --enable-targets=riscv32, x86_64-pc-linux-gnu= and then
-   =make all=. TODO: improve this part.
+   calling
+   #+BEGIN_SRC bash
+   export CFLAGS="-O2 -g -fPIC"
+   ./configure --enable-targets=riscv32, x86_64-pc-linux-gnu CFLAGS="-g -O2 -fPIC"
+   make all
+   #+END_SRC
+   TODO: improve this part.
 
 ** Building the C model and decompression code
    Run =make all= in =trdb/= for a release build. Make sure to link the

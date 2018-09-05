@@ -8,8 +8,12 @@
 ** Dependencies
    Requires =libbfd.a=, =libopcodes.a=, =libiberty.a= and =libzlib.a= from
    binutils built using [[https://github.com/pulp-platform/pulp-riscv-gnu-toolchain][this]] with the =trace_dbg_dev= branch. Build it by
-   calling =./configure --enable-targets=riscv32, x86_64-pc-linux-gnu= and then
-   =make all=.
+   calling
+   #+BEGIN_SRC bash
+   export CFLAGS="-O2 -g -fPIC"
+   ./configure --enable-targets=riscv32, x86_64-pc-linux-gnu CFLAGS="-g -O2 -fPIC"
+   make all
+   #+END_SRC
 
 ** Build
    Run =make all= for a release build or =make debug= for debug symbols and more
