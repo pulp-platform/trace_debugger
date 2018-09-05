@@ -97,23 +97,23 @@ module trdb_packet_emitter
 
                 if(branch_packet_off == 1) begin
                     packet_bits[7+:XLEN] = {iaddr_i, branch_map_i[0]};
-                    packet_len = 7 + 1 + XLEN;
+                    packet_len = 2 + 7 + 1 + XLEN;
 
                 end else if(branch_packet_off == 9) begin
                     packet_bits[7+:9+XLEN] = {iaddr_i, branch_map_i[8:0]};
-                    packet_len = 7 + 9 + XLEN;
+                    packet_len = 2 + 7 + 9 + XLEN;
 
                 end else if(branch_packet_off == 17) begin
                     packet_bits[7+:17+XLEN] = {iaddr_i, branch_map_i[16:0]};
-                    packet_len = 7 + 17 + XLEN;
+                    packet_len = 2 + 7 + 17 + XLEN;
 
                 end else if(branch_packet_off == 25) begin
                     packet_bits[7+:25+XLEN] = {iaddr_i, branch_map_i[24:0]};
-                    packet_len = 7 + 25 + XLEN;
+                    packet_len = 2 + 7 + 25 + XLEN;
 
                 end else begin
                     packet_bits[7+:31+XLEN] = {iaddr_i, branch_map_i[30:0]};
-                    packet_len = 7 + 31 + XLEN;
+                    packet_len = 2 + 7 + 31 + XLEN;
                 end
             end
 
@@ -141,14 +141,14 @@ module trdb_packet_emitter
                 SF_START: begin
                     packet_bits[2+:2+PRIVLEN+1+XLEN]
                         = {iaddr_i, is_branch_i, priv_i, packet_subformat_i};
-                    packet_len = 2 + PRIVLEN + 1 + XLEN;
+                    packet_len = 2 + 2 + PRIVLEN + 1 + XLEN;
                 end
 
                 SF_EXCEPTION: begin
                     packet_bits[2+:2+PRIVLEN+1+XLEN+CAUSELEN+1]
                         = {interrupt_i, cause_i, iaddr_i, is_branch_i, priv_i,
                            packet_subformat_i};
-                    packet_len = 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+                    packet_len = 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
                 end
 
                 SF_CONTEXT: begin

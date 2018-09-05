@@ -38,7 +38,7 @@
 
 #define XLEN 32
 #define CAUSELEN 5
-#define PRIVLEN 3 // TODO: fix this to 3 or 2
+#define PRIVLEN 3
 #define ILEN 32
 #define CONTEXTLEN 32
 
@@ -385,7 +385,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
  *     uint32_t tval : XLEN;
  * };
  *
- * 2 + 2 + 2 + 1 + 32 + 5 + 1 = 45
+ * 2 + 2 + 3 + 1 + 32 + 5 + 1 = 46
  */
 
 #endif
