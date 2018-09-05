@@ -22,16 +22,27 @@ module trdb_tb
 program automatic tb_run();
     Driver driver;
     Monitor monitor;
-    mailbox #(Stimuli) mail;
+    Scoreboard scoreboard;
+
+    logic tb_eos;
+
+    mailbox #(Stimuli) driver_monitor;
+    mailbox #(Response) gm_scoreboard;
+    mailbox #(Response) duv_scoreboard;
 
     initial begin
-        mail    = new();
-        driver  = new(tb_if, mail);
-        monitor = new(tb_if, mail);
+        driver_monitor = new();
+        gm_scoreboard  = new();
+        duv_scoreboard = new();
+
+        driver         = new(tb_if, driver_monitor);
+        monitor        = new(tb_if, driver_monitor, gm_scoreboard, duv_scoreboard);
+        scoreboard     = new(duv_scoreboard, gm_scoreboard);
 
         fork
-            driver.run();
-            monitor.run();
+            driver.run(tb_eos);
+            monitor.run(tb_eos);
+            // scoreboard.run();
         join
     end
 

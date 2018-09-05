@@ -43,7 +43,7 @@ class Driver;
         logic                compressed;
 
         if(DEBUG)
-            $display("[STIMULI]: Opening file %s.", path);
+            $display("[STIMULI]@%t Opening file %s.", $time, path);
         fp = $fopen(stimuli_path, "r");
 
         if($ferror(fp, err_str)) begin
@@ -70,7 +70,7 @@ class Driver;
         end
 
         if(DEBUG) begin
-            $display("[STIMULI]: Read %d lines.", linecnt);
+            $display("[STIMULI]@%t: Read %d lines.", $time, linecnt);
         end
 
         if ($ferror(fp, err_str)) begin
@@ -78,7 +78,7 @@ class Driver;
             return -1;
         end else if ($feof(fp)) begin
             if(DEBUG)
-                $display("[STIMULI]: Finished parsing %s.", path);
+                $display("[STIMULI]@%t: Finished parsing %s.", $time, path);
         end
 
         if(!fp)
@@ -102,8 +102,9 @@ class Driver;
     endfunction
 
 
-    task run();
+    task run(ref logic tb_eos);
         Stimuli stimuli;
+        tb_eos = 1'b0;
 
         if(DEBUG)
             $display("[DRIVER] @%t: Entering run() task.", $time);
@@ -151,12 +152,21 @@ class Driver;
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             // take response in monitor.svh
         end
+        $display("[DRIVER] @%t: Driver finished.", $time);
 
         @(posedge this.duv_if.clk_i);
         #STIM_APPLICATION_DEL;
         apply_zero();
 
-        // TODO: raise end of simulation
+        @(posedge this.duv_if.clk_i);
+        #STIM_APPLICATION_DEL;
+        apply_zero();
+
+        @(posedge this.duv_if.clk_i);
+        #STIM_APPLICATION_DEL;
+        apply_zero();
+        tb_eos = 1'b1;
+
     endtask;
 
 

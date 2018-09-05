@@ -29,7 +29,6 @@ package trdb_tb_pkg;
 
     const int  RESET_WAIT_CYCLES    = 4;
 
-    //
     typedef struct {
         logic      ivalid;
         logic      iexception;
@@ -42,6 +41,12 @@ package trdb_tb_pkg;
         logic            compressed;
     } trdb_instr;
 
+    typedef union packed {
+        // TODO: we would like to have this parametrizable
+        logic [127:0] bits;
+        logic [4][31:0] slices;
+    } trdb_packet;
+
     import "DPI-C" function void trdb_sv_alloc();
     import "DPI-C" function void trdb_sv_free();
     import "DPI-C" function void trdb_sv_feed_trace
@@ -52,7 +57,9 @@ package trdb_tb_pkg;
          output logic [PACKET_LEN-1:0] packet_bits, output logic packet_valid);
 
 `include "../tb/stimuli.svh"
+`include "../tb/response.svh"
 `include "../tb/driver.svh"
 `include "../tb/monitor.svh"
+`include "../tb/scoreboard.svh"
 
 endpackage // trdb_tb_pkg

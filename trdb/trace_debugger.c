@@ -233,6 +233,7 @@ struct trdb_ctx *trdb_new()
 
     info(ctx, "ctx %p created\n", ctx);
     dbg(ctx, "log_priority=%d\n", ctx->log_priority);
+
     return ctx;
 }
 
@@ -328,7 +329,8 @@ static bool use_differential_addr(uint32_t absolute, uint32_t differential)
     return false;
 }
 
-
+/* TODO: valid signal */
+/* Trapped instruction (!valid) but still advances?*/
 int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct list_head *packet_list,
                              struct tr_instr *instr)
@@ -1417,6 +1419,7 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         data.bits <<= align;
 
         *bitcnt = 9 + len + XLEN;
+	/* TODO: make ceiling division */
         memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
 
         for (size_t j = 0; j < ((*bitcnt + align) / 8 + 1); j++) {

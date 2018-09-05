@@ -15,22 +15,21 @@
 class Monitor;
 
     virtual trace_debugger_if duv_if;
-    mailbox #(Stimuli) mail;
+    mailbox #(Stimuli) inbox;
+    mailbox #(Response) outbox_gm;
+    mailbox #(Response) outbox_duv;
 
-    function new(virtual trace_debugger_if duv_if, mailbox #(Stimuli) mail);
-        this.duv_if = duv_if;
-        this.mail   = mail;
+    function new(virtual trace_debugger_if duv_if, mailbox #(Stimuli) inbox,
+                 mailbox #(Response) outbox_gm,
+                 mailbox #(Response) outbox_duv);
+        this.duv_if     = duv_if;
+        this.inbox      = inbox;
+        this.outbox_duv = outbox_duv;
+        this.outbox_gm  = outbox_gm;
     endfunction
 
-    class Statistics;
 
-        function void print();
-        endfunction;
-
-    endclass // Statistics
-
-
-    task run();
+    task run(ref logic tb_eos);
         automatic logic                ivalid;
         automatic logic                iexception;
         automatic logic                interrupt;
@@ -44,39 +43,79 @@ class Monitor;
         automatic logic [PACKET_LEN-1:0] packet_bits;
         automatic logic                  packet_valid;
 
-
-        Statistics stats = new();
+        // helper variables to parse packet
+        automatic int bitcnt;
+        automatic int max_reads;
+        automatic int off;
+        automatic trdb_packet packet;
+        Response response;
 
         // get stimuli
         Stimuli stimuli;
-        mail.get(stimuli);
+        inbox.get(stimuli);
 
         // reserve memory for golden model
         trdb_sv_alloc();
 
-        // run golden model
-        while(stimuli.ivalid.size() > 0) begin
-            ivalid     = stimuli.ivalid.pop_back();
-            iexception = stimuli.iexception.pop_back();
-            interrupt  = stimuli.interrupt.pop_back();
-            cause      = stimuli.cause.pop_back();
-            tval       = stimuli.tval.pop_back();
-            priv       = stimuli.priv.pop_back();
-            iaddr      = stimuli.iaddr.pop_back();
-            instr      = stimuli.instr.pop_back();
-            compressed = stimuli.compressed.pop_back();
+        // run golden model TODO: put in seperate task
+        for(int i = 0; i < stimuli.ivalid.size(); i++) begin
+            ivalid     = stimuli.ivalid[i];
+            iexception = stimuli.iexception[i];
+            interrupt  = stimuli.interrupt[i];
+            cause      = stimuli.cause[i];
+            tval       = stimuli.tval[i];
+            priv       = stimuli.priv[i];
+            iaddr      = stimuli.iaddr[i];
+            instr      = stimuli.instr[i];
+            compressed = stimuli.compressed[i];
+
             trdb_sv_feed_trace(ivalid, iexception, interrupt, cause, tval, priv,
-                               iaddr, instr, compressed, packet_bits, packet_valid);
+                               iaddr, instr, compressed, packet_bits,
+                               packet_valid);
+
+            if(packet_valid) begin
+                packet.bits = packet_bits;
+                response    = new(packet);
+                outbox_gm.put(response);
+            end
         end
+        $display("finished golden model computation, queued %d packets", outbox_gm.num());
 
-        // TODO: read output of rtl model
-        @(posedge this.duv_if.clk_i);
-        #STIM_APPLICATION_DEL;
+        forever begin: acquire
+            @(posedge this.duv_if.clk_i);
+            #STIM_APPLICATION_DEL;
 
-        #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
+            #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
+            if(tb_eos == 1'b1) begin
+                $display("[Monitor] @%t: Signaled end of simulation.", $time);
+                break;
+            end
+
+            if(this.duv_if.packet_word_valid == 1'b1) begin
+                if(off == 0) begin
+                    //we are dealing with a new packet
+                    bitcnt            = this.duv_if.packet_word[PACKET_HEADER_LEN-1:0];
+                    max_reads         = (bitcnt + 32 - 1) / 32;
+                    packet.slices[off] = this.duv_if.packet_word;
+                    off++;
+                end else begin
+                    packet.slices[off] = this.duv_if.packet_word;
+                    off++;
+                end
+
+                // next packet
+                if(off == max_reads) begin
+                    off      = 0;
+                    response = new(packet);
+                    outbox_duv.put(response);
+                    $display("duv put someting in mailbox");
+                end
+            end
+        end
 
         repeat(10)
             @(posedge this.duv_if.clk_i);
+
 
         //cleanup
         trdb_sv_free();
