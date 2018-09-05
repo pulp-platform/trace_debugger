@@ -60,7 +60,7 @@ INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
 BIN		= trdb
 TEST_BIN	= tests
 # golden model lib for simulator
-GMLIB		= trdb_sv_dpi
+GMLIB		= libtrdb
 
 
 CTAGS		= ctags
@@ -87,7 +87,9 @@ $(TEST_BIN): $(OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)
 
 $(GMLIB).so: $(OBJS) $(DPI_OBJS)
-	ld -shared -E -o $(GMLIB).so $(OBJS) $(DPI_OBJS)
+#	gcc -o $(GMLIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)
+	ld -shared -E --exclude-libs ALL -o $(GMLIB).so -lc $(LDFLAGS) \
+		$(OBJS) $(DPI_OBJS) $(LDLIBS)
 
 # $@ = name of target
 # $< = first dependency
@@ -113,7 +115,7 @@ valgrind-main:
 .PHONY: TAGS
 TAGS:
 	$(CTAGS) -R -e -h=".c.h" --tag-relative=always . $(LIB_PATHS) \
-	$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
+		$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
 
 docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
 	$(DOC) doxyfile
@@ -121,7 +123,7 @@ docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
 .PHONY: clean
 clean:
 	rm -rf $(BIN) $(TEST_BIN) $(GMLIB).so $(OBJS) $(MAIN_OBJS) $(TEST_OBJS) \
-	$(DPI_OBJS)
+		$(DPI_OBJS)
 
 .PHONY: distclean
 distclean: clean

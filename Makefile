@@ -46,7 +46,7 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
 DPINAME			= trdb/dpi/trdb_sv.h
 DPISRC			= $(RTLSRC_TB_PKG)
-GMLIB			= trdb/trdb_sv_dpi
+GMLIB			= trdb/libtrdb
 
 # rtl related targets
 .PHONY: lint
