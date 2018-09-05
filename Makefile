@@ -117,11 +117,19 @@ tb-all: vlog
 dpiheader: tb-all
 	$(VLOG) -work $(VWORK) -l $(VLOG_LOG) -dpiheader $(DPINAME) $(DPISRC)
 
+# run tb and exit
 .PHONY: tb-run
 tb-run:
 	$(VSIM) -work $(VWORK) -sv_lib $(GMLIB) $(VSIM_FLAGS) \
+	$(RTLSRC_VOPT_TB_TOP) -do 'source $(VSIM_SCRIPT); exit -f'
+
+# run tb and drop into interactive shell
+.PHONY: tb-run-sh
+tb-run-sh:
+	$(VSIM) -work $(VWORK) -sv_lib $(GMLIB) $(VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do $(VSIM_SCRIPT)
 
+# run tb with simulator gui
 .PHONY: tb-run-gui
 tb-run-gui: VSIM_FLAGS = $(VSIM_GUI_FLAGS)
 tb-run-gui: tb-run
