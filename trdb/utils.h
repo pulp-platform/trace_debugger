@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <syslog.h>
+#include <assert.h>
 #include "trace_debugger.h"
 
 #ifdef NDEBUG
@@ -44,6 +45,13 @@
 #        define TRDB_VERBOSE_DEBUG 0
 #    endif
 #endif
+
+/* Different non-portable way to calculate packed bits requires __uint128_t
+ * and little endian (or add the htole128 function)
+ */
+static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
+              "Machine must be little endian");
+
 
 /* static inline void __attribute__((always_inline, format(printf, 2, 3))) */
 /* trdb_log_null(struct trdb_ctx *ctx, const char *format, ...) */
