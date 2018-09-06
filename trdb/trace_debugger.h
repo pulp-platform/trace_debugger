@@ -36,6 +36,10 @@
 #include "disassembly.h"
 #include "list.h"
 
+/* custom header */
+#define PACKETLEN 7
+
+/* given header */
 #define XLEN 32
 #define CAUSELEN 5
 #define PRIVLEN 3
@@ -90,7 +94,7 @@ struct tr_instr {
  */
 struct tr_packet {
     /* transport layer header */
-    uint32_t length : 7;
+    uint32_t length : PACKETLEN;
     /* actual payload of spec */
     uint32_t msg_type : 2; /**< UltraSoC specific TODO: remove */
     uint32_t format : 2;   /**< header denoting the packet type */
@@ -312,7 +316,9 @@ void trdb_free_instr_list(struct list_head *instr_list);
 
 /**
  * Packs the @p packet into an array @p bin, aligned by @p align and writes the
- * packet length in bits into @p bitcnt.
+ * packet length in bits into @p bitcnt. This function is specific to the PULP
+ * platform since it omits certain fields such as "context", which are always
+ * set to zero.
  *
  * @param c a trace debugger context
  * @param packet the data to serialize

@@ -1354,6 +1354,8 @@ static uint32_t branch_map_len(uint32_t branches)
         return 1;
     } else if (branches <= 9) {
         return 9;
+    } else if (branches <= 17){
+	return 17;
     } else if (branches <= 25) {
         return 25;
     } else if (branches <= 31) {
@@ -1379,13 +1381,8 @@ union pack {
 
 /* bin must be an all zeros array */
 int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
-                     size_t *bitcnt, uint8_t align, uint8_t bin[])
+                          size_t *bitcnt, uint8_t align, uint8_t bin[])
 {
-    if (packet->msg_type != 0x2) {
-        err(c, "trace packet message type not supported: %d\n",
-            packet->msg_type);
-        return -1;
-    }
     if (!c->config.full_address) {
         err(c, "full_address false: not implemented yet\n");
         return -1;
@@ -1401,78 +1398,77 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     case F_BRANCH_FULL: {
         uint32_t len = branch_map_len(packet->branches);
 
-        /* different non-portable way to calculate same packed bits.
-         * For some additional assurance. Machine must be little
-         * endian (or add the htole128 function)
-         */
-        assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__);
         /* we need enough space to do the packing it in uint128 */
-        assert(128 > XLEN + 9 + 31 + 8);
+        assert(128 > PACKETLEN + 2 + 5 + 31 + XLEN);
         /* TODO: assert branch map to overfull */
         /* TODO: branch map full logic handling */
         /* TODO: for now we put the address always */
-        data.bits = 0;
-        data.bits = (packet->msg_type) | (packet->format << 2)
-                    | (packet->branches << 4);
-        data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len)) << 9;
-        data.bits |= ((__uint128_t)packet->address << (9 + len));
+        data.bits = (packet->length) | (packet->format << PACKETLEN)
+                    | (packet->branches << (PACKETLEN + 2));
+        data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len))
+                     << (PACKETLEN + 2 + 5);
+        data.bits |=
+            ((__uint128_t)packet->address << (PACKETLEN + 2 + 5 + len));
+
         data.bits <<= align;
+        *bitcnt = PACKETLEN + 2 + 5 + len + XLEN;
+        memcpy(bin, data.bin,
+               (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
 
-        *bitcnt = 9 + len + XLEN;
-	/* TODO: make ceiling division */
-        memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
-
-        for (size_t j = 0; j < ((*bitcnt + align) / 8 + 1); j++) {
-            /* printf("0x%" PRIx8 "\n", data.bin[j]); */
-        }
         return 0;
     }
 
     case F_BRANCH_DIFF:
-        err(c, "F_BRANCH_DIFF trdb_serialize_packet not implemented yet\n");
+        err(c, "F_BRANCH_DIFF not implemented yet\n");
         *bitcnt = 0;
         return -1;
 
     case F_ADDR_ONLY:
-        assert(128 > XLEN + 4 + 8);
-        data.bits = packet->msg_type | (packet->format << 2)
-                    | ((__uint128_t)packet->address << 4);
-        data.bits <<= align;
+        assert(128 > PACKETLEN + 2 + XLEN);
+        data.bits = (packet->length) | (packet->format << PACKETLEN)
+                    | ((__uint128_t)packet->address << (PACKETLEN + 2));
 
-        *bitcnt = XLEN + 4;
-        memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
+        *bitcnt = PACKETLEN + 2 + XLEN;
+
+        data.bits <<= align;
+        memcpy(bin, data.bin,
+               (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
         return 0;
 
     case F_SYNC:
         assert(PRIVLEN == 3);
         /* check for enough space to the packing */
-        assert(128 > 2 + 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN);
+        assert(128 > PACKETLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1);
         /* TODO: for now we ignore the context field since we have
-         *  only one hart
+         * only one hart
          */
 
-        data.bits = 0;
         /* common part to all sub formats */
-        data.bits = packet->msg_type | (packet->format << 2)
-                    | (packet->subformat << 4) | (packet->privilege << 6);
-        *bitcnt = 6 + PRIVLEN;
+        data.bits = (packet->length) | (packet->format << PACKETLEN)
+                    | (packet->subformat << (PACKETLEN + 2))
+                    | (packet->privilege << (PACKETLEN + 4));
+        *bitcnt = PACKETLEN + 4 + PRIVLEN;
 
         switch (packet->subformat) {
         case SF_START:
-            data.bits |= (packet->branch << (6 + PRIVLEN))
-                         | ((__uint128_t)packet->address << (7 + PRIVLEN));
+            data.bits |= (packet->branch << (PACKETLEN + 4 + PRIVLEN))
+                         | ((__uint128_t)packet->address
+                            << (PACKETLEN + 4 + PRIVLEN + 1));
             *bitcnt += 1 + XLEN;
             break;
 
         case SF_EXCEPTION:
-            data.bits |= (packet->branch << (6 + PRIVLEN))
-                         | ((__uint128_t)packet->address << (7 + PRIVLEN))
-                         | ((__uint128_t)packet->ecause << (7 + PRIVLEN + XLEN))
+            data.bits |= (packet->branch << (PACKETLEN + 4 + PRIVLEN))
+                         | ((__uint128_t)packet->address
+                            << (PACKETLEN + 4 + PRIVLEN + 1))
+                         | ((__uint128_t)packet->ecause
+                            << (PACKETLEN + 4 + PRIVLEN + 1 + XLEN))
                          | ((__uint128_t)packet->interrupt
-                            << (7 + PRIVLEN + XLEN + CAUSELEN))
-                         | ((__uint128_t)packet->tval
-                            << (8 + PRIVLEN + XLEN + CAUSELEN));
-            *bitcnt += 1 + XLEN + CAUSELEN + 1 + XLEN;
+                            << (PACKETLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN));
+            // going to be zero anyway in our case
+            //  | ((__uint128_t)packet->tval
+            //   << (PACKETLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1));
+            *bitcnt += (1 + XLEN + CAUSELEN + 1);
             break;
 
         case SF_CONTEXT:
@@ -1481,7 +1477,8 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         }
 
         data.bits <<= align;
-        memcpy(bin, data.bin, (*bitcnt + align) / 8 + 1);
+        memcpy(bin, data.bin,
+               (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
         return 0;
     }
     return -1;
@@ -1673,23 +1670,23 @@ void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
         subf[3] = "RESERVED";
         fprintf(stream, "    subformat : %s\n", subf[packet->subformat]);
 
-        switch (packet->subformat) {
-        case SF_CONTEXT:
-            /* TODO fix this */
-            fprintf(stream, "    context   :\n");
-            fprintf(stream, "    privilege : 0x%" PRIx32 "\n",
-                    packet->privilege);
-        case SF_START:
-            fprintf(stream, "    branch    : %s\n",
-                    packet->branch ? "true" : "false");
-            fprintf(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
-        case SF_EXCEPTION:
-            fprintf(stream, "    ecause    : 0x%" PRIx32 "\n", packet->ecause);
-            fprintf(stream, "    interrupt : %s\n",
-                    packet->interrupt ? "true" : "false");
-            fprintf(stream, "    tval      : 0x%" PRIx32 "\n", packet->tval);
-        }
-        break;
+        /* TODO fix this */
+        fprintf(stream, "    context   :\n");
+        fprintf(stream, "    privilege : 0x%" PRIx32 "\n", packet->privilege);
+        if (packet->subformat == SF_CONTEXT)
+            return;
+
+        fprintf(stream, "    branch    : %s\n",
+                packet->branch ? "true" : "false");
+        fprintf(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
+        if (packet->subformat == SF_START)
+            return;
+
+        fprintf(stream, "    ecause    : 0x%" PRIx32 "\n", packet->ecause);
+        fprintf(stream, "    interrupt : %s\n",
+                packet->interrupt ? "true" : "false");
+        fprintf(stream, "    tval      : 0x%" PRIx32 "\n", packet->tval);
+        /* SF_EXCEPTION */
     }
 }
 
