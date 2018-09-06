@@ -42,7 +42,7 @@ program automatic tb_run();
         fork
             driver.run(tb_eos);
             monitor.run(tb_eos);
-            // scoreboard.run();
+            scoreboard.run(tb_eos);
         join
     end
 

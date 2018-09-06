@@ -33,13 +33,44 @@ class Scoreboard;
     function void print;
     endfunction
 
-    task run();
+    task run(ref logic tb_eos);
+        automatic int packetcnt;
+        Statistics stats;
         Response gm_response;
         Response duv_response;
+        trdb_packet gm_packet;
+        trdb_packet duv_packet;
+
+        stats     = new();
+        packetcnt = 0;
+
         forever begin
+            if(tb_eos == 1'b1) begin
+                //TODO: do statistics report
+                $display("[SCORE]  @%t: Signaled end of stimulation.", $time);
+                if(gm_box.num() > 0)
+                    $display ("[SCORE]  @%t: GM has %d pending packets.", $time,
+                              gm_box.num());
+                if(duv_box.num() > 0)
+                    $display ("[SCORE]  @%t: DUV has %d pending packets.",
+                              $time, duv_box.num());
+
+                break;
+            end
+
             gm_box.get(gm_response);
             duv_box.get(duv_response);
-            $display("got something from both...");
+            gm_packet  = gm_response.packet;
+            duv_packet = duv_response.packet;
+            packetcnt++;
+            //TODO: remove this range when packet length is fixed
+            if(gm_packet.bits[127:7] != duv_packet.bits[127:7]) begin
+                $display("[SCORE]  @%t: ERROR - Packet mismatch for number %d",
+                         $time, packetcnt);
+                $display("[SCORE]  @%t: Expected: %h", $time, gm_packet.bits);
+                $display("[SCORE]  @%t: Received: %h", $time, duv_packet.bits);
+            end
+
         end
     endtask
 

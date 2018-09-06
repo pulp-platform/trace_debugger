@@ -43,7 +43,7 @@ class Driver;
         logic                compressed;
 
         if(DEBUG)
-            $display("[STIMULI]@%t Opening file %s.", $time, path);
+            $display("[STIMULI]@%t: Opening file %s.", $time, path);
         fp = $fopen(stimuli_path, "r");
 
         if($ferror(fp, err_str)) begin
@@ -145,7 +145,7 @@ class Driver;
             this.duv_if.instr      = stimuli.instr.pop_back();
             this.duv_if.compressed = stimuli.compressed.pop_back();
 
-            if(DEBUG)
+            if(VERBOSE)
                 $display("[DRIVER] @%t: Applying vector with addr=%h.", $time,
                          this.duv_if.iaddr);
 

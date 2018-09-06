@@ -15,9 +15,10 @@ package trdb_tb_pkg;
     import trdb_pkg::*;
 
     parameter int DEBUG = 1;
+    parameter int VERBOSE           = 0;
 
     // stimuli file
-    const string stimuli_path = "trdb/data/trdb_stimuli";
+    const string stimuli_path       = "trdb/data/trdb_stimuli";
 
     // clock and acquisition related settings
     const time CLK_PHASE_HI         = 5ns;
@@ -54,6 +55,7 @@ package trdb_tb_pkg;
          input logic [CAUSELEN-1:0]    cause, input logic [XLEN-1:0] tval,
          input logic [PRIVLEN-1:0]     priv, input logic [XLEN-1:0] iaddr,
          input logic [ILEN-1:0]        instr, input logic compressed,
+         input int                     packet_max_len,
          output logic [PACKET_LEN-1:0] packet_bits, output logic packet_valid);
 
 `include "../tb/stimuli.svh"

@@ -30,9 +30,12 @@ module trdb_packet_emitter
      input logic [XLEN-1:0]        iaddr_i,
      input logic [CONTEXTLEN-1:0]  context_i,
 
+     input logic                   lc_u_discontinuity_i,
+
      input logic [30:0]            branch_map_i,
      input logic [4:0]             branch_map_cnt_i,
      input logic                   branch_map_empty_i,
+     input logic                   branch_map_full_i,
      input logic                   is_branch_i,
 
      output logic                  branch_map_flush_o,
@@ -52,20 +55,26 @@ module trdb_packet_emitter
 
     logic [4:0]                    branch_packet_off ;
 
+    logic                          branch_map_edge_case;
 
-    assign packet_gen_valid = valid_i;
     assign branch_map_flush_o = branch_map_flush_q;
+
+    always_comb begin: packet_gen_assert
+        assert(packet_fifo_not_full == '1)
+            else $error("[TRDB]   @%t: Packet fifo is overflowing", $time);
+        packet_gen_valid        = valid_i;
+    end
 
     always_comb begin: branch_map_offset
         assert (branch_map_cnt_i < 31);
 
-        if(branch_map_cnt_i < 1) begin
+        if(branch_map_cnt_i <= 1) begin
             branch_packet_off = 1;
-        end else if(branch_map_cnt_i < 9) begin
+        end else if(branch_map_cnt_i <= 9) begin
             branch_packet_off = 9;
-        end else if(branch_map_cnt_i < 17) begin
+        end else if(branch_map_cnt_i <= 17) begin
             branch_packet_off = 17;
-        end else if(branch_map_cnt_i < 25) begin
+        end else if(branch_map_cnt_i <= 25) begin
             branch_packet_off = 25;
         end else begin
             branch_packet_off = 31;
@@ -79,6 +88,9 @@ module trdb_packet_emitter
 
         // TODO: implement this
         assert (packet_format_i != F_BRANCH_DIFF);
+
+        // TODO: actually this might not be necessary
+        branch_map_edge_case = branch_map_full_i && lc_u_discontinuity_i;
 
         if(valid_i) begin
 
@@ -112,8 +124,9 @@ module trdb_packet_emitter
                     packet_len = 2 + 7 + 25 + XLEN;
 
                 end else begin
-                    packet_bits[7+:31+XLEN] = {iaddr_i, branch_map_i[30:0]};
-                    packet_len = 2 + 7 + 31 + XLEN;
+                    packet_bits[7+:31+XLEN] = {branch_map_edge_case ? iaddr_i :
+                                               32'b0, branch_map_i[30:0]};
+                    packet_len = 2 + 7 + 31 + (branch_map_edge_case ? XLEN : 0);
                 end
             end
 

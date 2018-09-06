@@ -40,6 +40,7 @@ class Monitor;
         automatic logic [ILEN-1:0]     instr;
         automatic logic                compressed;
 
+        automatic int packet_max_len;
         automatic logic [PACKET_LEN-1:0] packet_bits;
         automatic logic                  packet_valid;
 
@@ -58,19 +59,20 @@ class Monitor;
         trdb_sv_alloc();
 
         // run golden model TODO: put in seperate task
-        for(int i = 0; i < stimuli.ivalid.size(); i++) begin
-            ivalid     = stimuli.ivalid[i];
-            iexception = stimuli.iexception[i];
-            interrupt  = stimuli.interrupt[i];
-            cause      = stimuli.cause[i];
-            tval       = stimuli.tval[i];
-            priv       = stimuli.priv[i];
-            iaddr      = stimuli.iaddr[i];
-            instr      = stimuli.instr[i];
-            compressed = stimuli.compressed[i];
+        for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
+            ivalid         = stimuli.ivalid[i];
+            iexception     = stimuli.iexception[i];
+            interrupt      = stimuli.interrupt[i];
+            cause          = stimuli.cause[i];
+            tval           = stimuli.tval[i];
+            priv           = stimuli.priv[i];
+            iaddr          = stimuli.iaddr[i];
+            instr          = stimuli.instr[i];
+            compressed     = stimuli.compressed[i];
 
+            packet_max_len = PACKET_LEN;
             trdb_sv_feed_trace(ivalid, iexception, interrupt, cause, tval, priv,
-                               iaddr, instr, compressed, packet_bits,
+                               iaddr, instr, compressed, packet_max_len, packet_bits,
                                packet_valid);
 
             if(packet_valid) begin
@@ -79,7 +81,8 @@ class Monitor;
                 outbox_gm.put(response);
             end
         end
-        $display("finished golden model computation, queued %d packets", outbox_gm.num());
+        $display("[MONITOR]@%t: Finished golden model computation, queued %d \
+                packets.", $time, outbox_gm.num());
 
         forever begin: acquire
             @(posedge this.duv_if.clk_i);
@@ -87,19 +90,20 @@ class Monitor;
 
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             if(tb_eos == 1'b1) begin
-                $display("[Monitor] @%t: Signaled end of simulation.", $time);
+                $display("[MONITOR]@%t: Signaled end of simulation.", $time);
                 break;
             end
 
             if(this.duv_if.packet_word_valid == 1'b1) begin
                 if(off == 0) begin
                     //we are dealing with a new packet
-                    bitcnt            = this.duv_if.packet_word[PACKET_HEADER_LEN-1:0];
-                    max_reads         = (bitcnt + 32 - 1) / 32;
-                    packet.slices[off] = this.duv_if.packet_word;
+                    packet.bits            = '0;
+                    bitcnt                 = this.duv_if.packet_word[PACKET_HEADER_LEN-1:0];
+                    max_reads              = (bitcnt + 32 - 1) / 32;
+                    packet.slices[3 - off] = this.duv_if.packet_word;
                     off++;
                 end else begin
-                    packet.slices[off] = this.duv_if.packet_word;
+                    packet.slices[3 - off] = this.duv_if.packet_word;
                     off++;
                 end
 
@@ -108,7 +112,6 @@ class Monitor;
                     off      = 0;
                     response = new(packet);
                     outbox_duv.put(response);
-                    $display("duv put someting in mailbox");
                 end
             end
         end
