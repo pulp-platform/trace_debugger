@@ -15,34 +15,15 @@
 class Monitor;
 
     virtual trace_debugger_if duv_if;
-    mailbox #(Stimuli) inbox;
-    mailbox #(Response) outbox_gm;
     mailbox #(Response) outbox_duv;
 
-    function new(virtual trace_debugger_if duv_if, mailbox #(Stimuli) inbox,
-                 mailbox #(Response) outbox_gm,
+    function new(virtual trace_debugger_if duv_if,
                  mailbox #(Response) outbox_duv);
         this.duv_if     = duv_if;
-        this.inbox      = inbox;
         this.outbox_duv = outbox_duv;
-        this.outbox_gm  = outbox_gm;
     endfunction
 
-
     task run(ref logic tb_eos);
-        automatic logic                ivalid;
-        automatic logic                iexception;
-        automatic logic                interrupt;
-        automatic logic [CAUSELEN-1:0] cause;
-        automatic logic [XLEN-1:0]     tval;
-        automatic logic [PRIVLEN-1:0]  priv;
-        automatic logic [XLEN-1:0]     iaddr;
-        automatic logic [ILEN-1:0]     instr;
-        automatic logic                compressed;
-
-        automatic int packet_max_len;
-        automatic logic [PACKET_LEN-1:0] packet_bits;
-        automatic logic                  packet_valid;
 
         // helper variables to parse packet
         automatic int bitcnt;
@@ -50,39 +31,6 @@ class Monitor;
         automatic int off;
         automatic trdb_packet packet;
         Response response;
-
-        // get stimuli
-        Stimuli stimuli;
-        inbox.get(stimuli);
-
-        // reserve memory for golden model
-        trdb_sv_alloc();
-
-        // run golden model TODO: put in seperate task
-        for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
-            ivalid         = stimuli.ivalid[i];
-            iexception     = stimuli.iexception[i];
-            interrupt      = stimuli.interrupt[i];
-            cause          = stimuli.cause[i];
-            tval           = stimuli.tval[i];
-            priv           = stimuli.priv[i];
-            iaddr          = stimuli.iaddr[i];
-            instr          = stimuli.instr[i];
-            compressed     = stimuli.compressed[i];
-
-            packet_max_len = PACKET_LEN;
-            trdb_sv_feed_trace(ivalid, iexception, interrupt, cause, tval, priv,
-                               iaddr, instr, compressed, packet_max_len, packet_bits,
-                               packet_valid);
-
-            if(packet_valid) begin
-                packet.bits = packet_bits;
-                response    = new(packet);
-                outbox_gm.put(response);
-            end
-        end
-        $display("[MONITOR]@%t: Finished golden model computation, queued %d \
-                packets.", $time, outbox_gm.num());
 
         forever begin: acquire
             @(posedge this.duv_if.clk_i);
@@ -118,10 +66,6 @@ class Monitor;
 
         repeat(10)
             @(posedge this.duv_if.clk_i);
-
-
-        //cleanup
-        trdb_sv_free();
 
     endtask
 

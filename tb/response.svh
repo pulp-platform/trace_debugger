@@ -22,6 +22,51 @@ class Response;
     endfunction
 
     function void print;
+    //     automatic logic [1:0] format = packet[8:7];
+    //     case(format) begin
+    //         F_BRANCH_DIFF:
+    //             $display("F_BRANCH_DIFF not implemented.");
+    //         F_BRANCH_FULL:
+    //             $write("PACKET ");
+    //         format == F_BRANCH_FULL ? $write("0: F_BRANCH_FULL\n")
+    //             : $write("1: F_BRANCH_DIFF\n");
+    //         $write(stream, "    branches  : %" "\n", packet->branches);
+    //         $write(stream, "    branch_map: 0x%" PRIx32 "\n", packet->branch_map);
+    //         $write(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
+    //     /* TODO: that special full branch map behaviour */
+    //     end
+
+    // case F_ADDR_ONLY:
+    //     fprintf(stream, "PACKET 2: F_ADDR_ONLY\n");
+    //     fprintf(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
+    //     break;
+    // case F_SYNC:
+    //     fprintf(stream, "PACKET 3: F_SYNC\n");
+    //     const char *subf[4];
+    //     subf[0] = "SF_START";
+    //     subf[1] = "SF_EXCEPTION";
+    //     subf[2] = "SF_CONTEXT";
+    //     subf[3] = "RESERVED";
+    //     fprintf(stream, "    subformat : %s\n", subf[packet->subformat]);
+
+    //     /* TODO fix this */
+    //     fprintf(stream, "    context   :\n");
+    //     fprintf(stream, "    privilege : 0x%" PRIx32 "\n", packet->privilege);
+    //     if (packet->subformat == SF_CONTEXT)
+    //         return;
+
+    //     fprintf(stream, "    branch    : %s\n",
+    //             packet->branch ? "true" : "false");
+    //     fprintf(stream, "    address   : 0x%" PRIx32 "\n", packet->address);
+    //     if (packet->subformat == SF_START)
+    //         return;
+
+    //     fprintf(stream, "    ecause    : 0x%" PRIx32 "\n", packet->ecause);
+    //     fprintf(stream, "    interrupt : %s\n",
+    //             packet->interrupt ? "true" : "false");
+    //     fprintf(stream, "    tval      : 0x%" PRIx32 "\n", packet->tval);
+    //     /* SF_EXCEPTION */
+    // end
 
     endfunction
 

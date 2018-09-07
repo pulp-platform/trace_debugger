@@ -16,22 +16,87 @@ import trdb_pkg::*;
 class Scoreboard;
     mailbox #(Response) duv_box;
     mailbox #(Response) gm_box;
+    mailbox #(Stimuli) inbox;
 
 
     class Statistics;
+        longint total_packets;
+        longint packet_bad;
 
         function void print();
+            $display("Simulation Results");
+            $display("Bad packets %0d/%0d", packet_bad, total_packets);
         endfunction;
 
     endclass // Statistics
 
-    function new(mailbox #(Response) duv_box, mailbox #(Response) gm_box);
+    function new(mailbox #(Stimuli) inbox, mailbox #(Response) duv_box);
         this.duv_box = duv_box;
-        this.gm_box  = gm_box;
+        this.inbox = inbox;
     endfunction
+
 
     function void print;
     endfunction
+
+
+    task run_gm();
+        automatic logic                ivalid;
+        automatic logic                iexception;
+        automatic logic                interrupt;
+        automatic logic [CAUSELEN-1:0] cause;
+        automatic logic [XLEN-1:0]     tval;
+        automatic logic [PRIVLEN-1:0]  priv;
+        automatic logic [XLEN-1:0]     iaddr;
+        automatic logic [ILEN-1:0]     instr;
+        automatic logic                compressed;
+
+        automatic int packet_max_len;
+        automatic logic [PACKET_LEN-1:0] packet_bits;
+        automatic logic                  packet_valid;
+
+        automatic trdb_packet packet;
+        Response response;
+        Stimuli stimuli;
+
+        // reserve memory for golden model
+        trdb_sv_alloc();
+        gm_box = new();
+
+        // acquire stimuli
+        inbox.get(stimuli);
+
+
+        for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
+            ivalid         = stimuli.ivalid[i];
+            iexception     = stimuli.iexception[i];
+            interrupt      = stimuli.interrupt[i];
+            cause          = stimuli.cause[i];
+            tval           = stimuli.tval[i];
+            priv           = stimuli.priv[i];
+            iaddr          = stimuli.iaddr[i];
+            instr          = stimuli.instr[i];
+            compressed     = stimuli.compressed[i];
+
+            packet_max_len = PACKET_LEN;
+            trdb_sv_feed_trace(ivalid, iexception, interrupt, cause, tval, priv,
+                               iaddr, instr, compressed, packet_max_len,
+                               packet_bits, packet_valid);
+
+            if(packet_valid) begin
+                packet.bits = packet_bits;
+                response    = new(packet);
+                gm_box.put(response);
+            end
+        end
+        $display("[SCORE]  @%t: Finished golden model computation, queued %d \
+                packets.", $time, gm_box.num());
+
+        //cleanup
+        trdb_sv_free();
+
+    endtask
+
 
     task run(ref logic tb_eos);
         automatic int packetcnt;
@@ -41,20 +106,23 @@ class Scoreboard;
         trdb_packet gm_packet;
         trdb_packet duv_packet;
 
+        // generate responses
+        run_gm();
+
         stats     = new();
         packetcnt = 0;
-
         forever begin
             if(tb_eos == 1'b1) begin
                 //TODO: do statistics report
                 $display("[SCORE]  @%t: Signaled end of stimulation.", $time);
                 if(gm_box.num() > 0)
-                    $display ("[SCORE]  @%t: GM has %d pending packets.", $time,
+                    $display ("[SCORE]  @%t: GM has %0d pending packets.", $time,
                               gm_box.num());
                 if(duv_box.num() > 0)
-                    $display ("[SCORE]  @%t: DUV has %d pending packets.",
+                    $display ("[SCORE]  @%t: DUV has %0d pending packets.",
                               $time, duv_box.num());
 
+                stats.print();
                 break;
             end
 
@@ -62,15 +130,15 @@ class Scoreboard;
             duv_box.get(duv_response);
             gm_packet  = gm_response.packet;
             duv_packet = duv_response.packet;
-            packetcnt++;
+            stats.total_packets = packetcnt++;
             //TODO: remove this range when packet length is fixed
             if(gm_packet.bits[127:7] != duv_packet.bits[127:7]) begin
-                $display("[SCORE]  @%t: ERROR - Packet mismatch for number %d",
+                $display("[SCORE]  @%t: ERROR - Packet mismatch for number %0d",
                          $time, packetcnt);
                 $display("[SCORE]  @%t: Expected: %h", $time, gm_packet.bits);
                 $display("[SCORE]  @%t: Received: %h", $time, duv_packet.bits);
+                stats.packet_bad++;
             end
-
         end
     endtask
 

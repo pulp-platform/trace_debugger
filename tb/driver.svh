@@ -119,7 +119,7 @@ class Driver;
         if(parse_stimuli(stimuli_path, stimuli))
             $display("[ERROR]: parse_stimuli() failed.");
 
-        // send to monitor
+        // send to scoreboard
         mail.put(stimuli);
 
         //TODO: fix this hack
@@ -129,21 +129,21 @@ class Driver;
         apply_zero();
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
-        while(stimuli.ivalid.size() > 0) begin
+        for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
 
             @(posedge this.duv_if.clk_i);
             #STIM_APPLICATION_DEL;
 
             // apply stimuli pop_back()
-            this.duv_if.ivalid     = stimuli.ivalid.pop_back();
-            this.duv_if.iexception = stimuli.iexception.pop_back();
-            this.duv_if.interrupt  = stimuli.interrupt.pop_back();
-            this.duv_if.cause      = stimuli.cause.pop_back();
-            this.duv_if.tval       = stimuli.tval.pop_back();
-            this.duv_if.priv       = stimuli.priv.pop_back();
-            this.duv_if.iaddr      = stimuli.iaddr.pop_back();
-            this.duv_if.instr      = stimuli.instr.pop_back();
-            this.duv_if.compressed = stimuli.compressed.pop_back();
+            this.duv_if.ivalid     = stimuli.ivalid[i];
+            this.duv_if.iexception = stimuli.iexception[i];
+            this.duv_if.interrupt  = stimuli.interrupt[i];
+            this.duv_if.cause      = stimuli.cause[i];
+            this.duv_if.tval       = stimuli.tval[i];
+            this.duv_if.priv       = stimuli.priv[i];
+            this.duv_if.iaddr      = stimuli.iaddr[i];
+            this.duv_if.instr      = stimuli.instr[i];
+            this.duv_if.compressed = stimuli.compressed[i];
 
             if(VERBOSE)
                 $display("[DRIVER] @%t: Applying vector with addr=%h.", $time,

@@ -26,18 +26,18 @@ program automatic tb_run();
 
     logic tb_eos;
 
-    mailbox #(Stimuli) driver_monitor;
+    mailbox #(Stimuli) stimuli;
     mailbox #(Response) gm_scoreboard;
     mailbox #(Response) duv_scoreboard;
 
     initial begin
-        driver_monitor = new();
+        stimuli        = new();
         gm_scoreboard  = new();
         duv_scoreboard = new();
 
-        driver         = new(tb_if, driver_monitor);
-        monitor        = new(tb_if, driver_monitor, gm_scoreboard, duv_scoreboard);
-        scoreboard     = new(duv_scoreboard, gm_scoreboard);
+        driver         = new(tb_if, stimuli);
+        monitor        = new(tb_if, duv_scoreboard);
+        scoreboard     = new(stimuli, duv_scoreboard);
 
         fork
             driver.run(tb_eos);
