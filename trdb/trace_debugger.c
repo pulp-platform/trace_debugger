@@ -1354,8 +1354,8 @@ static uint32_t branch_map_len(uint32_t branches)
         return 1;
     } else if (branches <= 9) {
         return 9;
-    } else if (branches <= 17){
-	return 17;
+    } else if (branches <= 17) {
+        return 17;
     } else if (branches <= 25) {
         return 25;
     } else if (branches <= 31) {
