@@ -483,11 +483,14 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
 {
     trdb_init();
 
+    struct trdb_ctx *ctx = NULL;
+
     FILE *expected_packets = NULL;
     FILE *tmp_fp0 = NULL;
     FILE *tmp_fp1 = NULL;
 
-    struct trdb_ctx *ctx = NULL;
+    char *compare = NULL;
+    char *expected = NULL;
 
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
@@ -555,8 +558,6 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     trdb_dump_packet_list(tmp_fp1, &packet1_head);
     rewind(tmp_fp1);
 
-    char *compare = NULL;
-    char *expected = NULL;
     size_t linecnt = 0;
     size_t len = 0;
     ssize_t nread_compare;
@@ -657,7 +658,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     LIST_HEAD(instr1_head);
     struct list_head *ret =
         trdb_compress_trace(&packet0_head, samplecnt, *samples);
-    // trdb_compress_trace_legacy(&packet_head, samplecnt, *samples);
+    // trdb_compress_trace_legacy(&packet0_head, samplecnt, *samples);
     if (!ret) {
         LOG_ERRT("Compress trace failed\n");
         status = TRDB_FAIL;
@@ -719,7 +720,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         i++;
     }
 
-    if(list_empty(&instr0_head)){
+    if (list_empty(&instr0_head)) {
         LOG_ERRT("Empty instruction list.\n");
         return 0;
     }
