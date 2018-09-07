@@ -70,7 +70,8 @@ module trace_debugger
     logic [PRIVLEN-1:0]         priv0_q, priv0_d;
     logic                       privchange0_q, privchange0_d;
     logic                       exception0_q, exception0_d,
-                                exception1_q, exception1_d;
+                                exception1_q, exception1_d,
+                                exception2_q, exception2_d;
     logic                       u_discontinuity0_q, u_discontinuity0_d,
                                 u_discontinuity1_q, u_discontinuity1_d;
     logic                       is_branch0_q, is_branch0_d;
@@ -105,23 +106,26 @@ module trace_debugger
     assign trace_valid0_d = ivalid_i;
     assign trace_valid1_d = trace_valid0_q;
 
-    // manage their input and outputs
+    // buffer variables
     assign interrupt0_d = interrupt_i;
     assign interrupt1_d = interrupt0_q;
     assign cause0_d = cause_i;
     assign cause1_d = cause0_q;
     assign priv0_d = priv_i;
-    // assign privchange0_d = ;
     assign exception0_d = iexception_i;
-    // assign u_discontinuity0_d (below)
-    // assign is_branch0_d (below)
+    assign exception1_d = exception0_q;
+    assign exception2_d = exception1_q;
     assign compressed0_d = compressed_i;
     assign iaddr0_d = iaddr_i;
-    // assign qualified0_q =
 
-    assign exception1_d = exception0_q;
+    // assign privchange0_d (below)
+    // assign u_discontinuity0_d (below)
+    // assign is_branch0_d (below)
+
     assign u_discontinuity1_d = u_discontinuity0_q;
     assign is_branch1_d = is_branch0_q;
+    // TODO: add feature to have selective tracing, add enable with regmap
+    assign qualified0_d = '1 && nc_trace_valid;
     assign qualified1_d = qualified0_q;
 
     // Hook phase related variables up to proper register
@@ -136,18 +140,19 @@ module trace_debugger
     assign tc_privchange = privchange0_q;
     assign nc_exception = exception0_d;
     assign lc_exception = exception1_q;
+    // with that variable we force another packet after an exception packet, so
+    // that we don't need to know the vector table entries
+    assign lc_exception_sync = exception2_q;
     assign lc_u_discontinuity = u_discontinuity1_q;
-    // assign tc_first_qualified (below)
     assign tc_is_branch = is_branch0_q;
-    // assign tc_branch_taken (below)
     assign tc_qualified = qualified0_q;
     assign lc_qualified = qualified1_q;
     assign tc_compressed = compressed0_q;
     assign nc_iaddr = iaddr0_d;
     assign tc_iaddr = iaddr0_q;
+    // assign tc_first_qualified (below)
+    // assign tc_branch_taken (below)
 
-    // TODO: add feature to have selective tracing, add enable with regmap
-    assign qualified0_d = '1 && nc_trace_valid;
 
     // decide whether a privilege change occured
     always_comb begin
@@ -208,7 +213,7 @@ module trace_debugger
          .rst_ni(rst_ni),
          .valid_i(tc_trace_valid),
          .lc_exception_i(lc_exception),
-         //input logic lc_emitted_exception_sync (hack)
+         .lc_exception_sync_i(lc_exception_sync),
 
          .tc_first_qualified_i(tc_first_qualified),
          //input logic  tc_unhalted,
@@ -301,6 +306,7 @@ module trace_debugger
             privchange0_q      <= privchange0_d;
             exception0_q       <= exception0_d;
             exception1_q       <= exception1_d;
+            exception2_q       <= exception2_d;
             u_discontinuity0_q <= u_discontinuity0_d;
             u_discontinuity1_q <= u_discontinuity1_d;
             is_branch0_q       <= is_branch0_d;

@@ -22,7 +22,7 @@ module trdb_priority
      input logic  valid_i,
 
      input logic  lc_exception_i,
-     //input logic lc_emitted_exception_sync (hack)
+     input logic  lc_exception_sync_i,
 
      input logic  tc_first_qualified_i,
      //input logic  tc_unhalted,
@@ -70,6 +70,13 @@ module trdb_priority
                 valid_o            = '1;
                 // TODO: lc_emitted_exception_sync
                 // TODO: missing some conditions
+            end else if (lc_exception_sync_i) begin
+                if(branch_map_empty_i)
+                    packet_format_o = F_ADDR_ONLY;
+                else
+                    packet_format_o = F_BRANCH_FULL;
+                valid_o = '1;
+
             end else if (tc_first_qualified_i || tc_unhalted_i ||
                          tc_privchange_i) begin
                 packet_format_o    = F_SYNC;
@@ -81,7 +88,7 @@ module trdb_priority
                     packet_format_o = F_ADDR_ONLY;
                 else
                     packet_format_o = F_BRANCH_FULL;
-                valid_o            = '1;
+                valid_o = '1;
 
                 //TODO: resync and branch_map_nonempty clause
             end else if (nc_halt_i || nc_exception_i || nc_privchange_i ||
@@ -90,10 +97,10 @@ module trdb_priority
                     packet_format_o = F_ADDR_ONLY;
                 else
                     packet_format_o = F_BRANCH_FULL;
-                valid_o            = '1;
+                valid_o = '1;
 
             end else if (branch_map_full_i) begin
-                packet_format_o = F_BRANCH_FULL;
+                packet_format_o    = F_BRANCH_FULL;
                 valid_o            = '1;
 
             end else if (tc_context_change) begin
