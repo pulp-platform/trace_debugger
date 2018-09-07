@@ -66,7 +66,7 @@ module trdb_priority
         if(valid_i) begin
             if (lc_exception_i) begin
                 packet_format_o    = F_SYNC;
-                packet_subformat_o = SF_START;
+                packet_subformat_o = SF_EXCEPTION;
                 valid_o            = '1;
                 // TODO: lc_emitted_exception_sync
                 // TODO: missing some conditions
