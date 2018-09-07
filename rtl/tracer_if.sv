@@ -41,7 +41,11 @@ module tracer_if
      output logic [1:0]                data_rx_datasize_o,
      output logic [31:0]               data_rx_data_o,
      output logic                      data_rx_valid_o,
-     input logic                       data_rx_ready_i);
+     input logic                       data_rx_ready_i,
+
+     // Data from the trace debugger unit to this interface
+     input logic [31:0]                trdb_packet_i,
+     input logic                       trdb_word_valid_i);
 
     logic [31:0]                       data_rx_data_q;
     logic                              data_rx_valid_q;
@@ -73,8 +77,7 @@ module tracer_if
          .cfg_rx_curr_addr_i (cfg_rx_curr_addr_i),
          .cfg_rx_bytes_left_i(cfg_rx_bytes_left_i));
 
-    // For now we generate some predictable data, we also just ignore
-    // data_rx_ready_i because we don't care if transfers succeed
+
     assign data_rx_data_o = data_rx_data_q;
     assign data_rx_valid_o = data_rx_data_q;
 
@@ -83,8 +86,8 @@ module tracer_if
             data_rx_data_q  <= 'h0;
             data_rx_valid_q <= 'h0;
         end else begin
-            data_rx_data_q  <= '1; //0xffff
-            data_rx_valid_q <= 'h1;
+            data_rx_data_q  <= trdb_packet_i;
+            data_rx_valid_q <= trdb_word_valid_i;
         end
     end
 endmodule // tracer_if

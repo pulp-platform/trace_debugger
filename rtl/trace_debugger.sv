@@ -18,6 +18,7 @@ module trace_debugger
     (input logic                clk_i,
      input logic                rst_ni,
 
+     // data from the cpu
      input logic                ivalid_i, //TODO: pipelined valid
      input logic                iexception_i,
      input logic                interrupt_i,
@@ -28,6 +29,9 @@ module trace_debugger
      input logic [ILEN-1:0]     instr_i,
      input logic                compressed_i,
 
+     APB_BUS.Slave              apb_slave,
+
+     // generated packets, which go the the udma (or somewhere else)
      output logic [XLEN-1:0]    packet_word_o,
      output logic               packet_word_valid_o
 );
