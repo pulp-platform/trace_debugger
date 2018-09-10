@@ -58,15 +58,9 @@ module trdb_packet_emitter
     logic                          branch_map_edge_case;
 
     assign branch_map_flush_o = branch_map_flush_q;
-
-    always_comb begin: packet_gen_assert
-        assert(packet_fifo_not_full == '1)
-            else $error("[TRDB]   @%t: Packet fifo is overflowing", $time);
-        packet_gen_valid        = valid_i;
-    end
+    assign packet_gen_valid = valid_i;
 
     always_comb begin: branch_map_offset
-        assert (branch_map_cnt_i < 31);
 
         if(branch_map_cnt_i <= 1) begin
             branch_packet_off = 1;
@@ -81,13 +75,27 @@ module trdb_packet_emitter
         end
     end
 
+
+    branch_map_size_check: assert property
+    (@(posedge clk_i) disable iff (~rst_ni) (branch_map_cnt_i < 32))
+        else $error("[TRDB]    @%t: branch_map_cnt_i=%d is too large",
+                    $time, branch_map_cnt_i);
+
+
+    unimplemented_packet : assert property
+    (@(posedge clk_i) disable iff (~rst_ni) (packet_format_i != F_BRANCH_DIFF))
+     else $error("[TRDB]   @%t: Invalid packet format signaled.", $time);
+
+
+    packet_fifo_overflow: assert property
+    (@(posedge clk_i) disable iff (~rst_ni) (packet_fifo_not_full == 1'b1))
+            else $error("[TRDB]   @%t: Packet FIFO is overflowing.", $time);
+
+
     always_comb begin: set_packet_bits
         packet_bits        = '0;
         packet_len         = '0;
         branch_map_flush_d = '0;
-
-        // TODO: implement this
-        assert (packet_format_i != F_BRANCH_DIFF);
 
         // TODO: actually this might not be necessary
         branch_map_edge_case = branch_map_full_i && lc_u_discontinuity_i;
@@ -174,10 +182,6 @@ module trdb_packet_emitter
         end
     end
 
-    // always_comb begin:
-    //     assert (packet_fifo_not_full == 1'b1)
-    //         else $error("Packet FIFO is overflowing.");
-    // end
     //TODO: implement fifo nuking logic
     //TODO: request resync logic on nuked fifo
 
