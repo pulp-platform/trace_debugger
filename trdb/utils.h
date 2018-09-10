@@ -107,8 +107,8 @@ void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
 #define LOG_ERRT(format, ...)                                                  \
     do {                                                                       \
         if (TRDB_LEVEL > 0)                                                    \
-            fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
-                    __func__, ##__VA_ARGS__);                                  \
+            fprintf(stderr, "tests: %s:%d:0: %s(): " format, __FILE__,         \
+                    __LINE__, __func__, ##__VA_ARGS__);                        \
     } while (false)
 /* ## is gcc extension */
 
@@ -119,8 +119,8 @@ void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
 #define LOG_WARNT(format, ...)                                                 \
     do {                                                                       \
         if (TRDB_LEVEL > 1)                                                    \
-            fprintf(stderr, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
-                    __func__, ##__VA_ARGS__);                                  \
+            fprintf(stderr, "tests: %s:%d:0: %s(): " format, __FILE__,         \
+                    __LINE__, __func__, ##__VA_ARGS__);                        \
     } while (false)
 
 /**
@@ -130,8 +130,8 @@ void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
 #define LOG_INFOT(format, ...)                                                 \
     do {                                                                       \
         if (TRDB_LEVEL > 2)                                                    \
-            fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
-                    __func__, ##__VA_ARGS__);                                  \
+            fprintf(stdout, "tests: %s:%d:0: %s(): " format, __FILE__,         \
+                    __LINE__, __func__, ##__VA_ARGS__);                        \
     } while (false)
 
 /**
@@ -141,8 +141,8 @@ void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
 #define LOG_TRACET(format, ...)                                                \
     do {                                                                       \
         if (TRDB_TRACE)                                                        \
-            fprintf(stdout, "%s:%d:0: %s(): " format, __FILE__, __LINE__,      \
-                    __func__, ##__VA_ARGS__);                                  \
+            fprintf(stdout, "tests: %s:%d:0: %s(): " format, __FILE__,         \
+                    __LINE__, __func__, ##__VA_ARGS__);                        \
     } while (false)
 
 /* TODO: make this typesafer */

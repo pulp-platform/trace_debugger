@@ -702,9 +702,14 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
      * the pc for now. Legacy compression.
      */
     struct tr_instr *instr;
+    int processedcnt = 0;
     int i = 0;
     list_for_each_entry_reverse(instr, &instr0_head, list)
     {
+        /* skip all invalid instructions for the comparison */
+        while (!(*samples)[i].valid) {
+            i++;
+        }
         /* the reconstruction doesn't show the trapped instruction, so we skip
          */
         if ((*samples)[i].exception) {
@@ -718,7 +723,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
             goto fail;
         }
         i++;
+        processedcnt++;
     }
+    LOG_INFOT("Compared %d instructions\n", processedcnt);
 
     if (list_empty(&instr0_head)) {
         LOG_ERRT("Empty instruction list.\n");
@@ -728,9 +735,14 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     /* We compare whether the reconstruction matches the original sequence, only
      * the pc for now. Stepwise compression.
      */
+    processedcnt = 0;
     i = 0;
     list_for_each_entry_reverse(instr, &instr1_head, list)
     {
+        /* skip all invalid instructions for the comparison */
+        while (!(*samples)[i].valid) {
+            i++;
+        }
         /* the reconstruction doesn't show the trapped instruction, so we skip
          */
         if ((*samples)[i].exception) {
@@ -744,7 +756,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
             goto fail;
         }
         i++;
+        processedcnt++;
     }
+    LOG_INFOT("Compared %d instructions\n", processedcnt);
 
     if (list_empty(&instr1_head)) {
         LOG_ERRT("Empty instruction list.\n");
@@ -781,6 +795,11 @@ int main(int argc, char *argv[argc + 1])
     RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
     RUN_TEST(test_compress_trace, "data/trdb_stimuli", "data/trdb_packets");
     RUN_TEST(test_decompress_trace, "data/interrupt", "data/trdb_stimuli");
+    RUN_TEST(test_decompress_trace, "data/trdb_stimuli_valid_only_bin",
+             "data/trdb_stimuli_valid_only");
+    RUN_TEST(test_decompress_trace, "data/trdb_stimuli_all_bin",
+             "data/trdb_stimuli_all");
+
 
     return TESTS_SUCCESSFULL() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
