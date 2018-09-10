@@ -53,7 +53,7 @@
  * metadata.
  */
 struct tr_instr {
-    /* bool valid; */          /* implicitely true */
+    bool valid;                /**< whether this sample/struct is valid */
     bool exception;            /**< instruction trapped */
     bool interrupt;            /**< exception caused by interrupt */
     uint32_t cause : CAUSELEN; /**< exception cause */

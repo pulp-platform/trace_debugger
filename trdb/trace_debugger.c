@@ -394,6 +394,11 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     bool firstc_qualified = !lastc->qualified && thisc->qualified;
 
     /* Start of one cycle */
+    if (!instr->valid) {
+        /* Invalid interface data, just freeze state*/
+        return 0;
+    }
+
     if (!thisc->qualified) {
         /* check if we even need to record anything */
         *lastc = *thisc;
@@ -1575,9 +1580,11 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
                       &valid, &exception, &interrupt, &cause, &tval, &priv,
                       &compressed, &iaddr, &instr))
         != EOF) {
-        if (!valid) {
-            continue;
-        }
+        // TODO: make this configurable so that we don't have to store so much
+        // data
+        /* if (!valid) { */
+        /*     continue; */
+        /* } */
         if (scnt >= size) {
             size = 2 * size;
             struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
@@ -1589,6 +1596,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
             *samples = tmp;
         }
         (*samples)[scnt] = (struct tr_instr){0};
+        (*samples)[scnt].valid = valid;
         (*samples)[scnt].exception = exception;
         (*samples)[scnt].interrupt = interrupt;
         (*samples)[scnt].cause = cause;
@@ -2108,6 +2116,9 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
         bool firstc_qualified = !lastc.qualified && thisc.qualified;
 
         /* Start of one cycle */
+        if (!nextc.instr.valid) {
+            continue;
+        }
         if (!thisc.qualified) {
             /* check if we even need to record anything */
             lastc = thisc;
