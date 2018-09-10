@@ -32,10 +32,13 @@ interface trace_debugger_if
     logic [XLEN-1:0]     packet_word;
     logic                packet_word_valid;
 
+    APB_BUS              apb_trdb_bus();
+
 
     modport duv
         (input clk_i, rst_ni, ivalid, iexception, interrupt, cause, tval, priv,
-         iaddr, instr, compressed, output packet_word, packet_word_valid);
+         iaddr, instr, compressed, apb_trdb_bus, output packet_word,
+         packet_word_valid);
 
     modport tb
         (input clk_i, rst_ni, output ivalid, iexception, interrupt, cause,

@@ -86,14 +86,10 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
 
     *packet_valid = 0;
     /* info(ctx, "Received addr 0x%x\n", iaddr->aval); */
-    /* TODO: I think we should still calls trdb_compress_trace_step before
-     * returning
-     */
-    if (!ivalid)
-        return;
 
     /* Note: aval and bval are uint32_t per standard */
-    struct tr_instr tr_instr = {.exception = iexception,
+    struct tr_instr tr_instr = {.valid = ivalid,
+				.exception = iexception,
                                 .interrupt = interrupt,
                                 .cause = cause->aval,
                                 .tval = tval->aval,

@@ -35,7 +35,8 @@ VSIM_SCRIPT             = tb/scripts/vsim.tcl
 
 RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
 RTLSRC_TB_TOP		:= $(wildcard tb/*_top.sv)
-RTLSRC_TB		:= $(wildcard tb/*.sv)
+RTLSRC_TB		:= $(wildcard tb/*.sv) \
+				$(wildcard tb/dummy/*.sv)
 RTLSRC_PKG		:= $(wildcard include/trdb_pkg.sv)
 RTLSRC			:= $(wildcard rtl/*.sv) \
 				$(wildcard rtl/tech_cells_generic/*.sv) \
