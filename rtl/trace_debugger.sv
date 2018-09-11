@@ -48,7 +48,6 @@ module trace_debugger
     // we have three phases, called next cycle (nc), this cycle (tc) and next
     // cycle (nc), based on which we make decision whether we need to emit a
     // packet or not.
-    logic                       nc_trace_valid, tc_trace_valid, lc_trace_valid;
     logic [PRIVLEN-1:0]         nc_priv, tc_priv;
     logic                       nc_privchange, tc_privchange;
     logic                       nc_exception, lc_exception;
@@ -65,8 +64,6 @@ module trace_debugger
     logic                       lc_interupt;
 
     // registers to hold onto the input data for a few phases, mostly one
-    logic                       trace_valid0_q, trace_valid0_d,
-                                trace_valid1_q, trace_valid1_d;
     logic                       interrupt0_q, interrupt0_d;
     logic                       interrupt1_q, interrupt1_d;
     logic [CAUSELEN-1:0]        cause0_q, cause0_d;
@@ -106,17 +103,13 @@ module trace_debugger
     logic [XLEN-1:0]            packet_word;
     logic                       packet_word_valid;
 
-    // whether the interface got valid data
-    assign trace_valid0_d = ivalid_i;
-    assign trace_valid1_d = trace_valid0_q;
-
     // buffer variables
     assign interrupt0_d = interrupt_i;
     assign interrupt1_d = interrupt0_q;
     assign cause0_d = cause_i;
     assign cause1_d = cause0_q;
     assign priv0_d = priv_i;
-    assign exception0_d = iexception_i;
+    assign exception0_d = iexception_i && ivalid_i;
     assign exception1_d = exception0_q;
     assign exception2_d = exception1_q;
     assign compressed0_d = compressed_i;
@@ -129,13 +122,10 @@ module trace_debugger
     assign u_discontinuity1_d = u_discontinuity0_q;
     assign is_branch1_d = is_branch0_q;
     // TODO: add feature to have selective tracing, add enable with regmap
-    assign qualified0_d = '1 && nc_trace_valid;
+    assign qualified0_d = '1 && ivalid_i;
     assign qualified1_d = qualified0_q;
 
     // Hook phase related variables up to proper register
-    assign nc_trace_valid = trace_valid0_d;
-    assign tc_trace_valid = trace_valid0_q;
-    assign lc_trace_valid = trace_valid1_q;
     assign nc_priv = priv0_d;
     assign tc_priv = priv0_q;
     assign lc_interrupt = interrupt1_q;
@@ -160,7 +150,7 @@ module trace_debugger
 
     // decide whether a privilege change occured
     always_comb begin
-        privchange0_d = (tc_priv != nc_priv);
+        privchange0_d = (tc_priv != nc_priv) && ivalid_i;
     end
 
     // decide whether we have a branch instruction
@@ -204,7 +194,7 @@ module trace_debugger
     trdb_branch_map i_trdb_branch_map
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-         .valid_i(tc_is_branch && tc_trace_valid),
+         .valid_i(tc_is_branch && ivalid_i),
          .branch_taken_i(tc_branch_taken),
          .flush_i(branch_map_flush),
          .map_o(branch_map),
@@ -215,7 +205,9 @@ module trace_debugger
     trdb_priority i_trdb_priority
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-         .valid_i(tc_trace_valid),
+         .valid_i(ivalid_i), // there might be some data stuck in the pipeline
+                             // if valid never goes high again (e.g. after wfi),
+                             // but this shouldnt matter
          .lc_exception_i(lc_exception),
          .lc_exception_sync_i(lc_exception_sync),
 
@@ -283,8 +275,6 @@ module trace_debugger
     // TODO: assert that we are not dealing with an unsupported instruction
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
-            trace_valid0_q     <= '0;
-            trace_valid1_q     <= '0;
             interrupt0_q       <= '0;
             interrupt1_q       <= '0;
             cause0_q           <= '0;
@@ -300,24 +290,24 @@ module trace_debugger
             qualified0_q       <= '0;
             qualified1_q       <= '0;
         end else begin
-            trace_valid0_q     <= trace_valid0_d;
-            trace_valid1_q     <= trace_valid1_d;
-            interrupt0_q       <= interrupt0_d;
-            interrupt1_q       <= interrupt1_d;
-            cause0_q           <= cause0_d;
-            cause1_q           <= cause1_d;
-            priv0_q            <= priv0_d;
-            privchange0_q      <= privchange0_d;
-            exception0_q       <= exception0_d;
-            exception1_q       <= exception1_d;
-            exception2_q       <= exception2_d;
-            u_discontinuity0_q <= u_discontinuity0_d;
-            u_discontinuity1_q <= u_discontinuity1_d;
-            is_branch0_q       <= is_branch0_d;
-            compressed0_q      <= compressed0_d;
-            iaddr0_q           <= iaddr0_d;
-            qualified0_q       <= qualified0_d;
-            qualified1_q       <= qualified1_d;
+            if(ivalid_i) begin
+                interrupt0_q       <= interrupt0_d;
+                interrupt1_q       <= interrupt1_d;
+                cause0_q           <= cause0_d;
+                cause1_q           <= cause1_d;
+                priv0_q            <= priv0_d;
+                privchange0_q      <= privchange0_d;
+                exception0_q       <= exception0_d;
+                exception1_q       <= exception1_d;
+                exception2_q       <= exception2_d;
+                u_discontinuity0_q <= u_discontinuity0_d;
+                u_discontinuity1_q <= u_discontinuity1_d;
+                is_branch0_q       <= is_branch0_d;
+                compressed0_q      <= compressed0_d;
+                iaddr0_q           <= iaddr0_d;
+                qualified0_q       <= qualified0_d;
+                qualified1_q       <= qualified1_d;
+            end
         end
     end
 endmodule // trace_debugger
