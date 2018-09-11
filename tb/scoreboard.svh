@@ -27,7 +27,8 @@ class Scoreboard;
             $display("------------------------------------------------------");
             $display("------------------------------------------------------");
             $display("Simulation Results");
-            $display("Bad packets %0d/%0d", packet_bad, total_packets);
+            $display("Good packets %0d/%0d", total_packets - packet_bad,
+                     total_packets);
             $display("------------------------------------------------------");
             $display("------------------------------------------------------");
         endfunction;
