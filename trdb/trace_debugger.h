@@ -274,6 +274,15 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                             struct disassembler_unit *dunit);
 
 /**
+ * Output disassemble @p instr using fprintf_func in #disassembler_unit.dinfo.
+ *
+ * @param instr instruction, only #iaddr and #instr are needed
+ * @param dunit the configured disassembler
+ */
+void trdb_disassemble_instr(struct tr_instr *instr,
+                            struct disassembler_unit *dunit);
+
+/**
  * Prints a list of tr_packet in a formatted manner to @p stream.
  *
  * @param stream output to write to

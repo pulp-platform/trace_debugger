@@ -139,6 +139,7 @@ struct trdb_ctx {
     struct filter_state filter;
     /* state used for disassembling */
     struct tr_instr *dis_instr;
+    struct disassembler_unit *dunit;
     /* desired logging level and custom logging hook*/
     int log_priority;
     void (*log_fn)(struct trdb_ctx *ctx, int priority, const char *file,
@@ -329,8 +330,7 @@ static bool use_differential_addr(uint32_t absolute, uint32_t differential)
     return false;
 }
 
-/* TODO: valid signal */
-/* Trapped instruction (!valid) but still advances?*/
+
 int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct list_head *packet_list,
                              struct tr_instr *instr)
@@ -656,6 +656,24 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     /* update last cycle state */
     *lastc = *thisc;
     *thisc = *nextc;
+
+
+    /* TODO: unfortunately this ignores log_fn */
+    if (trdb_get_log_priority(ctx) == LOG_DEBUG) {
+        if (generated_packet) {
+            trdb_print_packet(
+                stderr,
+                list_entry(packet_list->next, typeof(struct tr_packet), list));
+        }
+
+        if (ctx->dunit) {
+            trdb_disassemble_instr(instr, ctx->dunit);
+        } else {
+            dbg(ctx, "0x%016jx  0x%08jx\n", (uintmax_t)instr->iaddr,
+                (uintmax_t)instr->instr);
+        }
+    }
+    /* also print packet */
     return generated_packet;
 fail:
 fail_malloc:
@@ -803,13 +821,17 @@ static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
 }
 
 
-static int add_to_trace(struct list_head *instr_list, struct tr_instr *instr)
+static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
+                     struct tr_instr *instr)
 {
     struct tr_instr *add = malloc(sizeof(*add));
     if (!add) {
-        perror("malloc");
+        err(c, "malloc: %s\n", strerror(errno));
         return -1;
     }
+
+    dbg(c, instr->str);
+
     memcpy(add, instr, sizeof(*add));
     list_add(&add->list, instr_list);
     return 0;
@@ -930,9 +952,11 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             goto fail;
         }
 
-        /* TODO: change this behaviour */
-        if (TRDB_TRACE)
-            trdb_print_packet(stdout, packet);
+        if (trdb_get_log_priority(c) == LOG_DEBUG) {
+            /* TODO: leverage log_fn */
+            trdb_print_packet(stderr, packet);
+        }
+
         if (last_packet && last_packet->format == F_SYNC
             && last_packet->subformat == SF_EXCEPTION) {
             /* exceptions come with three packets: flush, F_SYNC, and
@@ -980,7 +1004,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 goto fail;
             }
 
-            add_to_trace(instr_list, &dis_instr);
+            add_trace(c, instr_list, &dis_instr);
 
             pc += size; /* normal case */
 
@@ -1074,7 +1098,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     && pc == packet->address)
                     hit_address = true;
 
-                add_to_trace(instr_list, &dis_instr);
+                add_trace(c, instr_list, &dis_instr);
 
                 /* advance pc */
                 pc += size;
@@ -1208,7 +1232,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 goto fail;
             }
 
-            add_to_trace(instr_list, &dis_instr);
+            add_trace(c, instr_list, &dis_instr);
 
             pc += size;
 
@@ -1303,7 +1327,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     goto fail;
                 }
 
-                add_to_trace(instr_list, &dis_instr);
+                add_trace(c, instr_list, &dis_instr);
 
                 /* advance pc */
                 pc += size;
@@ -1627,6 +1651,7 @@ fail:
     return 0;
 }
 
+
 void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                             struct disassembler_unit *dunit)
 {
@@ -1641,6 +1666,20 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
         disassemble_single_instruction(trace[i].instr, trace[i].iaddr, dunit);
     }
 }
+
+
+void trdb_disassemble_instr(struct tr_instr *instr,
+                            struct disassembler_unit *dunit)
+{
+    struct disassemble_info *dinfo = dunit->dinfo;
+    (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
+                           (uintmax_t)instr->iaddr);
+    (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ", (uintmax_t)instr->instr);
+    (*dinfo->fprintf_func)(dinfo->stream, "%s",
+                           instr->exception ? "TRAP!  " : "");
+    disassemble_single_instruction(instr->instr, instr->iaddr, dunit);
+}
+
 
 void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list)
 {
