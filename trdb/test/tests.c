@@ -628,7 +628,7 @@ fail:
 }
 
 
-int test_decompress_trace(const char *bin_path, const char *trace_path)
+int test_decompress_trace_legacy(const char *bin_path, const char *trace_path)
 {
     trdb_init();
     struct trdb_ctx *ctx = NULL;
@@ -653,9 +653,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     status = TRDB_SUCCESS;
 
     LIST_HEAD(packet0_head);
-    LIST_HEAD(packet1_head);
     LIST_HEAD(instr0_head);
-    LIST_HEAD(instr1_head);
     struct list_head *ret =
         trdb_compress_trace(&packet0_head, samplecnt, *samples);
     // trdb_compress_trace_legacy(&packet0_head, samplecnt, *samples);
@@ -664,6 +662,98 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         status = TRDB_FAIL;
         goto fail;
     }
+
+    ctx = trdb_new();
+    if (!ctx) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+
+    if (TRDB_VERBOSE_DEBUG)
+        trdb_dump_packet_list(stdout, &packet0_head);
+
+    trdb_decompress_trace(ctx, abfd, &packet0_head, &instr0_head);
+
+    if (TRDB_VERBOSE_DEBUG) {
+        LOG_INFOT("Reconstructed trace disassembly:\n");
+        struct tr_instr *instr;
+        list_for_each_entry_reverse(instr, &instr0_head, list)
+        {
+            LOG_INFOT("%s", instr->str);
+        }
+    }
+
+    /* We compare whether the reconstruction matches the original sequence, only
+     * the pc for now. Legacy compression.
+     */
+    struct tr_instr *instr;
+    int processedcnt = 0;
+    int i = 0;
+    list_for_each_entry_reverse(instr, &instr0_head, list)
+    {
+        /* skip all invalid instructions for the comparison */
+        while (!(*samples)[i].valid || (*samples)[i].exception) {
+            i++;
+        }
+
+        if (instr->iaddr != (*samples)[i].iaddr) {
+            LOG_ERRT("%s", instr->str);
+            LOG_ERRT("original instr: %" PRIx32 " @%" PRIx32 "\n",
+                     (*samples)[i].instr, (*samples)[i].iaddr);
+            LOG_ERRT("reconst. instr: %" PRIx32 " @%" PRIx32 "\n", instr->instr,
+                     instr->iaddr);
+            status = TRDB_FAIL;
+            goto fail;
+        }
+        i++;
+        processedcnt++;
+    }
+    LOG_INFOT("Compared %d instructions\n", processedcnt);
+
+    if (list_empty(&instr0_head)) {
+        LOG_ERRT("Empty instruction list.\n");
+        return 0;
+    }
+
+fail:
+    trdb_free(ctx);
+    free(*samples);
+    trdb_free_packet_list(&packet0_head);
+    trdb_free_instr_list(&instr0_head);
+    bfd_close(abfd);
+
+    return status;
+}
+
+
+int test_decompress_trace(const char *bin_path, const char *trace_path)
+{
+    trdb_init();
+    struct trdb_ctx *ctx = NULL;
+
+    bfd_init();
+    bfd *abfd = bfd_openr(bin_path, NULL);
+
+    if (!(abfd && bfd_check_format(abfd, bfd_object))) {
+        bfd_perror("test_decompress_trace");
+        return TRDB_FAIL;
+    }
+
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
+    int status = 0;
+    size_t samplecnt = trdb_stimuli_to_trace(ctx, trace_path, samples, &status);
+    if (status != 0) {
+        LOG_ERRT("Stimuli to tr_instr failed\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+    status = TRDB_SUCCESS;
+
+    LIST_HEAD(packet1_head);
+    LIST_HEAD(instr1_head);
 
     ctx = trdb_new();
     if (!ctx) {
@@ -683,10 +773,8 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
 
     if (TRDB_VERBOSE_DEBUG)
-        trdb_dump_packet_list(stdout, &packet0_head);
+        trdb_dump_packet_list(stdout, &packet1_head);
 
-    trdb_decompress_trace(ctx, abfd, &packet0_head, &instr0_head);
-    trdb_reset_decompression(ctx);
     trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
 
     if (TRDB_VERBOSE_DEBUG) {
@@ -704,50 +792,13 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     struct tr_instr *instr;
     int processedcnt = 0;
     int i = 0;
-    list_for_each_entry_reverse(instr, &instr0_head, list)
-    {
-        /* skip all invalid instructions for the comparison */
-        while (!(*samples)[i].valid) {
-            i++;
-        }
-        /* the reconstruction doesn't show the trapped instruction, so we skip
-         */
-        if ((*samples)[i].exception) {
-            i++;
-        }
-        if (instr->iaddr != (*samples)[i].iaddr) {
-            LOG_ERRT("%s", instr->str);
-            LOG_ERRT("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
-            LOG_ERRT("reconst. instr: %" PRIx32 "\n", instr->iaddr);
-            status = TRDB_FAIL;
-            goto fail;
-        }
-        i++;
-        processedcnt++;
-    }
-    LOG_INFOT("Compared %d instructions\n", processedcnt);
-
-    if (list_empty(&instr0_head)) {
-        LOG_ERRT("Empty instruction list.\n");
-        return 0;
-    }
-
-    /* We compare whether the reconstruction matches the original sequence, only
-     * the pc for now. Stepwise compression.
-     */
-    processedcnt = 0;
-    i = 0;
     list_for_each_entry_reverse(instr, &instr1_head, list)
     {
         /* skip all invalid instructions for the comparison */
-        while (!(*samples)[i].valid) {
+        while (!(*samples)[i].valid || (*samples)[i].exception) {
             i++;
         }
-        /* the reconstruction doesn't show the trapped instruction, so we skip
-         */
-        if ((*samples)[i].exception) {
-            i++;
-        }
+
         if (instr->iaddr != (*samples)[i].iaddr) {
             LOG_ERRT("%s", instr->str);
             LOG_ERRT("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
@@ -768,9 +819,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
 fail:
     trdb_free(ctx);
     free(*samples);
-    trdb_free_packet_list(&packet0_head);
     trdb_free_packet_list(&packet1_head);
-    trdb_free_instr_list(&instr0_head);
     trdb_free_instr_list(&instr1_head);
     bfd_close(abfd);
 
@@ -799,7 +848,12 @@ int main(int argc, char *argv[argc + 1])
              "data/trdb_stimuli_valid_only");
     RUN_TEST(test_decompress_trace, "data/trdb_stimuli_all_bin",
              "data/trdb_stimuli_all");
-
+    RUN_TEST(test_decompress_trace,
+             "data/hello/build/pulpissimo-riscy/test/test",
+             "data/hello/build/pulpissimo-riscy/trdb_stimuli");
+    RUN_TEST(test_decompress_trace,
+             "data/enqueue_delayed/build/pulpissimo-riscy/test/test",
+             "data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli");
 
     return TESTS_SUCCESSFULL() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
