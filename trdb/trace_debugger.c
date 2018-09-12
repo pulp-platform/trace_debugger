@@ -875,7 +875,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
-    struct trdb_dec_state decompression_context = {0};
+    struct trdb_dec_state decomp_ctx = {.privilege = 7};
     struct tr_instr dis_instr = {0};
 
     dunit.dinfo = &dinfo;
@@ -1004,6 +1004,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (status != 0)
                 goto fail;
 
+            dis_instr.priv = decomp_ctx.privilege;
             add_trace(c, instr_list, &dis_instr);
 
             pc += size; /* normal case */
@@ -1092,6 +1093,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     && pc == packet->address)
                     hit_address = true;
 
+                dis_instr.priv = decomp_ctx.privilege;
                 add_trace(c, instr_list, &dis_instr);
 
                 /* advance pc */
@@ -1190,7 +1192,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * (empty branch map) and context change. For now we dont allow both
              * situations
              */
-            decompression_context.privilege = packet->privilege;
+            decomp_ctx.privilege = packet->privilege;
             pc = packet->address;
 
             /* since we are abruptly changing the pc we have to check if we
@@ -1220,6 +1222,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (status != 0)
                 goto fail;
 
+            dis_instr.priv = decomp_ctx.privilege;
             add_trace(c, instr_list, &dis_instr);
 
             pc += size;
@@ -1309,6 +1312,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 if (!search_discontinuity && pc == packet->address)
                     hit_address = true;
 
+                dis_instr.priv = decomp_ctx.privilege;
                 add_trace(c, instr_list, &dis_instr);
 
                 /* advance pc */
