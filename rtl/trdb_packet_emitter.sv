@@ -98,7 +98,7 @@ module trdb_packet_emitter
         branch_map_flush_d = '0;
 
         // TODO: actually this might not be necessary
-        branch_map_edge_case = branch_map_full_i && lc_u_discontinuity_i;
+        branch_map_edge_case = lc_u_discontinuity_i;
 
         if(valid_i) begin
 
@@ -130,6 +130,10 @@ module trdb_packet_emitter
                 end else if(branch_packet_off == 25) begin
                     packet_bits[7+:25+XLEN] = {iaddr_i, branch_map_i[24:0]};
                     packet_len = 2 + 7 + 25 + XLEN;
+
+                end else if (branch_packet_off == 31 && !branch_map_full_i) begin
+                    packet_bits[7+:31+XLEN] = {iaddr_i, branch_map_i[30:0]};
+                    packet_len = 2 + 7 + 31 + XLEN;
 
                 end else begin
                     packet_bits[7+:31+XLEN] = {branch_map_edge_case ? iaddr_i :
