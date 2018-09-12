@@ -40,6 +40,8 @@ module trace_debugger
     // APB_BUS.Slave              apb_slave);
 
     logic                       trace_enable = '1;
+    logic                       packet_after_exception = '1;
+
     logic                       debug_mode;
     logic                       trace_valid;
 
@@ -222,7 +224,7 @@ module trace_debugger
                                 // pipeline if valid never goes high again (e.g.
                                 // after wfi), but this shouldnt matter
          .lc_exception_i(lc_exception),
-         .lc_exception_sync_i(lc_exception_sync),
+         .lc_exception_sync_i(lc_exception_sync && packet_after_exception),
 
          .tc_first_qualified_i(tc_first_qualified),
          //input logic  tc_unhalted,
