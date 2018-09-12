@@ -190,9 +190,9 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
     ctx->config = (struct trdb_config){
         .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
 
-    ctx->lastc = (struct trdb_state){0};
-    ctx->thisc = (struct trdb_state){0};
-    ctx->nextc = (struct trdb_state){0};
+    ctx->lastc = (struct trdb_state){.privilege = 7};
+    ctx->thisc = (struct trdb_state){.privilege = 7};
+    ctx->nextc = (struct trdb_state){.privilege = 7};
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
 }
@@ -218,9 +218,9 @@ struct trdb_ctx *trdb_new()
     ctx->config = (struct trdb_config){
         .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
 
-    ctx->lastc = (struct trdb_state){0};
-    ctx->thisc = (struct trdb_state){0};
-    ctx->nextc = (struct trdb_state){0};
+    ctx->lastc = (struct trdb_state){.privilege = 7};
+    ctx->thisc = (struct trdb_state){.privilege = 7};
+    ctx->nextc = (struct trdb_state){.privilege = 7};
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
 
