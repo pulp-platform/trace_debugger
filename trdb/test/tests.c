@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include "../list.h"
 #include "../trace_debugger.h"
 #include "../trace_debugger.c"
@@ -829,6 +830,21 @@ fail:
 
 int main(int argc, char *argv[argc + 1])
 {
+    const char *tv[] = {
+        "data/interrupt",
+        "data/trdb_stimuli",
+        "data/trdb_stimuli_valid_only_bin",
+        "data/trdb_stimuli_valid_only",
+        "data/trdb_stimuli_all_bin",
+        "data/trdb_stimuli_all",
+        "data/hello/build/pulpissimo-riscy/test/test",
+        "data/hello/build/pulpissimo-riscy/trdb_stimuli",
+        "data/enqueue_delayed/build/pulpissimo-riscy/test/test",
+        "data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli",
+        "data/timer_oneshot/build/pulpissimo-riscy/test/test",
+        "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli"};
+
+
     INIT_TESTS();
     /* for (size_t i = 0; i < 8; i++) */
     /*     RUN_TEST(test_trdb_serialize_packet, i); */
@@ -843,17 +859,19 @@ int main(int argc, char *argv[argc + 1])
      */
     RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
     RUN_TEST(test_compress_trace, "data/trdb_stimuli", "data/trdb_packets");
-    RUN_TEST(test_decompress_trace, "data/interrupt", "data/trdb_stimuli");
-    RUN_TEST(test_decompress_trace, "data/trdb_stimuli_valid_only_bin",
-             "data/trdb_stimuli_valid_only");
-    RUN_TEST(test_decompress_trace, "data/trdb_stimuli_all_bin",
-             "data/trdb_stimuli_all");
-    RUN_TEST(test_decompress_trace,
-             "data/hello/build/pulpissimo-riscy/test/test",
-             "data/hello/build/pulpissimo-riscy/trdb_stimuli");
-    RUN_TEST(test_decompress_trace,
-             "data/enqueue_delayed/build/pulpissimo-riscy/test/test",
-             "data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli");
+
+    if (TRDB_ARRAY_SIZE(tv) % 2 != 0)
+        LOG_ERRT("Test vector strings are incomplete.");
+
+    for (unsigned j = 0; j < TRDB_ARRAY_SIZE(tv); j += 2) {
+        const char *bin = tv[j];
+        const char *stim = tv[j + 1];
+        if (access(bin, R_OK) || access(stim, R_OK)) {
+            LOG_ERRT("File not found, skipping test at %s\n", bin);
+            continue;
+        }
+        RUN_TEST(test_decompress_trace, bin, stim);
+    }
 
     return TESTS_SUCCESSFULL() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
