@@ -21,13 +21,16 @@
 
 CC		= gcc
 CPPFLAGS	=
-CFLAGS		+= -std=gnu11 -Wall -O2 -fno-strict-aliasing \
+CFLAGS		+= -std=gnu11 -Wall -O2 -march=native -fno-strict-aliasing \
 			-Wno-unused-function -DENABLE_LOGGING -DNDEBUG
 CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
 			-Wno-unused-function -fsanitize=address \
 			-DENABLE_LOGGING -DENABLE_DEBUG
 
-QUESTASIM_PATH = /usr/pack/modelsim-10.5c-kgf/questasim
+PREFIX		= $(DESTDIR)/usr/local
+BINDIR		= $(PREFIX)/bin
+
+QUESTASIM_PATH	= /usr/pack/modelsim-10.5c-kgf/questasim
 PULP_BINUTILS_PATH = /scratch/balasr/pulp-riscv-binutils-gdb
 
 LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
@@ -77,6 +80,17 @@ debug: all
 
 lib: CFLAGS += -fPIC
 lib: $(GMLIB).so
+
+.PHONY: install
+install: all
+	install -D $(BIN) $(BINDIR)/$(BIN)
+
+.PHONY: install-strip
+install-strip: all
+	install -D -s $(BIN) $(BINDIR)/$(BIN)
+
+uninstall:
+	-rm $(BINDIR)/$(BIN)
 
 
 $(BIN): $(OBJS) $(MAIN_OBJS)
