@@ -39,6 +39,10 @@ module trace_debugger
     // TODO: add dependencies for this
     // APB_BUS.Slave              apb_slave);
 
+    logic                       trace_enable = '1;
+    logic                       debug_mode;
+    logic                       trace_valid;
+
     // unused variables for a more extensive implementation
     // riscy doesn't have those features
     logic [XLEN-1:0]            lc_tval;
@@ -102,6 +106,15 @@ module trace_debugger
     logic                       packet_is_read;
     logic [XLEN-1:0]            packet_word;
     logic                       packet_word_valid;
+
+    // if we do tracing at all
+    assign trace_valid = ivalid_i && debug_mode && trace_enable;
+    assign debug_mode = priv_i[PRIVLEN-1];
+
+    trace_valid_and_debug: assert property
+    (@(posedge clk_i) disable iff (~rst_ni) (trace_enable |-> debug_mode))
+        else $info("[TRDB]    @%t: Tracing works only in debug mode",
+                   $time);
 
     // buffer variables
     assign interrupt0_d = interrupt_i;
@@ -205,9 +218,9 @@ module trace_debugger
     trdb_priority i_trdb_priority
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-         .valid_i(ivalid_i), // there might be some data stuck in the pipeline
-                             // if valid never goes high again (e.g. after wfi),
-                             // but this shouldnt matter
+         .valid_i(trace_valid), // there might be some data stuck in the
+                                // pipeline if valid never goes high again (e.g.
+                                // after wfi), but this shouldnt matter
          .lc_exception_i(lc_exception),
          .lc_exception_sync_i(lc_exception_sync),
 
@@ -279,7 +292,7 @@ module trace_debugger
             interrupt1_q       <= '0;
             cause0_q           <= '0;
             cause1_q           <= '0;
-            priv0_q            <= '0;
+            priv0_q            <=  3'h7; //we always start in M-mode
             exception0_q       <= '0;
             exception1_q       <= '0;
             u_discontinuity0_q <= '0;
