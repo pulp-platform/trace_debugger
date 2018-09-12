@@ -105,6 +105,9 @@ module trdb_packet_emitter
             // packet format
             packet_bits[1:0] = packet_format_i;
 
+            // always flush branchmap
+            branch_map_flush_d = '1;
+
             case(packet_format_i)
 
             F_BRANCH_FULL: begin

@@ -673,6 +673,10 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
                 (uintmax_t)instr->instr);
         }
     }
+
+    if (generated_packet) {
+        *branch_map = (struct branch_map_state){0};
+    }
     /* also print packet */
     return generated_packet;
 fail:
