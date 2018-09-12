@@ -681,6 +681,32 @@ fail_malloc:
 }
 
 
+static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
+                             struct disassemble_info *dinfo)
+{
+    /* return (*dinfo->read_memory_func)(pc, myaddr, len, dinfo); */
+    bfd_byte packet[2];
+    *instr = 0;
+    bfd_vma n;
+    int status;
+
+    /* Instructions are a sequence of 2-byte packets in little-endian order.  */
+    for (n = 0; n < sizeof(uint64_t) && n < riscv_instr_len(*instr); n += 2) {
+        status = (*dinfo->read_memory_func)(pc + n, packet, 2, dinfo);
+        if (status != 0) {
+            /* Don't fail just because we fell off the end.  */
+            if (n > 0)
+                break;
+            (*dinfo->memory_error_func)(status, pc, dinfo);
+            return status;
+        }
+
+        (*instr) |= ((uint64_t)bfd_getl16(packet)) << (8 * n);
+    }
+    return status;
+}
+
+
 static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
                              struct tr_instr *instr,
                              struct disassembler_unit *dunit, int *status)
@@ -712,11 +738,17 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
         *status = -1;
         return 0;
     }
+    uint64_t instr_bits = 0;
+    if (read_memory_at_pc(pc, &instr_bits, 0, dinfo)) {
+        err(c, "Reading instr at pc failed\n");
+        *status = -1;
+        return 0;
+    }
 
+    instr->valid = true;
     instr->iaddr = pc;
-    /* TODO: add more data */
-    /* instr->instr = */
-    /* instr->compressed */
+    instr->instr = instr_bits;
+    instr->compressed = instr_size == 2;
     /* instr->priv = 0 */
     return instr_size;
 }
@@ -792,32 +824,6 @@ static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
     dinfo->buffer_length = section_size;
     dinfo->section = section;
     return 0;
-}
-
-
-static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
-                             struct disassemble_info *dinfo)
-{
-    /* return (*dinfo->read_memory_func)(pc, myaddr, len, dinfo); */
-    bfd_byte packet[2];
-    *instr = 0;
-    bfd_vma n;
-    int status;
-
-    /* Instructions are a sequence of 2-byte packets in little-endian order.  */
-    for (n = 0; n < sizeof(uint64_t) && n < riscv_instr_len(*instr); n += 2) {
-        status = (*dinfo->read_memory_func)(pc + n, packet, 2, dinfo);
-        if (status != 0) {
-            /* Don't fail just because we fell off the end.  */
-            if (n > 0)
-                break;
-            (*dinfo->memory_error_func)(status, pc, dinfo);
-            return status;
-        }
-
-        (*instr) |= ((uint64_t)bfd_getl16(packet)) << (8 * n);
-    }
-    return status;
 }
 
 
@@ -998,12 +1004,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (status != 0)
                 goto fail;
 
-            uint64_t instr_at_pc = 0;
-            if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                err(c, "Reading instr at pc failed\n");
-                goto fail;
-            }
-
             add_trace(c, instr_list, &dis_instr);
 
             pc += size; /* normal case */
@@ -1012,7 +1012,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             case dis_nonbranch:
                 /* TODO: we need this hack since {m,s,u} ret are not classified
                  */
-                if (!is_unpred_discontinuity(instr_at_pc)) {
+                if (!is_unpred_discontinuity(dis_instr.instr)) {
                     break;
                 }
                 info(c, "Detected mret, uret or sret\n");
@@ -1088,12 +1088,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 if (status != 0)
                     goto fail;
 
-                uint64_t instr_at_pc = 0;
-                if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                    err(c, "Reading instr at pc failed\n");
-                    goto fail;
-                }
-
                 if (!search_discontinuity && branch_map.cnt == 0
                     && pc == packet->address)
                     hit_address = true;
@@ -1109,7 +1103,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(instr_at_pc)) {
+                    if (!is_unpred_discontinuity(dis_instr.instr)) {
                         break;
                     }
                     info(c, "Detected mret, uret or sret\n");
@@ -1226,12 +1220,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (status != 0)
                 goto fail;
 
-            uint64_t instr_at_pc = 0;
-            if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                err(c, "Reading instr at pc failed\n");
-                goto fail;
-            }
-
             add_trace(c, instr_list, &dis_instr);
 
             pc += size;
@@ -1241,7 +1229,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 /* TODO: we need this hack since {m,s,u} ret are not
                  * classified
                  */
-                if (!is_unpred_discontinuity(instr_at_pc)) {
+                if (!is_unpred_discontinuity(dis_instr.instr)) {
                     break;
                 }
                 info(c, "Detected mret, uret or sret\n");
@@ -1321,12 +1309,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 if (!search_discontinuity && pc == packet->address)
                     hit_address = true;
 
-                uint64_t instr_at_pc = 0;
-                if (read_memory_at_pc(pc, &instr_at_pc, size, &dinfo)) {
-                    err(c, "Reading instr at pc failed\n");
-                    goto fail;
-                }
-
                 add_trace(c, instr_list, &dis_instr);
 
                 /* advance pc */
@@ -1337,7 +1319,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(instr_at_pc)) {
+                    if (!is_unpred_discontinuity(dis_instr.instr)) {
                         break;
                     }
                     info(c, "Detected mret, uret or sret\n");
