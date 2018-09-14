@@ -16,6 +16,7 @@ import trdb_pkg::*;
 // TODO: doesn't do alignment yet, just zero fill empty words
 // TODO: inserting double WORD header not done yet
 module trdb_stream_align
+    #(parameter ID = 1)
     (input logic                         clk_i,
      input logic                         rst_ni,
 
@@ -28,7 +29,7 @@ module trdb_stream_align
      output logic                        valid_o);
 
 
-    enum logic [1:0] {IDLE, READING, DELIVER} cs, ns;
+    enum logic [1:0] {WORD0, WORD1} cs, ns;
 
     logic [32+PACKET_TOTAL-1:0]       padded_packet_bits;
     logic [$clog2(32+PACKET_TOTAL):0] low_ptr_d, low_ptr_q, high_ptr;
@@ -37,39 +38,69 @@ module trdb_stream_align
     logic [4:0]                       residual_fill_q, residual_fill_d;
     logic                             valid_d, valid_q;
 
+    logic [4:0]                       instance_id = ID;
+
     assign valid_o = valid_q;
     assign data_o = data_q;
     assign padded_packet_bits = {32'b0, packet_bits_i, packet_len_i};
 
+    // TODO: halfword, byte, nibble, bit alignment
+    // TODO: flush capabilities
+    // TODO: source tag
+    // TODO: word tag
 
     always_comb begin
-        ns        = cs;
-        low_ptr_d = low_ptr_q;
-        valid_d   = '0;
-        data_d    = '0;
-        grant_o   = '0;
-        high_ptr  = low_ptr_q + 32;
+        ns         = cs;
+        low_ptr_d  = low_ptr_q;
+        valid_d    = '0;
+        data_d     = '0;
+        grant_o    = '0;
 
         if(valid_i) begin
-            // check if we can still output 32 bit words for the current packet
-            data_d    = padded_packet_bits[low_ptr_q +: 32];
-            valid_d   = '1;
+            case(cs)
 
-            low_ptr_d = high_ptr;
-            // TODO: make this state machine maybe
-            if(high_ptr >= packet_len_i) begin
-                //we are done with the current packet
-                low_ptr_d = '0;
-                // request the next packet
-                grant_o   = '1; //TODO: doesn't cause comb loop with fifo?
+            WORD0: begin
+                ns       = WORD1;
+                high_ptr = low_ptr_q + 32-7;
+                data_d   = {padded_packet_bits[low_ptr_q +: 32-7], 2'b1,
+                           instance_id};
+                valid_d = '1;
+
+                low_ptr_d = high_ptr;
+                if(high_ptr >= packet_len_i) begin
+                    //we are done with the current packet
+                    low_ptr_d = '0;
+                    // request the next packet
+                    grant_o   = '1;
+                end
             end
+
+            WORD1: begin
+                ns        = WORD0;
+                high_ptr  = low_ptr_q + 32;
+                // check if we can still output 32 bit words for the current
+                // packet
+                data_d    = padded_packet_bits[low_ptr_q +: 32];
+                valid_d   = '1;
+
+                low_ptr_d = high_ptr;
+                // TODO: make this state machine maybe
+                if(high_ptr >= packet_len_i) begin
+                    //we are done with the current packet
+                    low_ptr_d = '0;
+                    // request the next packet
+                    grant_o   = '1; //TODO: doesn't cause comb loop with fifo?
+                end
+            end
+
+            endcase
         end
     end
 
 
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
-            cs              <= IDLE;
+            cs              <= WORD0;
             low_ptr_q       <= '0;
             residual_q      <= '0;
             residual_fill_q <= '0;

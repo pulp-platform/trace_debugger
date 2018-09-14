@@ -26,9 +26,12 @@ class Monitor;
     task run(ref logic tb_eos);
 
         // helper variables to parse packet
-        automatic int bitcnt;
+        automatic int pbits;
+        automatic int totalbits;
         automatic int max_reads;
         automatic int off;
+        automatic int wordmod;
+        automatic int packet_ptr;
         automatic trdb_packet packet;
         Response response;
 
@@ -45,23 +48,51 @@ class Monitor;
             if(this.duv_if.packet_word_valid == 1'b1) begin
                 if(off == 0) begin
                     //we are dealing with a new packet
-                    packet.bits            = '0;
-                    bitcnt                 = this.duv_if.packet_word[PACKET_HEADER_LEN-1:0];
-                    max_reads              = (bitcnt + 32 - 1) / 32;
-                    packet.slices[3 - off] = this.duv_if.packet_word;
+                    packet.bits = '0;
+                    pbits = (wordmod == 0 ?
+                             this.duv_if.packet_word[PACKET_HEADER_LEN-1+7:7]:
+                             this.duv_if.packet_word[PACKET_HEADER_LEN-1:0]);
+
+                    // every other words (wordmod == 0) has an additional 7 bits
+                    totalbits = pbits + (pbits/(32+32-7)) * 7
+                        + ((pbits % (32+32-7)) != 0) * 7
+                        - (wordmod == 0 ? 0 : 7);
+
+                    max_reads = (totalbits + 32 - 1) / 32;
+
+                    if(wordmod == 0)  begin
+                        packet.bits[packet_ptr+:32-7] = this.duv_if.packet_word[31:7];
+                        packet_ptr += 32-7;
+                    end else begin
+                        packet.bits[packet_ptr+:32] = this.duv_if.packet_word;
+                        packet_ptr += 32;
+                    end
                     off++;
+
                 end else begin
-                    packet.slices[3 - off] = this.duv_if.packet_word;
+                    if(wordmod == 0)  begin
+                        packet.bits[packet_ptr+:32-7] = this.duv_if.packet_word[31:7];
+                        packet_ptr += 32-7;
+                    end else begin
+                        packet.bits[packet_ptr+:32] = this.duv_if.packet_word;
+                        packet_ptr += 32;
+                    end
                     off++;
                 end
 
                 // next packet
                 if(off == max_reads) begin
+                    packet_ptr  = 0;
                     off      = 0;
                     response = new(packet);
                     outbox_duv.put(response);
                 end
+
+                // emulate word state of streamer
+                wordmod ++;
+                wordmod %= 2;
             end
+
         end
 
         repeat(10)
