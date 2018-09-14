@@ -772,6 +772,8 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
             goto fail;
         }
     }
+    printf("(Compression) Bits per instruction:%lf\n",
+           ctx->stats.packetbits / (double)ctx->stats.instrs);
 
     if (TRDB_VERBOSE_DEBUG)
         trdb_dump_packet_list(stdout, &packet1_head);
@@ -843,15 +845,14 @@ int main(int argc, char *argv[argc + 1])
         "data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli",
         "data/timer_oneshot/build/pulpissimo-riscy/test/test",
         "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli",
-        "data/timer_oneshot/build/pulpissimo-riscy/test/test",
-        "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli",
+        "data/wait_time/build/pulpissimo-riscy/test/test",
+        "data/wait_time/build/pulpissimo-riscy/trdb_stimuli",
         "data/uart_send/build/pulpissimo-riscy/test/test",
         "data/uart_send/build/pulpissimo-riscy/trdb_stimuli",
         "data/uart_loopback/build/pulpissimo-riscy/test/test",
         "data/uart_loopback/build/pulpissimo-riscy/trdb_stimuli",
-	"data/coremark/build/pulpissimo-riscy/test/test",
+        "data/coremark/build/pulpissimo-riscy/test/test",
         "data/coremark/build/pulpissimo-riscy/trdb_stimuli",
-
     };
 
 

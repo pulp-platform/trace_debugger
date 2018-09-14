@@ -124,11 +124,13 @@ struct tr_packet {
     }                                                                          \
     *name = (struct tr_packet){.msg_type = 2};
 
-#define INIT_PACKET(p)                                                         \
-    do {                                                                       \
-        *p = (struct tr_packet){0};                                            \
-    } while (false)
-
+#define ALLOC_PACKET(name)                                                     \
+    name = malloc(sizeof(*name));                                              \
+    if (!name) {                                                               \
+        err(ctx, "malloc: %s\n", strerror(errno));                             \
+        goto fail_malloc;                                                      \
+    }                                                                          \
+    *name = (struct tr_packet){0};
 
 /**
  * Library/trace debugger context, needs to be hold by program and passed to

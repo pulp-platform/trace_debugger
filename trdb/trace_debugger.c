@@ -127,7 +127,17 @@ struct filter_state {
 };
 
 
-/* Library context, needs to be passed to most function calls. */
+struct trdb_stats {
+    size_t packetbits;
+    size_t instrbits;
+    size_t instrs;
+    size_t packets;
+};
+
+
+/* Library context, needs to be passed to most function calls.
+ * TODO: don't pass everything via stack
+ */
 struct trdb_ctx {
     /* specific settings for compression/decompression */
     struct trdb_config config;
@@ -140,6 +150,8 @@ struct trdb_ctx {
     /* state used for disassembling */
     struct tr_instr *dis_instr;
     struct disassembler_unit *dunit;
+    /* compression statistics */
+    struct trdb_stats stats;
     /* desired logging level and custom logging hook*/
     int log_priority;
     void (*log_fn)(struct trdb_ctx *ctx, int priority, const char *file,
@@ -195,6 +207,7 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
     ctx->nextc = (struct trdb_state){.privilege = 7};
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
+    ctx->stats = (struct trdb_stats){0};
 }
 
 
@@ -205,6 +218,7 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
 
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
+    ctx->stats = (struct trdb_stats){0};
 }
 
 
@@ -223,6 +237,7 @@ struct trdb_ctx *trdb_new()
     ctx->nextc = (struct trdb_state){.privilege = 7};
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
+    ctx->stats = (struct trdb_stats){0};
 
     ctx->log_fn = log_stderr;
     ctx->log_priority = LOG_ERR; // TODO: change that
@@ -456,6 +471,9 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
             branch_map->full = true;
         }
     }
+
+    struct tr_packet *tr = NULL;
+
     /* We trace the packet before the trapped instruction and the
      * first one of the exception handler
      */
@@ -465,7 +483,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * subformat 1 (exception -> all fields present)
          * resync_pend = 0
          */
-        ALLOC_INIT_PACKET(tr);
+        ALLOC_PACKET(tr);
         tr->format = F_SYNC; /* sync */
         tr->subformat = 1;   /* exception */
         tr->context = 0;     /* TODO: what comes here? */
@@ -508,7 +526,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* Send te_inst:
          * format 0/1/2
          */
-        ALLOC_INIT_PACKET(tr);
+        ALLOC_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
             err(ctx, "full_address false: Not implemented yet\n");
@@ -541,7 +559,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * subformat 0 (start, no ecause, interrupt and tval)
          * resync_pend = 0
          */
-        ALLOC_INIT_PACKET(tr);
+        ALLOC_PACKET(tr);
         tr->format = F_SYNC; /* sync */
         tr->subformat = 0;   /* start */
         tr->context = 0;     /* TODO: what comes here? */
@@ -564,7 +582,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* Send te_inst:
          * format 0/1/2
          */
-        ALLOC_INIT_PACKET(tr);
+        ALLOC_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
             err(ctx, "full_address false: Not implemented yet\n");
@@ -593,7 +611,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* Send te_inst:
          * format 0/1/2
          */
-        ALLOC_INIT_PACKET(tr);
+        ALLOC_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
             err(ctx, "full_address false: Not implemented yet\n");
@@ -616,7 +634,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* Send te_inst:
          * format 0/1/2
          */
-        ALLOC_INIT_PACKET(tr);
+        ALLOC_PACKET(tr);
         /* TODO: for now only full address */
         if (!full_address) {
             err(ctx, "full_address false: Not implemented yet\n");
@@ -646,7 +664,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * no address
          */
         assert(branch_map->cnt == 31);
-        ALLOC_INIT_PACKET(tr);
+        ALLOC_PACKET(tr);
         tr->format = F_BRANCH_FULL;
         tr->branches = branch_map->cnt;
         tr->branch_map = branch_map->bits;
@@ -686,6 +704,15 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     *lastc = *thisc;
     *thisc = *nextc;
 
+    /* TODO: no 64 bit instr support */
+    ctx->stats.instrbits += instr->compressed ? 16 : 32;
+    ctx->stats.instrs++;
+    if (generated_packet) {
+        *branch_map = (struct branch_map_state){0};
+        ctx->stats.packetbits += tr->length;
+        ctx->stats.packets++;
+    }
+
 
     /* TODO: unfortunately this ignores log_fn */
     if (trdb_get_log_priority(ctx) == LOG_DEBUG) {
@@ -703,9 +730,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         }
     }
 
-    if (generated_packet) {
-        *branch_map = (struct branch_map_state){0};
-    }
     /* also print packet */
     return generated_packet;
 fail:
