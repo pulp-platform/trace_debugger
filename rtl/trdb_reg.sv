@@ -11,9 +11,7 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: Memory mapped control registers for the trace debugger
 
-`define REG_TRDB_CFG    4'h0    //BASEADDR+0x00
-`define REG_DUMP        4'h4    //BASEADDR+0x04
-
+import trdb_pkg::*;
 
 module trdb_reg
     #(parameter APB_ADDR_WIDTH = 12)
@@ -27,7 +25,7 @@ module trdb_reg
      input logic                      per_we_i,
      input logic                      per_valid_i,
 
-     output logic [31:0]              cfg_o,
+     output logic                     trace_enable_o,
      output logic [31:0]              dump_o);
 
     // hold configuration data
@@ -37,7 +35,7 @@ module trdb_reg
     // debugger
     logic [31:0] dump_q, dump_d;
 
-    assign cfg_o = cfg_q;
+    assign trace_enable_o = cfg_q[TRDB_ENABLE];
     assign dump_o = dump_q;
 
     //TODO: read write logic fix
@@ -45,9 +43,9 @@ module trdb_reg
         per_rdata_o = 32'h0;
         if(per_valid_i & ~per_we_i) begin
             case(per_addr_i)
-            `REG_TRDB_CFG:
+            REG_TRDB_CFG:
                 per_rdata_o = cfg_q;
-            `REG_DUMP:
+            REG_DUMP:
                 per_rdata_o = 32'h0;
             default:
                 per_rdata_o = 32'h0;
@@ -55,8 +53,8 @@ module trdb_reg
         end
     end
 
-    // we can tie this high since according the the apb protocol if we react in
-    // the next cycle this is allowed
+    // we can tie this high since according the apb protocol if we react in the
+    // next cycle this is allowed
     assign per_ready_o = 1'b1;
 
     always_ff @(posedge clk_i, negedge rst_ni) begin
@@ -66,9 +64,9 @@ module trdb_reg
         end else begin
             if(per_valid_i & per_we_i) begin
                 case (per_addr_i)
-                `REG_TRDB_CFG:
+                REG_TRDB_CFG:
                     cfg_q <= per_wdata_i;
-                `REG_DUMP:
+                REG_DUMP:
                     dump_q <= per_wdata_i;
                 endcase
             end else begin

@@ -19,8 +19,13 @@ package trdb_tb_pkg;
 
     // stimuli file
     const string stimuli_path       = "trdb/data/trdb_stimuli";
+    // const string  stimuli_path      = "trdb/data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli";
+    // const string  stimuli_path      = "trdb/data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli";
+    // const string  stimuli_path      = "trdb/data/uart_loopback/build/pulpissimo-riscy/trdb_stimuli";
+    // const string  stimuli_path      = "trdb/data/coremark/build/pulpissimo-riscy/trdb_stimuli";
 
-    // clock and acquisition related settings
+
+                                         // clock and acquisition related settings
     const time CLK_PHASE_HI         = 5ns;
     const time CLK_PHASE_LO         = 5ns;
     const time CLK_PERIOD           = CLK_PHASE_HI + CLK_PHASE_LO;

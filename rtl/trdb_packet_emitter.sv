@@ -112,8 +112,9 @@ module trdb_packet_emitter
 
             F_BRANCH_FULL: begin
                 // We shouldn't have an empty branch map if we want to generate
-                // this packet
-                assert(branch_map_cnt_i != 0);
+                // this packet TODO: there is an issue since branch_map_flush_d
+                // immediately changes branch_map_cnt_i
+                //  assert(branch_map_cnt_i != 0);
 
                 packet_bits[6:2]   = branch_map_cnt_i;
                 branch_map_flush_d = '1;

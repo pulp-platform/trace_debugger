@@ -39,7 +39,7 @@ module trace_debugger
     // TODO: add dependencies for this
     // APB_BUS.Slave              apb_slave);
 
-    logic                       trace_enable = '1;
+    logic                       trace_enable;
     logic                       packet_after_exception = '1;
 
     logic                       debug_mode;
@@ -100,16 +100,29 @@ module trace_debugger
     trdb_subformat_t            packet_subformat;
 
     // generated packet
-    logic [PACKET_LEN-1:0]      packet_bits;
-    logic [6:0]                 packet_len;
-    logic                       packet_gen_valid;
+    logic [PACKET_LEN-1:0]     packet_bits;
+    logic [6:0]                packet_len;
+    logic                      packet_gen_valid;
 
     // packet to word
-    logic                       packet_is_read;
-    logic [XLEN-1:0]            packet_word;
-    logic                       packet_word_valid;
+    logic                      packet_is_read;
+    logic [XLEN-1:0]           packet_word;
+    logic                      packet_word_valid;
 
-    // if we do tracing at all
+    // Holds data from/to advanced peripheral bus
+    logic [31:0]               per_rdata;
+    logic                      per_ready;
+    logic [31:0]               per_wdata;
+    logic [APB_ADDR_WIDTH-1:0] per_addr;
+    logic                      per_we;
+    logic                      per_valid;
+
+    // software dumping: certain writes to the trace debugger are included in
+    // the packet stream
+    logic [31:0]               sw_dump;
+
+
+    // whether we do tracing at all
     assign trace_valid = ivalid_i && debug_mode && trace_enable;
     assign debug_mode = priv_i[PRIVLEN-1];
 
@@ -118,7 +131,7 @@ module trace_debugger
         else $info("[TRDB]    @%t: Tracing works only in debug mode",
                    $time);
 
-    // buffer variables
+    // buffer variables. Certain variables we need to hold up to three cycles
     assign interrupt0_d = interrupt_i;
     assign interrupt1_d = interrupt0_q;
     assign cause0_d = cause_i;
@@ -161,7 +174,6 @@ module trace_debugger
     assign tc_iaddr = iaddr0_q;
     // assign tc_first_qualified (below)
     // assign tc_branch_taken (below)
-
 
     // decide whether a privilege change occured
     always_comb begin
@@ -325,4 +337,43 @@ module trace_debugger
             end
         end
     end
+
+    // Connection to the APB. Used to configure the trace debugger. This is just
+    // a translation layer.
+    trdb_apb_if
+        #(.APB_ADDR_WIDTH(APB_ADDR_WIDTH))
+    i_trdb_apb_if
+        (.paddr(apb_slave.paddr),
+         .pwdata(apb_slave.pwdata),
+         .pwrite(apb_slave.pwrite),
+         .psel(apb_slave.psel),
+         .penable(apb_slave.penable),
+         .prdata(apb_slave.prdata),
+         .pready(apb_slave.pready),
+         .pslverr(apb_slave.pslverr),
+
+         .per_rdata_i(per_rdata),
+         .per_ready_i(per_ready),
+         .per_wdata_o(per_wdata),
+         .per_addr_o(per_addr),
+         .per_we_o(per_we),
+         .per_valid_o(per_valid));
+
+    // Holds configuration data written from the APB and asserts relevant
+    // control signals depending on that
+    trdb_reg
+        #(.APB_ADDR_WIDTH(APB_ADDR_WIDTH))
+    i_trdb_reg
+        (.clk_i(clk_i),
+         .rst_ni(rst_ni),
+         .per_rdata_o(per_rdata),
+         .per_ready_o(per_ready),
+         .per_wdata_i(per_wdata),
+         .per_addr_i(per_addr),
+         .per_we_i(per_we),
+         .per_valid_i(per_valid),
+         .trace_enable_o(trace_enable),
+         .dump_o(sw_dump));
+
+
 endmodule // trace_debugger

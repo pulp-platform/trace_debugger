@@ -26,7 +26,7 @@ module trace_debugger_wrapper
          .iaddr_i(duv_if.iaddr),
          .instr_i(duv_if.instr),
          .compressed_i(duv_if.compressed),
-         .apb_slave(duv_if.apb_trdb_bus),
+         .apb_slave(duv_if.apb_bus),
          .packet_word_o(duv_if.packet_word),
          .packet_word_valid_o(duv_if.packet_word_valid));
 

@@ -128,6 +128,22 @@ class Driver;
         @(posedge this.duv_if.clk_i);
         apply_zero();
 
+        // enable trace debugger by simulating apb write
+        @(posedge this.duv_if.clk_i);
+        this.duv_if.apb_bus.paddr  = REG_TRDB_CFG;
+        this.duv_if.apb_bus.pwrite = 1'b1;
+        this.duv_if.apb_bus.psel   = 1'b1;
+        this.duv_if.apb_bus.pwdata = 1;
+
+        @(posedge this.duv_if.clk_i);
+        // we are now the access state of the apb
+        this.duv_if.apb_bus.penable     = 1'b1;
+
+        @(posedge this.duv_if.clk_i);
+        wait(this.duv_if.apb_bus.pready == 1);
+        this.duv_if.apb_bus.penable     = 1'b0;
+        this.duv_if.apb_bus.psel   = 1'b0;
+
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
 

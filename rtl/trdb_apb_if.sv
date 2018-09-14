@@ -35,7 +35,8 @@ module trdb_apb_if
     assign per_addr_o = paddr;
     assign per_we_o = pwrite;
     assign per_wdata_o = pwdata;
-
+    // psel indicates if your device is selected
+    // penable indicates the access phase
     assign per_valid_o = psel & penable;
 
     assign prdata = per_rdata_i;
