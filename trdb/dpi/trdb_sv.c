@@ -85,11 +85,10 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
     }
 
     *packet_valid = 0;
-    /* info(ctx, "Received addr 0x%x\n", iaddr->aval); */
 
     /* Note: aval and bval are uint32_t per standard */
     struct tr_instr tr_instr = {.valid = ivalid,
-				.exception = iexception,
+                                .exception = iexception,
                                 .interrupt = interrupt,
                                 .cause = cause->aval,
                                 .tval = tval->aval,
@@ -97,7 +96,6 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
                                 .iaddr = iaddr->aval,
                                 .instr = instr->aval,
                                 .compressed = compressed};
-    /* trdb_print_instr(stdout, &tr_instr); */
 
     /* upper bounded local buffer for serialization */
     size_t bitcnt = 0;
@@ -117,17 +115,16 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
         if (trdb_serialize_packet(ctx, latest_packet, &bitcnt, 0, buff)) {
             err(ctx, "failed to serialize packet, continuing...\n");
         }
-	packetcnt++;
-	//TODO: change that to debug
+        packetcnt++;
+        // TODO: change that to debug
         info(ctx, "ID: %d\n", packetcnt);
         trdb_print_packet(stdout, latest_packet);
-
 
         int total_bytes = svSizeOfLogicPackedArr(packet_max_len);
         /* this is just a integer divions (ceiling) of bitcount/8 */
         int packet_bytes = (bitcnt / 8 + (bitcnt % 8 != 0));
 
-	/* fill in vector with packet and zero pad */
+        /* fill in vector with packet and zero pad */
         for (size_t i = 0; i < total_bytes; i++) {
             if (i < packet_bytes)
                 tmp.aval = buff[i];
@@ -137,6 +134,6 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
 
             svPutPartselLogic(packet_bits, tmp, i * 8, 8);
         }
-	*packet_valid = 1;
+        *packet_valid = 1;
     }
 }
