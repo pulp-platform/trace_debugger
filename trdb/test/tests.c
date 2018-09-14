@@ -842,7 +842,17 @@ int main(int argc, char *argv[argc + 1])
         "data/enqueue_delayed/build/pulpissimo-riscy/test/test",
         "data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli",
         "data/timer_oneshot/build/pulpissimo-riscy/test/test",
-        "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli"};
+        "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli",
+        "data/timer_oneshot/build/pulpissimo-riscy/test/test",
+        "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli",
+        "data/uart_send/build/pulpissimo-riscy/test/test",
+        "data/uart_send/build/pulpissimo-riscy/trdb_stimuli",
+        "data/uart_loopback/build/pulpissimo-riscy/test/test",
+        "data/uart_loopback/build/pulpissimo-riscy/trdb_stimuli",
+	"data/coremark/build/pulpissimo-riscy/test/test",
+        "data/coremark/build/pulpissimo-riscy/trdb_stimuli",
+
+    };
 
 
     INIT_TESTS();
