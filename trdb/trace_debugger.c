@@ -1560,6 +1560,104 @@ fail:
     return status;
 }
 
+
+size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
+                                  int *status, struct list_head *instrs)
+{
+    *status = 0;
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        err(c, "fopen: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+    size_t scnt = 0;
+
+    int ret = 0;
+    int valid = 0;
+    int exception = 0;
+    int interrupt = 0;
+    uint32_t cause = 0;
+    uint32_t tval = 0;
+    uint32_t priv = 0;
+    uint32_t iaddr = 0;
+    uint32_t instr = 0;
+    int compressed = 0;
+
+    size_t size = 128;
+    struct tr_instr *samples = malloc(size * sizeof(*samples));
+    if (!samples) {
+        *status = -1;
+        goto fail;
+    }
+
+    while (
+        (ret = fscanf(fp,
+                      "valid= %d exception= %d interrupt= %d cause= %" SCNx32
+                      " tval= %" SCNx32 " priv= %" SCNx32
+                      " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
+                      &valid, &exception, &interrupt, &cause, &tval, &priv,
+                      &compressed, &iaddr, &instr))
+        != EOF) {
+        // TODO: make this configurable so that we don't have to store so
+        // much data
+        /* if (!valid) { */
+        /*     continue; */
+        /* } */
+        if (scnt >= size) {
+            size = 2 * size;
+            struct tr_instr *tmp = realloc(samples, size * sizeof(*samples));
+            if (!tmp) {
+                err(c, "realloc: %s\n", strerror(errno));
+                *status = -1;
+                goto fail;
+            }
+            samples = tmp;
+        }
+        (samples)[scnt] = (struct tr_instr){0};
+        (samples)[scnt].valid = valid;
+        (samples)[scnt].exception = exception;
+        (samples)[scnt].interrupt = interrupt;
+        (samples)[scnt].cause = cause;
+        (samples)[scnt].tval = tval;
+        (samples)[scnt].priv = priv;
+        (samples)[scnt].iaddr = iaddr;
+        (samples)[scnt].instr = instr;
+        (samples)[scnt].compressed = compressed;
+        scnt++;
+    }
+
+    /* free the remaining unused memory */
+    struct tr_instr *tmp = realloc(samples, scnt * sizeof(*samples));
+    if (!tmp) {
+        err(c, "realloc: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+    samples = tmp;
+
+    /* add entries to list */
+    for (size_t i = 0; i < scnt; i++) {
+        list_add(&((samples)[scnt].list), instrs);
+    }
+
+    if (ferror(fp)) {
+        err(c, "fscanf: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+
+    if (fp)
+        fclose(fp);
+    return scnt;
+fail:
+    if (fp)
+        fclose(fp);
+    free(samples);
+    return 0;
+}
+
+
 /* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
 size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
                              struct tr_instr **samples, int *status)
@@ -1586,6 +1684,11 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
 
     size_t size = 128;
     *samples = malloc(size * sizeof(**samples));
+    if (!*samples) {
+        *status = -1;
+        goto fail;
+    }
+
     while (
         (ret = fscanf(fp,
                       "valid= %d exception= %d interrupt= %d cause= %" SCNx32
