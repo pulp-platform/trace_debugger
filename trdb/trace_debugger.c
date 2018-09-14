@@ -299,6 +299,23 @@ static bool branch_taken(bool before_compressed, uint32_t addr_before,
 }
 
 
+static uint32_t branch_map_len(uint32_t branches)
+{
+    if (branches <= 1) {
+        return 1;
+    } else if (branches <= 9) {
+        return 9;
+    } else if (branches <= 17) {
+        return 17;
+    } else if (branches <= 25) {
+        return 25;
+    } else if (branches <= 31) {
+        return 31;
+    }
+    return -1;
+}
+
+
 /* Some jumps can't be predicted i.e. the jump address can only be figured out
  * at runtime. That happens e.g. if the target address depends on some register
  * entries. For plain RISC-V I this is just the jalr instruction. For the PULP
@@ -325,9 +342,18 @@ static bool is_unsupported(uint32_t instr)
  * address into the packet. We choose the one which has the least amount of
  * meaningfull bits, i.e. the bits that can't be inferred by sign-extension.
  */
-static bool use_differential_addr(uint32_t absolute, uint32_t differential)
+static bool differential_addr(int *lead, uint32_t absolute,
+                              uint32_t differential)
 {
-    return false;
+    int aclz = __builtin_clz(absolute);
+    int aclo = __builtin_clz(~absolute);
+    int dclz = __builtin_clz(differential);
+    int dclo = __builtin_clz(~differential);
+
+    int abs = aclz > aclo ? aclz : aclo;
+    int diff = dclz > dclo ? dclz : dclo;
+    *lead = diff > abs ? diff : abs;
+    return diff > abs;
 }
 
 
@@ -444,10 +470,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         tr->subformat = 1;   /* exception */
         tr->context = 0;     /* TODO: what comes here? */
         tr->privilege = tc_instr->priv;
-        /* TODO: actually we should clear the branch map if we really
-         * fill out this entry, else we have recorded twice (in the next
-         * packet)
-         */
+
         if (is_branch(tc_instr->instr)
             && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
                              nc_instr->iaddr))
@@ -464,6 +487,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         tr->ecause = lc_instr->cause;
         tr->interrupt = lc_instr->interrupt;
         tr->tval = lc_instr->tval;
+        tr->length = 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
         list_add(&tr->list, packet_list);
 
         thisc->emitted_exception_sync = true;
@@ -493,14 +517,14 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         if (branch_map->cnt == 0) {
             tr->format = F_ADDR_ONLY;
             tr->address = full_address ? tc_instr->iaddr : 0;
-
+            tr->length = 2 + XLEN;
             assert(branch_map->bits == 0);
         } else {
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
             tr->branches = branch_map->cnt;
             tr->branch_map = branch_map->bits;
             tr->address = full_address ? tc_instr->iaddr : 0;
-
+            tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
             *branch_map = (struct branch_map_state){0};
         }
         list_add(&tr->list, packet_list);
@@ -529,6 +553,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         else
             tr->branch = 0;
         tr->address = tc_instr->iaddr;
+        tr->length = 2 + 2 + PRIVLEN + 1 + XLEN;
         list_add(&tr->list, packet_list);
 
         filter->resync_pend = false;
@@ -548,14 +573,14 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         if (branch_map->cnt == 0) {
             tr->format = F_ADDR_ONLY;
             tr->address = full_address ? tc_instr->iaddr : 0;
-
+            tr->length = 2 + XLEN;
             assert(branch_map->bits == 0);
         } else {
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
             tr->branches = branch_map->cnt;
             tr->branch_map = branch_map->bits;
             tr->address = tc_instr->iaddr;
-
+            tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
             *branch_map = (struct branch_map_state){0};
         }
         list_add(&tr->list, packet_list);
@@ -578,6 +603,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         tr->branches = branch_map->cnt;
         tr->branch_map = branch_map->bits;
         tr->address = full_address ? tc_instr->iaddr : 0;
+        tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
         list_add(&tr->list, packet_list);
 
         *branch_map = (struct branch_map_state){0};
@@ -599,14 +625,14 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         if (branch_map->cnt == 0) {
             tr->format = F_ADDR_ONLY;
             tr->address = full_address ? tc_instr->iaddr : 0;
-
+            tr->length = 2 + XLEN;
             assert(branch_map->bits == 0);
         } else {
             tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
             tr->branches = branch_map->cnt;
             tr->branch_map = branch_map->bits;
             tr->address = full_address ? tc_instr->iaddr : 0;
-
+            tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
             *branch_map = (struct branch_map_state){0};
         }
         list_add(&tr->list, packet_list);
@@ -625,6 +651,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         tr->branches = branch_map->cnt;
         tr->branch_map = branch_map->bits;
         /* tr->address  TODO: no address, study explanation */
+        tr->length = 2 + 7 + branch_map_len(31);
         list_add(&tr->list, packet_list);
 
         *branch_map = (struct branch_map_state){0};
@@ -633,24 +660,26 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* end of cycle */
 
     } else if (thisc->context_change) {
-        /* TODO: don't understand how to detect context change */
         /* Send te_inst:
          * format 3
          * subformat 2
          */
-        ALLOC_INIT_PACKET(tr);
-        tr->format = F_SYNC;
-        tr->subformat = 2;
-        tr->context = 0; /* TODO: what comes here? */
-        tr->privilege = tc_instr->priv;
-        /* tr->branch */
-        /* tr->address */
-        /* tr->ecause */
-        /* tr->interrupt */
-        /* tr->tval */
-        list_add(&tr->list, packet_list);
+        err(ctx, "context_change not supported\n");
+        goto fail;
+        /* ALLOC_INIT_PACKET(tr); */
+        /* tr->format = F_SYNC; */
+        /* tr->subformat = 2; */
+        /* tr->context = 0; /\* TODO: what comes here? *\/ */
+        /* tr->privilege = tc_instr->priv; */
+        /* /\* tr->branch *\/ */
+        /* /\* tr->address *\/ */
+        /* /\* tr->ecause *\/ */
+        /* /\* tr->interrupt *\/ */
+        /* /\* tr->tval *\/ */
+        /* tr->length =  */
+        /* list_add(&tr->list, packet_list); */
 
-        generated_packet = 1;
+        /* generated_packet = 1; */
     }
 
     /* update last cycle state */
@@ -1367,21 +1396,6 @@ fail:
     return NULL;
 }
 
-static uint32_t branch_map_len(uint32_t branches)
-{
-    if (branches <= 1) {
-        return 1;
-    } else if (branches <= 9) {
-        return 9;
-    } else if (branches <= 17) {
-        return 17;
-    } else if (branches <= 25) {
-        return 25;
-    } else if (branches <= 31) {
-        return 31;
-    }
-    return -1;
-}
 
 /* It's pretty annoying to pack our packets tightly, since our packet members
  * are not 8 bit aligned. We assure that each packet is smaller that 128 bits,
@@ -1565,6 +1579,8 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
                                   int *status, struct list_head *instrs)
 {
     *status = 0;
+    struct tr_instr *samples = NULL;
+
     FILE *fp = fopen(path, "r");
     if (!fp) {
         err(c, "fopen: %s\n", strerror(errno));
@@ -1585,7 +1601,7 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
     int compressed = 0;
 
     size_t size = 128;
-    struct tr_instr *samples = malloc(size * sizeof(*samples));
+    samples = malloc(size * sizeof(*samples));
     if (!samples) {
         *status = -1;
         goto fail;
