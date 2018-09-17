@@ -6,54 +6,66 @@
 
      ~make conf gui=1 CONFIG_OPT="rt/trace=1 vsim/args=-debugdb vsim/tcl_args=-fsmdebug" clean all run~
 
+** Memory
+   + ~0x1c00'0000~ to ~0x1c00'8000~ private bank 0 for fc data
+   + ~0x1c00'8000~ to ~0x1c01'0000~ private bank 1 for fc code
+   + ~0x1c01'0000~ to ~0x1c08'0000~ multi-banked area for udma data
+   + ~rt_l2_base()~ returns ~0x1c01'0000~
+
+
+** PULP bridge commands
+   + ~plpbridge --chip=pulpissimo --binary=build/pulpissimo/test/test~
+   + ~plpbridge --chip=pulpissimo stop~
+   + ~plpbridge --chip=pulpissimo read --addr=0x1c000000 --size=1000~
+   + ~plpbridge --chip=pulpissimo write --addr=0x1c000000 --value=0x12345678 --size=1000~
 ** Compiler settings
    Run =/home/msc18f22/projects/pulp-sdk/pkg/pulp_riscv_gcc/1.0.5/bin/riscv32-unknown-elf-gcc -march=rv32imcxpulpv2 -Q --help=target=
    The following settings are available
-  + -mComp                      		[disabled]
-  + -mDIE=                      		0
-  + -mEci                       		[disabled]
-  + -mFC=                       		0
-  + -mL1Cl=                     		0
-  + -mL1Fc=                     		0
-  + -mL2=                       		0
-  + -mPE=                       		0
-  + -mWci                       		[disabled]
-  + -mabi=                      		ilp32
-  + -march=                     		rv32imcxpulpv2
-  + -mbranch-cost=N             		0
-  + -mchip=                     		[default]
-  + -mcmodel=                   		medlow
-  + -mconf=                     		all
-  + -mcpu=                      		pulpv2
-  + -mdf                        		[disabled]
-  + -mdiv                       		[disabled]
-  + -mexplicit-relocs           		[disabled]
-  + -mfdiv                      		[disabled]
-  + -mfpdouble=                 		double
-  + -mmemcpy                    		[disabled]
-  + -mnativeomp                 		[disabled]
-  + -mnoabs                     		[disabled]
-  + -mnoaddsubnormround         		[disabled]
-  + -mnobitop                   		[disabled]
-  + -mnoclip                    		[disabled]
-  + -mnofinduct                 		[disabled]
-  + -mnohwloop                  		[disabled]
-  + -mnoindregreg               		[disabled]
-  + -mnomac                     		[disabled]
-  + -mnominmax                  		[disabled]
-  + -mnomulmacnormround         		[disabled]
-  + -mnopartmac                 		[disabled]
-  + -mnopostmod                 		[disabled]
-  + -mnosext                    		[disabled]
-  + -mnoshufflepack             		[disabled]
-  + -mnoslet                    		[disabled]
-  + -mnovect                    		[disabled]
-  + -mplt                       		[enabled]
-  + -mreg=                      		32
-  + -msave-restore              		[disabled]
-  + -msloop                     		[disabled]
-  + -msmall-data-limit=N        		8
-  + -mstrict-align              		[disabled]
+  + -mComp					[disabled]
+  + -mDIE=					0
+  + -mEci					[disabled]
+  + -mFC=					0
+  + -mL1Cl=					0
+  + -mL1Fc=					0
+  + -mL2=					0
+  + -mPE=					0
+  + -mWci					[disabled]
+  + -mabi=					ilp32
+  + -march=					rv32imcxpulpv2
+  + -mbranch-cost=N				0
+  + -mchip=					[default]
+  + -mcmodel=					medlow
+  + -mconf=					all
+  + -mcpu=					pulpv2
+  + -mdf					[disabled]
+  + -mdiv					[disabled]
+  + -mexplicit-relocs				[disabled]
+  + -mfdiv					[disabled]
+  + -mfpdouble=					double
+  + -mmemcpy					[disabled]
+  + -mnativeomp					[disabled]
+  + -mnoabs					[disabled]
+  + -mnoaddsubnormround				[disabled]
+  + -mnobitop					[disabled]
+  + -mnoclip					[disabled]
+  + -mnofinduct					[disabled]
+  + -mnohwloop					[disabled]
+  + -mnoindregreg				[disabled]
+  + -mnomac					[disabled]
+  + -mnominmax					[disabled]
+  + -mnomulmacnormround				[disabled]
+  + -mnopartmac					[disabled]
+  + -mnopostmod					[disabled]
+  + -mnosext					[disabled]
+  + -mnoshufflepack				[disabled]
+  + -mnoslet					[disabled]
+  + -mnovect					[disabled]
+  + -mplt					[enabled]
+  + -mreg=					32
+  + -msave-restore				[disabled]
+  + -msloop					[disabled]
+  + -msmall-data-limit=N			8
+  + -mstrict-align				[disabled]
   + -mtune=PROCESSOR
 
 ** Code fragments on programming the event unit
@@ -81,7 +93,7 @@
     // UDMA_CHANNEL_RX_OFFSET
     printf("manual enqueue:\n");
     plp_udma_enqueue(0x1a102380, (unsigned int)buffers[0], BUFF_SIZE,
-    		     0 | UDMA_CHANNEL_CFG_EN);
+		     0 | UDMA_CHANNEL_CFG_EN);
 
     wait_soc_event(ARCHI_SOC_EVENT_TRACER_RX(0));
     clear_soc_event(ARCHI_SOC_EVENT_TRACER_RX(0));
