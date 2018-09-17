@@ -146,11 +146,11 @@ tb-clean:
 .PHONY: TAGS
 TAGS: check-env
 	echo "Generating TAGS for driver..."
-	$(CTAGS) -R -e -h=".c.h" --tag-relative=always \
-	--exclude=$(PULP_SDK_HOME) . $(PULP_PROJECT_HOME)
 	echo "Generating TAGS for RTL..."
-	$(CTAGS) -R -e -h=".sv.svh" --tag-relative=always \
-	rtl/ tb/
+	$(CTAGS) -R -e -h=".c.h.sv.svh" --tag-relative=always \
+		--exclude=$(PULP_SDK_HOME) \
+		. $(PULP_PROJECT_HOME) \
+		rtl/ tb/
 
 .PHONY: docs
 docs: c-docs
