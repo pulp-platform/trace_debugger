@@ -38,6 +38,9 @@ module trdb_reg
     assign trace_enable_o = cfg_q[TRDB_ENABLE];
     assign dump_o = dump_q;
 
+    // enable all
+    // enable privilege tracing
+    // enable exception tracing
     //TODO: read write logic fix
     always_comb begin: read_reg
         per_rdata_o = 32'h0;

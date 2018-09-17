@@ -45,12 +45,22 @@ module tracer_if
 
      // Data from the trace debugger unit to this interface
      input logic [31:0]                trdb_packet_i,
-     input logic                       trdb_word_valid_i);
+     input logic                       trdb_word_valid_i,
+     output logic                      trdb_stall_o);
 
+    // buffer data from trace debugger
     logic [31:0]                       data_rx_data_q;
     logic                              data_rx_valid_q;
 
-    // We are in the same clockdomain as the SoC, so no DC stuff needed
+    // statemachine for stall signal
+    enum logic [1:0] {IDLE, TRANSFER, STALL} cs, ns;
+
+    // signal that the udma fifo is overflowing
+    logic stall;
+
+    // We are in the same clockdomain as the SoC, so no DC stuff needed. This
+    // block just buffers all the udma configuration data, it is the same
+    // boilerplate stuff as in the other interfaces.
     tracer_reg_if
         #(.L2_AWIDTH_NOAL(L2_AWIDTH_NOAL),
           .TRANS_SIZE(TRANS_SIZE))
@@ -77,15 +87,58 @@ module tracer_if
          .cfg_rx_curr_addr_i (cfg_rx_curr_addr_i),
          .cfg_rx_bytes_left_i(cfg_rx_bytes_left_i));
 
+    // Signal the trace debugger if we have to stall because of FIFO overflow in
+    // UDMA
+    always_comb begin
+        ns = cs;
 
+        case(cs)
+
+        IDLE: begin
+            stall = '0;
+            if(data_rx_valid_q && data_rx_ready_i) begin
+                ns = TRANSFER;
+            end else if(data_rx_valid_q && !data_rx_ready_i) begin
+                ns = STALL;
+            end else begin
+                ns = IDLE;
+            end
+        end
+
+        TRANSFER: begin
+            stall = '0;
+            if(data_rx_valid_q && data_rx_ready_i) begin
+                ns    = TRANSFER;
+            end else if(data_rx_valid_q && !data_rx_ready_i) begin
+                ns    = STALL;
+            end else if(!data_rx_valid_q) begin
+                ns    = IDLE;
+            end
+        end
+
+        STALL: begin
+            stall = '1;
+            if(!data_rx_ready_i) begin
+                ns = STALL;
+            end else begin
+                ns = TRANSFER;
+            end
+        end
+
+        endcase // case (cs)
+    end
+
+    assign trdb_stall_o = stall;
     assign data_rx_data_o = data_rx_data_q;
-    assign data_rx_valid_o = data_rx_data_q;
+    assign data_rx_valid_o = data_rx_valid_q;
 
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
+            cs              <= IDLE;
             data_rx_data_q  <= 'h0;
             data_rx_valid_q <= 'h0;
         end else begin
+            cs              <= ns;
             data_rx_data_q  <= trdb_packet_i;
             data_rx_valid_q <= trdb_word_valid_i;
         end

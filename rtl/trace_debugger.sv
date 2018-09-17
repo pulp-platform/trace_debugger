@@ -33,8 +33,8 @@ module trace_debugger
 
      // generated packets, which go the the udma (or somewhere else)
      output logic [XLEN-1:0]    packet_word_o,
-     output logic               packet_word_valid_o
-);
+     output logic               packet_word_valid_o,
+     input logic                stall_i);
 
     // TODO: add dependencies for this
     // APB_BUS.Slave              apb_slave);

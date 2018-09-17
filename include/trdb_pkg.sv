@@ -53,7 +53,9 @@ typedef enum logic[1:0]
 typedef enum logic [1:0]
 {
  W_EMPTY = 2'h0,
- W_START = 2'h1
+ W_START = 2'h1,
+ W_OTHER = 2'h2,
+ W_SOFT  = 2'h3
  } trdb_marker_t;
 
 
