@@ -150,7 +150,7 @@ module trace_debugger
     assign u_discontinuity1_d = u_discontinuity0_q;
     assign is_branch1_d = is_branch0_q;
     // TODO: add feature to have selective tracing, add enable with regmap
-    assign qualified0_d = '1 && ivalid_i;
+    assign qualified0_d = trace_enable && ivalid_i;
     assign qualified1_d = qualified0_q;
 
     // Hook phase related variables up to proper register
