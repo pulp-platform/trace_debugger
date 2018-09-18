@@ -28,6 +28,8 @@ interface trace_debugger_if
     logic [ILEN-1:0]     instr;
     logic                compressed;
 
+    logic                stall;
+
     // outputs
     logic [XLEN-1:0]     packet_word;
     logic                packet_word_valid;
@@ -37,13 +39,13 @@ interface trace_debugger_if
 
     modport duv
         (input clk_i, rst_ni, ivalid, iexception, interrupt, cause, tval, priv,
-         iaddr, instr, compressed, apb_bus, output packet_word,
+         iaddr, instr, compressed, apb_bus, stall, output packet_word,
          packet_word_valid);
 
     modport tb
         (input clk_i, rst_ni, output ivalid, iexception, interrupt, cause,
-         tval, priv, iaddr, instr, compressed, apb_bus, input packet_word,
-         packet_word_valid);
+         tval, priv, iaddr, instr, compressed, apb_bus, stall,
+         input packet_word, packet_word_valid);
 
 
 endinterface

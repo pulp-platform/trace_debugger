@@ -28,6 +28,7 @@ module trace_debugger_wrapper
          .compressed_i(duv_if.compressed),
          .apb_slave(duv_if.apb_bus),
          .packet_word_o(duv_if.packet_word),
-         .packet_word_valid_o(duv_if.packet_word_valid));
+         .packet_word_valid_o(duv_if.packet_word_valid),
+         .stall_i(duv_if.stall));
 
 endmodule // trace_debugger_wrapper
