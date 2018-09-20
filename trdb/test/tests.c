@@ -772,6 +772,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
             goto fail;
         }
     }
+    printf("%s\n", bin_path);
     printf("(Compression) Bits per instruction:%lf\n",
            ctx->stats.packetbits / (double)ctx->stats.instrs);
 
@@ -790,7 +791,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
 
     /* We compare whether the reconstruction matches the original sequence, only
-     * the pc for now. Legacy compression.
+     * the pc for now.
      */
     struct tr_instr *instr;
     int processedcnt = 0;
@@ -853,6 +854,9 @@ int main(int argc, char *argv[argc + 1])
         "data/uart_loopback/build/pulpissimo-riscy/trdb_stimuli",
         "data/coremark/build/pulpissimo-riscy/test/test",
         "data/coremark/build/pulpissimo-riscy/trdb_stimuli",
+        "data/median/build/pulpissimo-riscy/median/median",
+        "data/median/build/pulpissimo-riscy/trdb_stimuli",
+
     };
 
 
