@@ -7,12 +7,14 @@
 
 ** Dependencies
    Requires =libbfd.a=, =libopcodes.a=, =libiberty.a= and =libzlib.a= from
-   binutils built using [[https://github.com/pulp-platform/pulp-riscv-gnu-toolchain][this]] with the =trace_dbg_dev= branch. Build it by
-   calling
+   [[https://github.com/pulp-platform/pulp-riscv-binutils-gdb][binutils]] built using the =trace_dbg_dev= branch. Build it by calling
+
    #+BEGIN_SRC bash
-   export CFLAGS="-O2 -g -fPIC"
-   ./configure --enable-targets=riscv32, x86_64-pc-linux-gnu CFLAGS="-g -O2 -fPIC"
-   make all
+     export CFLAGS="-g -O2 -fPIC"
+   ./configure --enable-targets=riscv32, x86_64-pc-linux-gnu --disable-gdb \
+   --disable-ld --disable-gas --disable-gold --disable-intl --disable-gprof \
+   --disable-readline --disable-sim --disable-libdecnumber
+   make clean all
    #+END_SRC
 
 ** Build
