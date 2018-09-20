@@ -247,8 +247,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
                                       struct tr_instr instrs[len]);
 
-/* packet from bitstream where parse single packet */
-/* packet from bitstream whole decode function */
 
 /**
  * Generate the original instruction sequence from a list of tr_packet, given

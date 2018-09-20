@@ -398,34 +398,16 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     /* test for qualification by filtering */
     /* TODO: implement filtering logic */
 
-
-    /* nextc.qualified = true; */
-    /* thisc.qualified = true; */
     nextc->qualified = true;
 
-    /* thisc.unqualified = !thisc.qualified; */
-    /* nextc.unqualified = !nextc.qualified; */
     nextc->unqualified = !nextc->qualified;
 
-    /* Update state TODO: maybe just ignore last sample instead?*/
-    /* thisc.exception = instrs[i].exception; */
-    /* nextc.exception = i < len ? instrs[i + 1].exception :
-     * thisc.exception; */
     nextc->exception = instr->exception;
 
-    /* thisc.unpred_disc = is_unpred_discontinuity(instrs[i].instr); */
-    /* nextc.unpred_disc = */
-    /* i < len ? is_unpred_discontinuity(instrs[i + 1].instr) : false; */
     nextc->unpred_disc = is_unpred_discontinuity(instr->instr);
 
-    /* thisc.privilege = instrs[i].priv; */
-    /* nextc.privilege = i < len ? instrs[i + 1].priv : thisc.privilege; */
     nextc->privilege = instr->priv;
 
-    /* thisc.privilege_change = (thisc.privilege !=
-       lastc.privilege); */
-    /* nextc.privilege_change = (thisc.privilege
-       != nextc.privilege); */
     nextc->privilege_change = (thisc->privilege != nextc->privilege);
 
     /* TODO: clean this up, proper initial state per round required */
@@ -444,7 +426,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* check if we even need to record anything */
         *lastc = *thisc;
         *thisc = *nextc;
-        return 0; /* end of cycle */ /* TODO: change to return */
+        return 0; /* end of cycle */
     }
 
     if (is_unsupported(tc_instr->instr)) {
@@ -741,7 +723,6 @@ fail_malloc:
 static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
                              struct disassemble_info *dinfo)
 {
-    /* return (*dinfo->read_memory_func)(pc, myaddr, len, dinfo); */
     bfd_byte packet[2];
     *instr = 0;
     bfd_vma n;
@@ -763,7 +744,10 @@ static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
     return status;
 }
 
-
+/* The decoding algorithm tries to recover as much information as possible from
+ * the packets. Additionaly it also disassembles the instruction bits given the
+ * context (address, binary).
+ */
 static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
                              struct tr_instr *instr,
                              struct disassembler_unit *dunit, int *status)
@@ -811,12 +795,15 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
 }
 
 
+/* libopcodes only knows how to call a fprintf based callback function. We abuse
+ * it by passing through the void pointer our custom data (instead of a stream).
+ * This ugly hack doesn't seem to be used by just me.
+ */
 static int build_instr_fprintf(void *stream, const char *format, ...)
 {
     struct trdb_ctx *c = stream;
     struct tr_instr *instr = c->dis_instr;
     char tmp[INSTR_STR_LEN];
-    /* ugly hack around libopcodes fprintf-only output */
     va_list args;
     va_start(args, format);
     int rv = vsnprintf(tmp, INSTR_STR_LEN - 1, format, args);
@@ -901,12 +888,6 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
 }
 
 
-static bfd_vma advance_pc(bfd_vma pc, int step, struct trdb_dec_state state)
-{
-    return pc + step;
-}
-
-
 struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                                         struct list_head *packet_list,
                                         struct list_head *instr_list)
@@ -917,9 +898,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
      * host format
      */
     /* TODO: supports only statically linked elf executables */
-    /* TODO: interrupt/exception support: mret, sret, uret and similar */
-    /* TODO: nested interrupt support */
-    /* TODO: boot code hack */
 
     /* find section belonging to start_address */
     bfd_vma start_address = abfd->start_address;
