@@ -137,6 +137,8 @@ class Scoreboard;
                 $display("[SCORE]  @%t: Expected: %h", $time, gm_packet.bits);
                 $display("[SCORE]  @%t: Received: %h", $time, duv_packet.bits);
                 stats.packet_bad++;
+            end else begin
+                $display("[SCORE] @%t: Packet number %0d ok", $time, packetcnt);
             end
         end
 

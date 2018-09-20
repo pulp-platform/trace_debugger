@@ -25,17 +25,24 @@ module trdb_reg
      input logic                      per_we_i,
      input logic                      per_valid_i,
 
+     output                           flush_stream_o,
+     input                            flush_confirm_i,
+
      output logic                     trace_enable_o,
      output logic [31:0]              dump_o);
 
-    // hold configuration data
+    // hold configuration data TODO: reduce size
     logic [31:0] cfg_q, cfg_d;
+
+    // hold control status TODO: reduce size, careful look below too
+    logic [31:0] ctrl_q, ctrl_d;
 
     // allow the user to write to this register to dump data through the trace
     // debugger
     logic [31:0] dump_q, dump_d;
 
     assign trace_enable_o = cfg_q[TRDB_ENABLE];
+    assign flush_stream_o = ctrl_q[TRDB_FLUSH_STREAM];
     assign dump_o = dump_q;
 
     // enable all
@@ -48,6 +55,8 @@ module trdb_reg
             case(per_addr_i)
             REG_TRDB_CFG:
                 per_rdata_o = cfg_q;
+            REG_TRDB_CTRL:
+                per_rdata_o = ctrl_q;
             REG_DUMP:
                 per_rdata_o = 32'h0;
             default:
@@ -63,16 +72,22 @@ module trdb_reg
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
             cfg_q  <= 'h0;
+            ctrl_q <= 'h0;
             dump_q <= 'h0;
         end else begin
             if(per_valid_i & per_we_i) begin
                 case (per_addr_i)
                 REG_TRDB_CFG:
                     cfg_q <= per_wdata_i;
+                REG_TRDB_CTRL:
+                    ctrl_q <= per_wdata_i;
                 REG_DUMP:
                     dump_q <= per_wdata_i;
                 endcase
             end else begin
+                if(flush_confirm_i) begin
+                    ctrl_q <= {ctrl_q[31:1], 1'b0};
+                end
             end
         end
     end

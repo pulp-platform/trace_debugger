@@ -36,14 +36,14 @@ module trace_debugger
      output logic               packet_word_valid_o,
      input logic                stall_i);
 
-    // TODO: add dependencies for this
-    // APB_BUS.Slave              apb_slave);
-
+    // general control of this module
     logic                       trace_enable;
     logic                       packet_after_exception = '1;
 
     logic                       debug_mode;
     logic                       trace_valid;
+    logic                       flush_stream;
+    logic                       flush_confirm;
 
     // unused variables for a more extensive implementation
     // riscy doesn't have those features
@@ -286,13 +286,15 @@ module trace_debugger
          .valid_o(packet_gen_valid),
          .grant_i(packet_is_read));
 
-    trdb_stream_align i_trdb_stream_align
+    trdb_stream_align8 i_trdb_stream_align
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
          .packet_bits_i(packet_bits),
          .packet_len_i(packet_len),
          .valid_i(packet_gen_valid),
          .grant_o(packet_is_read),
+         .flush_stream_i(flush_stream),
+         .flush_confirm_o(flush_confirm),
          .data_o(packet_word),
          .valid_o(packet_word_valid));
 
@@ -373,6 +375,8 @@ module trace_debugger
          .per_we_i(per_we),
          .per_valid_i(per_valid),
          .trace_enable_o(trace_enable),
+         .flush_stream_o(flush_stream),
+         .flush_confirm_i(flush_confirm),
          .dump_o(sw_dump));
 
 

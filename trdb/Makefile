@@ -39,6 +39,7 @@ LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
 		$(PULP_BINUTILS_PATH)/zlib
 
 INCLUDE_PATHS   = $(PULP_BINUTILS_PATH)/include \
+		$(PULP_BINUTILS_PATH)/bfd \
 		$(QUESTASIM_PATH)/include \
 		/usr/include
 

@@ -61,10 +61,13 @@ typedef enum logic [1:0]
 
 // This is information regarding the mapping of configuration registers and the
 // meaning of those bits offset of configuration registers from baseaddress
-parameter REG_TRDB_CFG = 4'h0; //BASEADDR+0x00
-parameter REG_DUMP     = 4'h4; //BASEADDR+0x04
+parameter REG_TRDB_CFG  = 4'h0; //BASEADDR+0x00
+parameter REG_TRDB_CTRL = 4'h4; //BASEADDR+0x04
+parameter REG_DUMP      = 4'h8; //BASEADDR+0x08
+
 
 parameter TRDB_ENABLE = 0;
+parameter TRDB_FLUSH_STREAM = 0;
 
 
 

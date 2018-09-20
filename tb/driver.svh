@@ -168,6 +168,25 @@ class Driver;
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             // take response in monitor.svh
         end
+        $display("[DRIVER] @%t: Flushing buffers.", $time);
+
+        // write flush command to register TODO: make task out of this
+        @(posedge this.duv_if.clk_i);
+        this.duv_if.apb_bus.paddr  = REG_TRDB_CTRL;
+        this.duv_if.apb_bus.pwrite = 1'b1;
+        this.duv_if.apb_bus.psel   = 1'b1;
+        this.duv_if.apb_bus.pwdata = 1;
+
+        @(posedge this.duv_if.clk_i);
+        // we are now the access state of the apb
+        this.duv_if.apb_bus.penable     = 1'b1;
+
+        @(posedge this.duv_if.clk_i);
+        wait(this.duv_if.apb_bus.pready == 1);
+        this.duv_if.apb_bus.penable     = 1'b0;
+        this.duv_if.apb_bus.psel   = 1'b0;
+
+
         $display("[DRIVER] @%t: Driver finished.", $time);
 
         @(posedge this.duv_if.clk_i);
