@@ -34,7 +34,7 @@
 
 struct trdb_config;
 struct trdb_state;
-struct branc_map_state;
+struct branch_map_state;
 struct filter_state;
 
 /* Configuration state of the trace debugger, used to guide the compression and
@@ -73,36 +73,6 @@ struct trdb_state {
     struct tr_instr instr;
 };
 
-
-/* Current state of the cpu during decompression. Allows one to
- * precisely emit a sequence  tr_instr. Handles the exception stack
- * (well here we assume that programs actually do nested exception
- * handling properly) and hardware loops (only the TODO: immediate
- * version for now).
- */
-/* TODO: Note on hw loops interrupted by an interrupt: look at after
- * the interrupt how many instructions of the loop are executed to
- * figure out in which loop number we got interrupted
- */
-struct trdb_dec_state {
-    /* absolute loop addresses */
-    uint32_t lp_start0;
-    uint32_t lp_end0;
-    uint32_t lp_cnt0;
-    uint32_t lp_start1;
-    uint32_t lp_end1;
-    uint32_t lp_cnt1;
-    /* nested interrupt stacks for each privilege mode*/
-    /* uint32_t m_exc_stack; */
-    /* uint32_t s_exc_stack; */
-    /* uint32_t u_exc_stack; */
-    /* record current privilege level */
-    uint32_t privilege : PRIVLEN;
-};
-
-
-/* TODO: interrupt stack (nested interrupts) for decompression? */
-
 /* Responsible to hold current branch state, that is the sequence of taken/not
  * taken branches so far. The bits field keeps track of that by setting the
  * cnt'th bit to 1 or 0 for a taken or not taken branch respectively. There can
@@ -124,6 +94,34 @@ struct filter_state {
     uint64_t resync_cnt;
     bool resync_pend;
     /* uint32_t resync_nh = 0;  */
+};
+
+
+/* Current state of the cpu during decompression. Allows one to
+ * precisely emit a sequence  tr_instr. Handles the exception stack
+ * (well here we assume that programs actually do nested exception
+ * handling properly) and hardware loops (only the TODO: immediate
+ * version for now).
+ */
+/* TODO: Note on hw loops interrupted by an interrupt: look at after
+ * the interrupt how many instructions of the loop are executed to
+ * figure out in which loop number we got interrupted
+ */
+struct trdb_dec_state {
+    /* absolute loop addresses */
+    /* uint32_t lp_start0; */
+    /* uint32_t lp_end0; */
+    /* uint32_t lp_cnt0; */
+    /* uint32_t lp_start1; */
+    /* uint32_t lp_end1; */
+    /* uint32_t lp_cnt1; */
+    /* nested interrupt stacks for each privilege mode*/
+    /* uint32_t m_exc_stack; */
+    /* uint32_t s_exc_stack; */
+    /* uint32_t u_exc_stack; */
+    /* record current privilege level */
+    uint32_t privilege : PRIVLEN;
+    struct branch_map_state branch_map;
 };
 
 
@@ -399,15 +397,10 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     /* TODO: implement filtering logic */
 
     nextc->qualified = true;
-
     nextc->unqualified = !nextc->qualified;
-
     nextc->exception = instr->exception;
-
     nextc->unpred_disc = is_unpred_discontinuity(instr->instr);
-
     nextc->privilege = instr->priv;
-
     nextc->privilege_change = (thisc->privilege != nextc->privilege);
 
     /* TODO: clean this up, proper initial state per round required */
@@ -908,7 +901,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
-    struct trdb_dec_state decomp_ctx = {.privilege = 7};
+    struct trdb_dec_state dec_ctx = {.privilege = 7};
     struct tr_instr dis_instr = {0};
 
     dunit.dinfo = &dinfo;
@@ -927,7 +920,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     }
     bfd_vma pc = start_address; /* TODO: well we get a sync packet anyway... */
 
-    struct branch_map_state branch_map = {0};
     /* we need to be able to look at two packets to make the right
      * decompression decision
      */
@@ -979,9 +971,9 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         switch (packet->format) {
         case F_BRANCH_FULL:
         case F_BRANCH_DIFF:
-            branch_map.cnt = packet->branches;
-            branch_map.bits = packet->branch_map;
-            branch_map.full = packet->branches == 31;
+            dec_ctx.branch_map.cnt = packet->branches;
+            dec_ctx.branch_map.bits = packet->branch_map;
+            dec_ctx.branch_map.full = packet->branches == 31;
             break;
         case F_SYNC:
             break;
@@ -1039,7 +1031,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (status != 0)
                 goto fail;
 
-            dis_instr.priv = decomp_ctx.privilege;
+            dis_instr.priv = dec_ctx.privilege;
             add_trace(c, instr_list, &dis_instr);
 
             pc += size; /* normal case */
@@ -1098,11 +1090,11 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * is full,(except if full and instr before last branch is
              * discontinuity)
              */
-            bool hit_discontinuity = branch_map.full;
+            bool hit_discontinuity = dec_ctx.branch_map.full;
 
 
-            while (
-                !(branch_map.cnt == 0 && (hit_discontinuity || hit_address))) {
+            while (!(dec_ctx.branch_map.cnt == 0
+                     && (hit_discontinuity || hit_address))) {
 
                 int status = 0;
                 int size =
@@ -1110,10 +1102,10 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 if (status != 0)
                     goto fail;
 
-                if (branch_map.cnt == 0 && pc == packet->address)
+                if (dec_ctx.branch_map.cnt == 0 && pc == packet->address)
                     hit_address = true;
 
-                dis_instr.priv = decomp_ctx.privilege;
+                dis_instr.priv = dec_ctx.privilege;
                 add_trace(c, instr_list, &dis_instr);
 
                 /* advance pc */
@@ -1138,12 +1130,12 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                      * then we know that its actually a branch_map
                      * flush + discontinuity packet.
                      */
-                    if (branch_map.cnt > 1 && dinfo.target == 0)
+                    if (dec_ctx.branch_map.cnt > 1 && dinfo.target == 0)
                         err(c,
                             "Can't predict the jump target, never happens\n");
 
-                    if (branch_map.cnt == 1 && dinfo.target == 0) {
-                        if (!branch_map.full) {
+                    if (dec_ctx.branch_map.cnt == 1 && dinfo.target == 0) {
+                        if (!dec_ctx.branch_map.full) {
                             info(
                                 c,
                                 "We hit the not-full branch_map + address edge case, "
@@ -1158,7 +1150,8 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                             pc = packet->address;
                         }
                         hit_discontinuity = true;
-                    } else if (branch_map.cnt > 0 || dinfo.target != 0) {
+                    } else if (dec_ctx.branch_map.cnt > 0
+                               || dinfo.target != 0) {
                         /* we should not hit unpredictable
                          * discontinuities
                          */
@@ -1177,9 +1170,9 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* this case allows us to exhaust the branch bits */
                     {
                         /* 32 would be undefined */
-                        bool branch_taken = branch_map.bits & 1;
-                        branch_map.bits >>= 1;
-                        branch_map.cnt--;
+                        bool branch_taken = dec_ctx.branch_map.bits & 1;
+                        dec_ctx.branch_map.bits >>= 1;
+                        dec_ctx.branch_map.cnt--;
                         if (dinfo.target == 0)
                             err(c,
                                 "Can't predict the jump target, never happens\n");
@@ -1203,7 +1196,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
         } else if (packet->format == F_SYNC) {
             /* Sync pc. */
-            decomp_ctx.privilege = packet->privilege;
+            dec_ctx.privilege = packet->privilege;
             pc = packet->address;
 
             /* since we are abruptly changing the pc we have to check if we
@@ -1233,7 +1226,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (status != 0)
                 goto fail;
 
-            dis_instr.priv = decomp_ctx.privilege;
+            dis_instr.priv = dec_ctx.privilege;
             add_trace(c, instr_list, &dis_instr);
 
             pc += size;
@@ -1311,7 +1304,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 if (pc == packet->address)
                     hit_address = true;
 
-                dis_instr.priv = decomp_ctx.privilege;
+                dis_instr.priv = dec_ctx.privilege;
                 add_trace(c, instr_list, &dis_instr);
 
                 /* advance pc */
