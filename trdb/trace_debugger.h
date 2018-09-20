@@ -62,23 +62,19 @@ struct tr_instr {
     uint32_t iaddr : XLEN;     /**< instruction address */
     uint32_t instr : ILEN;     /**< raw instruction value */
     bool compressed;           /**< instruction was originally compressed */
-    /* Disassembled name, only sometimes valid */
-    char str[INSTR_STR_LEN]; /**< disassembled instruction string */
-
-    // TODO: put this into trdb_packet instead
-    struct list_head list;
+    char str[INSTR_STR_LEN];   /**< disassembled instruction string, only
+                                  sometimes valid */
+    struct list_head list;     /**< anchor for linked list in list.h */
 };
 
-/* TODO: make enums */
-#define F_BRANCH_FULL 0
-#define F_BRANCH_DIFF 1
-#define F_ADDR_ONLY 2
-#define F_SYNC 3
+enum tr_packet_format {
+    F_BRANCH_FULL = 0,
+    F_BRANCH_DIFF = 1,
+    F_ADDR_ONLY = 2,
+    F_SYNC = 3
+};
 
-#define SF_START 0
-#define SF_EXCEPTION 1
-#define SF_CONTEXT 2
-
+enum tr_packet_subformat { SF_START = 0, SF_EXCEPTION = 1, SF_CONTEXT = 2 };
 
 /**
  * Canonical trace packet representation. This is the high level definition of a
