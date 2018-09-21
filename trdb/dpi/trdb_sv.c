@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <svdpi.h>
 #include <stdint.h>
+/* #include "autogen_trdb_sv.h" */
 #include "trdb_sv.h"
 #include "../utils.h"
 #include "../trace_debugger.h"
@@ -120,9 +121,18 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
         info(ctx, "ID: %d\n", packetcnt);
         trdb_print_packet(stdout, latest_packet);
 
-        int total_bytes = svSizeOfLogicPackedArr(packet_max_len);
+        /* SV_PACKED_DATA_NELEMS returns the number ov svLogicVecVal's, which
+         * each have 4 bytes
+         */
+        int total_bytes = SV_PACKED_DATA_NELEMS(packet_max_len) * 4;
+
         /* this is just a integer divions (ceiling) of bitcount/8 */
         int packet_bytes = (bitcnt / 8 + (bitcnt % 8 != 0));
+
+        if (packet_max_len / 8 < packet_bytes) {
+            err(ctx, "packet size on the sv side is too small\n");
+            return;
+        }
 
         /* fill in vector with packet and zero pad */
         for (size_t i = 0; i < total_bytes; i++) {
