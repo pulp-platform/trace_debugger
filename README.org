@@ -52,11 +52,13 @@ The used packet format is described [[https://github.com/riscv/riscv-trace-spec]
    binutils built using [[https://github.com/pulp-platform/pulp-riscv-gnu-toolchain][this]] with the =trace_dbg_dev= branch. Build it by
    calling
    #+BEGIN_SRC bash
-   export CFLAGS="-O2 -g -fPIC"
-   ./configure --enable-targets=riscv32, x86_64-pc-linux-gnu CFLAGS="-g -O2 -fPIC"
-   make all
+     export CFLAGS="-g -O2 -fPIC"
+   ./configure --enable-targets=riscv32, x86_64-pc-linux-gnu --disable-gdb \
+   --disable-ld --disable-gas --disable-gold --disable-intl --disable-gprof \
+   --disable-readline --disable-sim --disable-libdecnumber
+   make clean all
    #+END_SRC
-   TODO: improve this part.
+
 
 ** Building the C model and decompression code
    Run =make all= in =trdb/= for a release build. Make sure to link the
