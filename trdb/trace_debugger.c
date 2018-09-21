@@ -135,6 +135,7 @@ struct trdb_stats {
 
 /* Library context, needs to be passed to most function calls.
  * TODO: don't pass everything via stack
+ * TODO: add comments
  */
 struct trdb_ctx {
     /* specific settings for compression/decompression */
@@ -145,6 +146,7 @@ struct trdb_ctx {
     struct trdb_state nextc;
     struct branch_map_state branch_map;
     struct filter_state filter;
+    uint32_t last_iaddr; /* TODO: make this work with 64 bit */
     /* state used for disassembling */
     struct tr_instr *dis_instr;
     struct disassembler_unit *dunit;
@@ -205,6 +207,7 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
     ctx->nextc = (struct trdb_state){.privilege = 7};
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
+    ctx->last_iaddr = 0;
     ctx->stats = (struct trdb_stats){0};
 }
 
@@ -235,6 +238,7 @@ struct trdb_ctx *trdb_new()
     ctx->nextc = (struct trdb_state){.privilege = 7};
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
+    ctx->last_iaddr = 0;
     ctx->stats = (struct trdb_stats){0};
 
     ctx->log_fn = log_stderr;
@@ -422,7 +426,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                                         struct tr_packet *tr,
                                         struct branch_map_state *branch_map,
                                         struct tr_instr *tc_instr,
-                                        bool full_address)
+                                        uint32_t last_iaddr, bool full_address)
 {
     /* TODO: for now only full address */
     if (!full_address) {
@@ -431,17 +435,41 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
     }
     if (branch_map->cnt == 0) {
         tr->format = F_ADDR_ONLY;
-        tr->address = full_address ? tc_instr->iaddr : 0;
+        if (full_address) {
+            tr->address = tc_instr->iaddr;
+        } else {
+            /* always differential in F_ADDR_ONLY*/
+            tr->address = last_iaddr - tc_instr->iaddr;
+        }
+        /* TODO: compress length with differential */
         tr->length = 2 + XLEN;
         assert(branch_map->bits == 0);
     } else {
         if (branch_map->full)
             dbg(ctx, "full branch map and discontinuity edge case\n");
 
-        tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
+        if (full_address) {
+            tr->format = F_BRANCH_FULL;
+            tr->address = tc_instr->iaddr;
+        } else {
+            /* In this mode we try to compress the instruction address by taking
+             * the difference address or the absolute address, whichever has
+             * more bits which can be inferred by signextension.
+             */
+            uint32_t diff = last_iaddr - tc_instr->iaddr;
+            uint32_t full = tc_instr->iaddr;
+            int lead = 0;
+            if (differential_addr(&lead, full, diff)) {
+                tr->format = F_BRANCH_DIFF;
+                tr->address = diff;
+            } else {
+                tr->format = F_BRANCH_FULL;
+                tr->address = full;
+            }
+        }
         tr->branches = branch_map->cnt;
         tr->branch_map = branch_map->bits;
-        tr->address = tc_instr->iaddr;
+        /* TODO: compress length with differential */
         tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
         *branch_map = (struct branch_map_state){0};
     }
@@ -494,6 +522,11 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     nextc->unpred_disc = is_unpred_discontinuity(instr->instr);
     nextc->privilege = instr->priv;
     nextc->privilege_change = (thisc->privilege != nextc->privilege);
+
+    /* last address we emitted in packet, needed to compute differential
+     * addresses
+     */
+    uint32_t *last_iaddr = &ctx->last_iaddr;
 
     /* TODO: clean this up, proper initial state per round required */
     thisc->emitted_exception_sync = false;
@@ -552,6 +585,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          */
         ALLOC_PACKET(tr);
         emit_exception_packet(tr, lc_instr, tc_instr, nc_instr);
+        *last_iaddr = tr->address;
 
         list_add(&tr->list, packet_list);
 
@@ -577,6 +611,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          */
         ALLOC_PACKET(tr);
         emit_start_packet(tr, tc_instr, nc_instr);
+        *last_iaddr = tr->address;
 
         list_add(&tr->list, packet_list);
 
@@ -595,6 +630,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          */
         ALLOC_PACKET(tr);
         emit_start_packet(tr, tc_instr, nc_instr);
+        *last_iaddr = tr->address;
 
         list_add(&tr->list, packet_list);
 
@@ -608,9 +644,10 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          */
         ALLOC_PACKET(tr);
         if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
-                                         full_address)) {
+                                         *last_iaddr, full_address)) {
             goto fail;
         }
+        *last_iaddr = tr->address;
 
         list_add(&tr->list, packet_list);
 
@@ -624,9 +661,10 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          */
         ALLOC_PACKET(tr);
         if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
-                                         full_address)) {
+                                         *last_iaddr, full_address)) {
             goto fail;
         }
+        *last_iaddr = tr->address;
 
         list_add(&tr->list, packet_list);
 
@@ -640,9 +678,10 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          */
         ALLOC_PACKET(tr);
         if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
-                                         full_address)) {
+                                         *last_iaddr, full_address)) {
             goto fail;
         }
+        *last_iaddr = tr->address;
 
         list_add(&tr->list, packet_list);
 
@@ -673,6 +712,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* tr->format = F_SYNC; */
         /* tr->subformat = SF_CONTEXT; */
         /* tr->context = 0; /\* TODO: what comes here? *\/ */
+        /* *last_iaddr = tr->address; */
         /* tr->privilege = tc_instr->priv; */
         /* /\* tr->branch *\/ */
         /* /\* tr->address *\/ */
@@ -908,6 +948,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
+    /*TODO: move this into trdb_ctx so that we can continuously decode pieces?*/
     struct trdb_dec_state dec_ctx = {.privilege = 7};
     struct tr_instr dis_instr = {0};
 
@@ -1110,7 +1151,11 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 }
             }
         } else if (packet->format == F_BRANCH_DIFF) {
-            err(c, "F_BRANCH_DIFF decoding: not implemented yet\n");
+            if (c->config.full_address) {
+                err(c,
+                    "F_BRANCH_DIFF shouldn't happen, decoder configured with full_address\n");
+                goto fail;
+            }
 
         } else if (packet->format == F_SYNC) {
             /* Sync pc. */
