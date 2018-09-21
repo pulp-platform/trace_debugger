@@ -287,12 +287,29 @@ void trdb_disassemble_instr(struct tr_instr *instr,
 void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list);
 
 /**
+ * Log a single packet in a formatted manner using the library context @p c.
+ *
+ * @param c the context of the trace debugger
+ * @param packet tr_packet to log
+ */
+void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet);
+
+/**
  *  Prints a single packet in a formatted manner to @p stream.
  *
  * @param stream output to write to
  * @param packet tr_packet to print
  */
 void trdb_print_packet(FILE *stream, const struct tr_packet *packet);
+
+/**
+ *  Log a single instruction in a formatted manner using the library context @p
+ * c.
+ *
+ * @param c the context of the trace debugger
+ * @param instr tr_instr to log
+ */
+void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *packet);
 
 /**
  *  Prints a single instruction in a formatted manner to @p stream.

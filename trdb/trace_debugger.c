@@ -688,21 +688,18 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         ctx->stats.packets++;
     }
 
+    if (generated_packet) {
+        trdb_log_packet(
+            ctx, list_entry(packet_list->next, typeof(struct tr_packet), list));
+    }
 
-    /* TODO: unfortunately this ignores log_fn */
-    if (trdb_get_log_priority(ctx) == LOG_DEBUG) {
-        if (generated_packet) {
-            trdb_print_packet(
-                stderr,
-                list_entry(packet_list->next, typeof(struct tr_packet), list));
-        }
-
-        if (ctx->dunit) {
+    if (ctx->dunit) {
+        /* TODO: unfortunately this ignores log_fn */
+        if (trdb_get_log_priority(ctx) == LOG_DEBUG)
             trdb_disassemble_instr(instr, ctx->dunit);
-        } else {
-            dbg(ctx, "0x%016jx  0x%08jx\n", (uintmax_t)instr->iaddr,
-                (uintmax_t)instr->instr);
-        }
+    } else {
+        dbg(ctx, "0x%016jx  0x%08jx\n", (uintmax_t)instr->iaddr,
+            (uintmax_t)instr->instr);
     }
 
     /* also print packet */
@@ -1755,6 +1752,53 @@ void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list)
     }
 }
 
+
+void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
+{
+    switch (packet->format) {
+    case F_BRANCH_FULL:
+    case F_BRANCH_DIFF:
+        dbg(c, "PACKET ");
+        packet->format == F_BRANCH_FULL ? dbg(c, "0: F_BRANCH_FULL\n")
+                                        : dbg(c, "1: F_BRANCH_DIFF\n");
+        dbg(c, "    branches  : %" PRIu32 "\n", packet->branches);
+        dbg(c, "    branch_map: 0x%" PRIx32 "\n", packet->branch_map);
+        dbg(c, "    address   : 0x%" PRIx32 "\n", packet->address);
+        /* TODO: that special full branch map behaviour */
+        break;
+
+    case F_ADDR_ONLY:
+        dbg(c, "PACKET 2: F_ADDR_ONLY\n");
+        dbg(c, "    address   : 0x%" PRIx32 "\n", packet->address);
+        break;
+    case F_SYNC:
+        dbg(c, "PACKET 3: F_SYNC\n");
+        const char *subf[4];
+        subf[0] = "SF_START";
+        subf[1] = "SF_EXCEPTION";
+        subf[2] = "SF_CONTEXT";
+        subf[3] = "RESERVED";
+        dbg(c, "    subformat : %s\n", subf[packet->subformat]);
+
+        /* TODO fix this */
+        dbg(c, "    context   :\n");
+        dbg(c, "    privilege : 0x%" PRIx32 "\n", packet->privilege);
+        if (packet->subformat == SF_CONTEXT)
+            return;
+
+        dbg(c, "    branch    : %s\n", packet->branch ? "true" : "false");
+        dbg(c, "    address   : 0x%" PRIx32 "\n", packet->address);
+        if (packet->subformat == SF_START)
+            return;
+
+        dbg(c, "    ecause    : 0x%" PRIx32 "\n", packet->ecause);
+        dbg(c, "    interrupt : %s\n", packet->interrupt ? "true" : "false");
+        dbg(c, "    tval      : 0x%" PRIx32 "\n", packet->tval);
+        /* SF_EXCEPTION */
+    }
+}
+
+
 void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
 {
     switch (packet->format) {
@@ -1802,6 +1846,21 @@ void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
     }
 }
 
+
+void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *instr)
+{
+    dbg(c, "INSTR\n");
+    dbg(c, "    exception : %s\n", instr->exception ? "true" : "false");
+    dbg(c, "    interrupt : %s\n", instr->interrupt ? "true" : "false");
+    dbg(c, "    cause     : 0x%" PRIx32 "\n", instr->cause);
+    dbg(c, "    tval      : 0x%" PRIx32 "\n", instr->tval);
+    dbg(c, "    priv      : 0x%" PRIx32 "\n", instr->priv);
+    dbg(c, "    iaddr     : 0x%" PRIx32 "\n", instr->iaddr);
+    dbg(c, "    instr     : 0x%" PRIx32 "\n", instr->instr);
+    dbg(c, "    compressed: %s\n", instr->compressed ? "true" : "false");
+}
+
+
 void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
 {
     fprintf(stream, "INSTR\n");
@@ -1817,6 +1876,7 @@ void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
     fprintf(stream, "    compressed: %s\n",
             instr->compressed ? "true" : "false");
 }
+
 
 void trdb_free_packet_list(struct list_head *packet_list)
 {
