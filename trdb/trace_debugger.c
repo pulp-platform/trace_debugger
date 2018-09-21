@@ -459,9 +459,9 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        tr->format = F_SYNC; /* sync */
-        tr->subformat = 1;   /* exception */
-        tr->context = 0;     /* TODO: what comes here? */
+        tr->format = F_SYNC;          /* sync */
+        tr->subformat = SF_EXCEPTION; /* exception */
+        tr->context = 0;              /* TODO: what comes here? */
         tr->privilege = tc_instr->priv;
 
         if (is_branch(tc_instr->instr)
@@ -504,9 +504,9 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        tr->format = F_SYNC; /* sync */
-        tr->subformat = 0;   /* start */
-        tr->context = 0;     /* TODO: what comes here? */
+        tr->format = F_SYNC;      /* sync */
+        tr->subformat = SF_START; /* start */
+        tr->context = 0;          /* TODO: what comes here? */
         tr->privilege = tc_instr->priv;
         if (is_branch(tc_instr->instr)
             && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
@@ -532,9 +532,9 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        tr->format = F_SYNC; /* sync */
-        tr->subformat = 0;   /* start */
-        tr->context = 0;     /* TODO: what comes here? */
+        tr->format = F_SYNC;      /* sync */
+        tr->subformat = SF_START; /* start */
+        tr->context = 0;          /* TODO: what comes here? */
         tr->privilege = tc_instr->priv;
         if (is_branch(tc_instr->instr)
             && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
@@ -658,7 +658,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         goto fail;
         /* ALLOC_INIT_PACKET(tr); */
         /* tr->format = F_SYNC; */
-        /* tr->subformat = 2; */
+        /* tr->subformat = SF_CONTEXT; */
         /* tr->context = 0; /\* TODO: what comes here? *\/ */
         /* tr->privilege = tc_instr->priv; */
         /* /\* tr->branch *\/ */
