@@ -370,6 +370,98 @@ static bool differential_addr(int *lead, uint32_t absolute,
 }
 
 
+static void emit_exception_packet(struct tr_packet *tr,
+                                  struct tr_instr *lc_instr,
+                                  struct tr_instr *tc_instr,
+                                  struct tr_instr *nc_instr)
+{
+    tr->format = F_SYNC;          /* sync */
+    tr->subformat = SF_EXCEPTION; /* exception */
+    tr->context = 0;              /* TODO: what comes here? */
+    tr->privilege = tc_instr->priv;
+
+    if (is_branch(tc_instr->instr)
+        && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
+                         nc_instr->iaddr))
+        tr->branch = 1;
+    else
+        tr->branch = 0;
+
+    tr->address = tc_instr->iaddr;
+    /* With this packet we record last cycles exception
+     * information. It's not possible for (i==0 &&
+     * lastc_exception) to be true since it takes one cycle
+     * for lastc_exception to change
+     */
+    tr->ecause = lc_instr->cause;
+    tr->interrupt = lc_instr->interrupt;
+    tr->tval = lc_instr->tval;
+    tr->length = 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+}
+
+
+static void emit_start_packet(struct tr_packet *tr, struct tr_instr *tc_instr,
+                              struct tr_instr *nc_instr)
+{
+    tr->format = F_SYNC;      /* sync */
+    tr->subformat = SF_START; /* start */
+    tr->context = 0;          /* TODO: what comes here? */
+    tr->privilege = tc_instr->priv;
+    if (is_branch(tc_instr->instr)
+        && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
+                         nc_instr->iaddr))
+        tr->branch = 1;
+    else
+        tr->branch = 0;
+    tr->address = tc_instr->iaddr;
+    tr->length = 2 + 2 + PRIVLEN + 1 + XLEN;
+}
+
+
+static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
+                                        struct tr_packet *tr,
+                                        struct branch_map_state *branch_map,
+                                        struct tr_instr *tc_instr,
+                                        bool full_address)
+{
+    /* TODO: for now only full address */
+    if (!full_address) {
+        err(ctx, "full_address false: Not implemented yet\n");
+        return -1;
+    }
+    if (branch_map->cnt == 0) {
+        tr->format = F_ADDR_ONLY;
+        tr->address = full_address ? tc_instr->iaddr : 0;
+        tr->length = 2 + XLEN;
+        assert(branch_map->bits == 0);
+    } else {
+        if (branch_map->full)
+            dbg(ctx, "full branch map and discontinuity edge case\n");
+
+        tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
+        tr->branches = branch_map->cnt;
+        tr->branch_map = branch_map->bits;
+        tr->address = tc_instr->iaddr;
+        tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
+        *branch_map = (struct branch_map_state){0};
+    }
+
+    return 0;
+}
+
+
+static void emit_full_branch_map(struct tr_packet *tr,
+                                 struct branch_map_state *branch_map)
+{
+    assert(branch_map->cnt == 31);
+    tr->format = F_BRANCH_FULL;
+    tr->branches = branch_map->cnt;
+    tr->branch_map = branch_map->bits;
+    /* No address needed */
+    tr->length = 2 + 7 + branch_map_len(31);
+    *branch_map = (struct branch_map_state){0};
+}
+
 int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct list_head *packet_list,
                              struct tr_instr *instr)
@@ -459,28 +551,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        tr->format = F_SYNC;          /* sync */
-        tr->subformat = SF_EXCEPTION; /* exception */
-        tr->context = 0;              /* TODO: what comes here? */
-        tr->privilege = tc_instr->priv;
+        emit_exception_packet(tr, lc_instr, tc_instr, nc_instr);
 
-        if (is_branch(tc_instr->instr)
-            && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
-                             nc_instr->iaddr))
-            tr->branch = 1;
-        else
-            tr->branch = 0;
-
-        tr->address = tc_instr->iaddr;
-        /* With this packet we record last cycles exception
-         * information. It's not possible for (i==0 &&
-         * lastc_exception) to be true since it takes one cycle
-         * for lastc_exception to change
-         */
-        tr->ecause = lc_instr->cause;
-        tr->interrupt = lc_instr->interrupt;
-        tr->tval = lc_instr->tval;
-        tr->length = 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
         list_add(&tr->list, packet_list);
 
         thisc->emitted_exception_sync = true;
@@ -504,18 +576,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        tr->format = F_SYNC;      /* sync */
-        tr->subformat = SF_START; /* start */
-        tr->context = 0;          /* TODO: what comes here? */
-        tr->privilege = tc_instr->priv;
-        if (is_branch(tc_instr->instr)
-            && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
-                             nc_instr->iaddr))
-            tr->branch = 1;
-        else
-            tr->branch = 0;
-        tr->address = tc_instr->iaddr;
-        tr->length = 2 + 2 + PRIVLEN + 1 + XLEN;
+        emit_start_packet(tr, tc_instr, nc_instr);
+
         list_add(&tr->list, packet_list);
 
         filter->resync_pend = false;
@@ -532,18 +594,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        tr->format = F_SYNC;      /* sync */
-        tr->subformat = SF_START; /* start */
-        tr->context = 0;          /* TODO: what comes here? */
-        tr->privilege = tc_instr->priv;
-        if (is_branch(tc_instr->instr)
-            && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
-                             nc_instr->iaddr))
-            tr->branch = 1;
-        else
-            tr->branch = 0;
-        tr->address = tc_instr->iaddr;
-        tr->length = 2 + 2 + PRIVLEN + 1 + XLEN;
+        emit_start_packet(tr, tc_instr, nc_instr);
+
         list_add(&tr->list, packet_list);
 
         filter->resync_pend = false;
@@ -555,24 +607,11 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0/1/2
          */
         ALLOC_PACKET(tr);
-        /* TODO: for now only full address */
-        if (!full_address) {
-            err(ctx, "full_address false: Not implemented yet\n");
+        if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+                                         full_address)) {
             goto fail;
         }
-        if (branch_map->cnt == 0) {
-            tr->format = F_ADDR_ONLY;
-            tr->address = full_address ? tc_instr->iaddr : 0;
-            tr->length = 2 + XLEN;
-            assert(branch_map->bits == 0);
-        } else {
-            tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
-            tr->branches = branch_map->cnt;
-            tr->branch_map = branch_map->bits;
-            tr->address = tc_instr->iaddr;
-            tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
-            *branch_map = (struct branch_map_state){0};
-        }
+
         list_add(&tr->list, packet_list);
 
         generated_packet = 1;
@@ -584,19 +623,12 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0/1/2
          */
         ALLOC_PACKET(tr);
-        /* TODO: for now only full address */
-        if (!full_address) {
-            err(ctx, "full_address false: Not implemented yet\n");
+        if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+                                         full_address)) {
             goto fail;
         }
-        tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
-        tr->branches = branch_map->cnt;
-        tr->branch_map = branch_map->bits;
-        tr->address = full_address ? tc_instr->iaddr : 0;
-        tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
-        list_add(&tr->list, packet_list);
 
-        *branch_map = (struct branch_map_state){0};
+        list_add(&tr->list, packet_list);
 
         generated_packet = 1;
         /* end of cycle */
@@ -607,24 +639,11 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0/1/2
          */
         ALLOC_PACKET(tr);
-        /* TODO: for now only full address */
-        if (!full_address) {
-            err(ctx, "full_address false: Not implemented yet\n");
+        if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+                                         full_address)) {
             goto fail;
         }
-        if (branch_map->cnt == 0) {
-            tr->format = F_ADDR_ONLY;
-            tr->address = full_address ? tc_instr->iaddr : 0;
-            tr->length = 2 + XLEN;
-            assert(branch_map->bits == 0);
-        } else {
-            tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
-            tr->branches = branch_map->cnt;
-            tr->branch_map = branch_map->bits;
-            tr->address = full_address ? tc_instr->iaddr : 0;
-            tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
-            *branch_map = (struct branch_map_state){0};
-        }
+
         list_add(&tr->list, packet_list);
 
         generated_packet = 1;
@@ -635,16 +654,10 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0
          * no address
          */
-        assert(branch_map->cnt == 31);
         ALLOC_PACKET(tr);
-        tr->format = F_BRANCH_FULL;
-        tr->branches = branch_map->cnt;
-        tr->branch_map = branch_map->bits;
-        /* tr->address  TODO: no address, study explanation */
-        tr->length = 2 + 7 + branch_map_len(31);
-        list_add(&tr->list, packet_list);
+        emit_full_branch_map(tr, branch_map);
 
-        *branch_map = (struct branch_map_state){0};
+        list_add(&tr->list, packet_list);
 
         generated_packet = 1;
         /* end of cycle */
