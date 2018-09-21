@@ -71,11 +71,9 @@ module trdb_priority
                 // TODO: lc_emitted_exception_sync
                 // TODO: missing some conditions
             end else if (lc_exception_sync_i) begin
-                if(branch_map_empty_i)
-                    packet_format_o = F_ADDR_ONLY;
-                else
-                    packet_format_o = F_BRANCH_FULL;
-                valid_o = '1;
+                packet_format_o    = F_SYNC;
+                packet_subformat_o = SF_START;
+                valid_o            = '1;
 
             end else if (tc_first_qualified_i || tc_unhalted_i ||
                          tc_privchange_i) begin

@@ -496,32 +496,29 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * handler. This a bit hacky and made to work for the PULP. If
          * someone puts something else than a jump instruction there then
          * all bets are off. This is a custom change.
-         * TODO: merge this with lastc.unpred_discon
          */
+        /* Start packet */
         /* Send te_inst:
-         * format 0/1/2
+         * format 3
+         * subformat 0 (start, no ecause, interrupt and tval)
+         * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        /* TODO: for now only full address */
-        if (!full_address) {
-            err(ctx, "full_address false: Not implemented yet\n");
-            goto fail;
-        }
-        if (branch_map->cnt == 0) {
-            tr->format = F_ADDR_ONLY;
-            tr->address = full_address ? tc_instr->iaddr : 0;
-            tr->length = 2 + XLEN;
-            assert(branch_map->bits == 0);
-        } else {
-            tr->format = full_address ? F_BRANCH_FULL : F_BRANCH_DIFF;
-            tr->branches = branch_map->cnt;
-            tr->branch_map = branch_map->bits;
-            tr->address = full_address ? tc_instr->iaddr : 0;
-            tr->length = 2 + 7 + branch_map_len(branch_map->cnt) + XLEN;
-            *branch_map = (struct branch_map_state){0};
-        }
+        tr->format = F_SYNC; /* sync */
+        tr->subformat = 0;   /* start */
+        tr->context = 0;     /* TODO: what comes here? */
+        tr->privilege = tc_instr->priv;
+        if (is_branch(tc_instr->instr)
+            && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
+                             nc_instr->iaddr))
+            tr->branch = 1;
+        else
+            tr->branch = 0;
+        tr->address = tc_instr->iaddr;
+        tr->length = 2 + 2 + PRIVLEN + 1 + XLEN;
         list_add(&tr->list, packet_list);
 
+        filter->resync_pend = false;
         generated_packet = 1;
         /* end of cycle */
 
@@ -982,99 +979,10 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         }
 
         if (trdb_get_log_priority(c) == LOG_DEBUG) {
-            /* TODO: leverage log_fn */
-            trdb_print_packet(stderr, packet);
+            trdb_log_packet(c, packet);
         }
 
-        if (last_packet && last_packet->format == F_SYNC
-            && last_packet->subformat == SF_EXCEPTION) {
-            /* exceptions come with three packets: flush, F_SYNC, and
-             * F_ADDR_ONLY/F_BRANCH_*. The last packet is kinda of a hack to
-             * bridge over the vector table jump instruction (which can change
-             * at runtime) TODO: use F_SYNC packet instead and remove this
-             * clause
-             */
-            assert(packet->format == F_BRANCH_FULL
-                   || packet->format == F_ADDR_ONLY
-                   || packet->format == F_BRANCH_DIFF);
-            info(c, "Jumping over vector table\n");
-
-            pc = packet->address;
-
-            /* since we are abruptly changing the pc we have to check if we
-             * leave the section before we can disassemble. This is really ugly
-             * TODO: fix
-             */
-            if (pc >= section->vma + stop_offset || pc < section->vma) {
-                free_section_for_debugging(&dinfo);
-
-                section = get_section_for_vma(abfd, pc);
-                if (!section) {
-                    err(c, "VMA (PC) not pointing to any section\n");
-                    goto fail;
-                }
-                stop_offset =
-                    bfd_get_section_size(section) / dinfo.octets_per_byte;
-
-                if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
-                    err(c, "Failed alloc_section_for_debugging\n");
-                    goto fail;
-                }
-                info(c, "Switched to section:%s\n", section->name);
-            }
-
-            int status = 0;
-            int size = disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
-            if (status != 0)
-                goto fail;
-
-            dis_instr.priv = dec_ctx.privilege;
-            add_trace(c, instr_list, &dis_instr);
-
-            pc += size; /* normal case */
-
-            switch (dinfo.insn_type) {
-            case dis_nonbranch:
-                /* TODO: we need this hack since {m,s,u} ret are not classified
-                 * in libopcodes
-                 */
-                if (!is_unpred_discontinuity(dis_instr.instr)) {
-                    break;
-                }
-                info(c, "Detected mret, uret or sret\n");
-            case dis_jsr:    /* There is not real difference ... */
-            case dis_branch: /* ... between those two */
-                if (dinfo.target == 0) {
-                    err(c,
-                        "First instruction after vector table is unpredictable "
-                        "discontinuity\n");
-                    err(c, "TODO: fix this case by looking at next packet\n");
-                    goto fail;
-                }
-                pc = dinfo.target;
-                break;
-
-            case dis_condbranch:
-                if (dinfo.target == 0)
-                    err(c, "Can't predict the jump target, never happens\n");
-                if (packet->branches != 1)
-                    err(c, "Wrong number of branch entries\n");
-                if (packet->branch_map & 1) {
-                    err(c,
-                        "Doing a branch in the first intruction after vector table "
-                        "jump\n");
-                    pc = dinfo.target;
-                }
-                break;
-
-            case dis_dref: /* TODO: is this useful? */
-            case dis_dref2:
-            case dis_condjsr:
-            case dis_noninsn:
-                err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
-                goto fail;
-            }
-        } else if (packet->format == F_BRANCH_FULL) {
+        if (packet->format == F_BRANCH_FULL) {
             /* We have to find the instruction where we can apply the address
              * information to. This might either be a discontinuity infromation
              * or a sync up address. The search_discontinuity
@@ -1759,8 +1667,11 @@ void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
     case F_BRANCH_FULL:
     case F_BRANCH_DIFF:
         dbg(c, "PACKET ");
-        packet->format == F_BRANCH_FULL ? dbg(c, "0: F_BRANCH_FULL\n")
-                                        : dbg(c, "1: F_BRANCH_DIFF\n");
+        if (packet->format == F_BRANCH_FULL)
+            dbg(c, "0: F_BRANCH_FULL\n");
+        else
+            dbg(c, "1: F_BRANCH_DIFF\n");
+
         dbg(c, "    branches  : %" PRIu32 "\n", packet->branches);
         dbg(c, "    branch_map: 0x%" PRIx32 "\n", packet->branch_map);
         dbg(c, "    address   : 0x%" PRIx32 "\n", packet->address);

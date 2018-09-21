@@ -183,7 +183,11 @@ PACKET 3: F_SYNC
     ecause    : 0x1a
     interrupt : true
     tval      : 0x0
-PACKET 2: F_ADDR_ONLY
+PACKET 3: F_SYNC
+    subformat : SF_START
+    context   :
+    privilege : 0x7
+    branch    : false
     address   : 0x1c0081be
 PACKET 0: F_BRANCH_FULL
     branches  : 2
