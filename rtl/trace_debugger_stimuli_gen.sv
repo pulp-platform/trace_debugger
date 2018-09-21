@@ -47,9 +47,12 @@ module trace_debugger_stimuli_gen
             $fatal("[TRDB] Failed to open file");
 
         forever @(negedge clk_i) begin
-            if (!ivalid_i) begin
+            if(~rst_ni) begin
                 continue;
             end
+            // if(!ivalid_i) begin
+            //     continue;
+            // end
             $fdisplay(fd,"valid=%h exception=%h interrupt=%h cause=%h",
                       ivalid_i, iexception_i, interrupt_i, cause_i,
                       " tval=%h priv=%h compressed=%h addr=%h instr=%h",
