@@ -121,11 +121,13 @@ struct trdb_dec_state {
     /* uint32_t u_exc_stack; */
     /* record current privilege level */
     uint32_t privilege : PRIVLEN;
+    uint32_t last_packet_addr;
     struct branch_map_state branch_map;
 };
 
 
 struct trdb_stats {
+    size_t payloadbits;
     size_t packetbits;
     size_t instrbits;
     size_t instrs;
@@ -1051,6 +1053,11 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              */
             bool hit_discontinuity = dec_ctx.branch_map.full;
 
+            /* Remember last packet address to be able to compute differential
+             * addresses
+             */
+            dec_ctx.last_packet_addr = packet->address;
+
 
             while (!(dec_ctx.branch_map.cnt == 0
                      && (hit_discontinuity || hit_address))) {
@@ -1157,10 +1164,131 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 goto fail;
             }
 
+            /* We have to find the instruction where we can apply the address
+             * information to. This might either be a discontinuity information
+             * or a sync up address. Furthermore we have to calculate the
+             * absolute address we are referring to.
+             */
+            bool hit_address = false;
+            /* We don't need to care about the address field if the branch map
+             * is full,(except if full and instr before last branch is
+             * discontinuity)
+             */
+            bool hit_discontinuity = dec_ctx.branch_map.full;
+
+            uint32_t absolute_addr = dec_ctx.last_packet_addr - packet->address;
+            /* Remember last packet address to be able to compute differential
+             * addresses
+             */
+            dec_ctx.last_packet_addr = absolute_addr;
+
+
+            while (!(dec_ctx.branch_map.cnt == 0
+                     && (hit_discontinuity || hit_address))) {
+
+                int status = 0;
+                int size =
+                    disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
+                if (status != 0)
+                    goto fail;
+
+                if (dec_ctx.branch_map.cnt == 0 && pc == absolute_addr)
+                    hit_address = true;
+
+                dis_instr.priv = dec_ctx.privilege;
+                add_trace(c, instr_list, &dis_instr);
+
+                /* advance pc */
+                pc += size;
+
+                /* we hit a conditional branch, follow or not and update map */
+                switch (dinfo.insn_type) {
+                case dis_nonbranch:
+                    /* TODO: we need this hack since {m,s,u} ret are not
+                     * classified
+                     */
+                    if (!is_unpred_discontinuity(dis_instr.instr)) {
+                        break;
+                    }
+                    info(c, "Detected mret, uret or sret\n");
+                case dis_jsr:    /* There is not real difference ... */
+                case dis_branch: /* ... between those two */
+                    /* we know that this instruction must have its jump target
+                     * encoded in the binary else we would have gotten a
+                     * non-predictable discontinuity packet. If
+                     * branch_map.cnt == 0 + jump target unknown and we are here
+                     * then we know that its actually a branch_map
+                     * flush + discontinuity packet.
+                     */
+                    if (dec_ctx.branch_map.cnt > 1 && dinfo.target == 0)
+                        err(c,
+                            "Can't predict the jump target, never happens\n");
+
+                    if (dec_ctx.branch_map.cnt == 1 && dinfo.target == 0) {
+                        if (!dec_ctx.branch_map.full) {
+                            info(
+                                c,
+                                "We hit the not-full branch_map + address edge case, "
+                                "(branch following discontinuity is included in this "
+                                "packet)\n");
+                            /* TODO: should I poison addr? */
+                            pc = absolute_addr;
+                        } else {
+                            info(
+                                c,
+                                "We hit the full branch_map + address edge case\n");
+                            pc = absolute_addr;
+                        }
+                        hit_discontinuity = true;
+                    } else if (dec_ctx.branch_map.cnt > 0
+                               || dinfo.target != 0) {
+                        /* we should not hit unpredictable discontinuities */
+                        pc = dinfo.target;
+                    } else {
+                        /* we finally hit a jump with unknown destination, thus
+                         * the information in this packet is used up
+                         */
+                        pc = absolute_addr;
+                        hit_discontinuity = true;
+                        info(c, "Found the discontinuity\n");
+                    }
+                    break;
+
+                case dis_condbranch:
+                    /* this case allows us to exhaust the branch bits */
+                    {
+                        /* 32 would be undefined */
+                        bool branch_taken = dec_ctx.branch_map.bits & 1;
+                        dec_ctx.branch_map.bits >>= 1;
+                        dec_ctx.branch_map.cnt--;
+                        if (dinfo.target == 0)
+                            err(c,
+                                "Can't predict the jump target, never happens\n");
+                        if (branch_taken)
+                            pc = dinfo.target;
+                        break;
+                    }
+                case dis_dref:
+                    /* err(c, "Don't know what to do with this type\n"); */
+                    break;
+
+                case dis_dref2:
+                case dis_condjsr:
+                case dis_noninsn:
+                    err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
+                    goto fail;
+                }
+            }
+
         } else if (packet->format == F_SYNC) {
             /* Sync pc. */
             dec_ctx.privilege = packet->privilege;
             pc = packet->address;
+
+            /* Remember last packet address to be able to compute differential
+             * addresses
+             */
+            dec_ctx.last_packet_addr = packet->address;
 
             /* since we are abruptly changing the pc we have to check if we
              * leave the section before we can disassemble. This is really ugly
@@ -1251,6 +1379,17 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             bool hit_address = false;
             bool hit_discontinuity = false;
 
+            uint32_t absolute_addr;
+            if (c->config.full_address)
+                absolute_addr = packet->address;
+            else
+                absolute_addr = dec_ctx.last_packet_addr - packet->address;
+
+            /* Remember last packet address to be able to compute differential
+             * addresses
+             */
+            dec_ctx.last_packet_addr = absolute_addr;
+
             while (!(hit_address || hit_discontinuity)) {
                 int status = 0;
                 int size =
@@ -1264,7 +1403,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     goto fail;
                 }
 
-                if (pc == packet->address)
+                if (pc == absolute_addr)
                     hit_address = true;
 
                 dis_instr.priv = dec_ctx.privilege;
@@ -1288,7 +1427,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         pc = dinfo.target;
                     } else {
                         info(c, "Found the discontinuity\n");
-                        pc = packet->address;
+                        pc = absolute_addr;
                         hit_discontinuity = true;
                     }
                     break;
