@@ -40,6 +40,8 @@
 #define PACKETLEN 7
 
 /* given header */
+#define FORMATLEN 2
+#define BRANCHLEN 5
 #define XLEN 32
 #define CAUSELEN 5
 #define PRIVLEN 3
