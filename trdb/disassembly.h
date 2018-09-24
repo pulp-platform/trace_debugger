@@ -33,6 +33,10 @@
 #include "bfd.h"
 #include "demangle.h"
 #include "dis-asm.h"
+#include "trace_debugger.h"
+
+/* forward declarations */
+struct trdb_ctx;
 
 /* TODO: berkley */
 #define DECLARE_INSN(code, match, mask)                                        \
@@ -142,6 +146,60 @@ void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
  */
 int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
                            char *options);
+
+/**
+ * Initialize disassembler_unit and its containing disassemble_info from
+ * libopcodes by grabbing meta data out of @p abfd. Furthermore it allocates
+ * internal structures to allow #disassemble_fn in @p dunit to resolve addresses
+ * to nearest symbols. TODO: trdb_ctx sets demangle, disassembly options and
+ * more.
+ *
+ * @param c the trace debugger context containing settings
+ * @param abfd the bfd representing the binary
+ * @param dunit filled with information from @p abfd
+ * @return 0 on success, any other value on failure
+ */
+int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
+                              struct disassembler_unit *dunit);
+/**
+ * Free the memory allocated to @p abfd and @p dunit by a call to
+ * trdb_alloc_dinfo_with_bfd.
+ *
+ * @param c the trace debugger context containing settings
+ * @param abfd the bfd representing the binary
+ * @param dunit filled with information from @p abfd
+ */
+void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
+                              struct disassembler_unit *dunit);
+
+/**
+ * A #print_address_func used in disassemble_info, set by
+ * trdb_alloc_dinfo_with_bfd, which resolve addresses to symbols. This callback
+ * is only well defined if its disassemble_info struct was initialized using
+ * trdb_alloc_dinfo_with_bfd.
+ *
+ * This is a callback function, if registered, called by libopcodes to custom
+ * format addresses. It can also be abused to print other information.
+ *
+ * @param vma the virtual memory address where this instruction is located at
+ * @param dinfo context of disassembly
+ */
+void trdb_print_address(bfd_vma vma, struct disassemble_info *inf);
+
+/**
+ * A #symbol_at_address function used in disassemble_info, set by
+ * trdb_alloc_dinfo_with_bfd.
+ *
+ * This is a callback function, which gives libopcodes information about
+ * specific addresses. Determines if the given address has a symbol associated
+ * with it.
+ *
+ * @param vma the virtual memory address where this instruction is located at
+ * @param dinfo context of disassembly
+ * @return
+ */
+int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf);
+
 
 /**
  *  Print the bfd section header to stdout.

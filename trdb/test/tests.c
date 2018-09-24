@@ -137,11 +137,10 @@ static int test_trdb_dinfo_init(char *path)
 
     struct disassemble_info dinfo = {0};
     struct disassembler_unit dunit = {0};
-    struct trdb_disasm_aux aux = {0};
 
     dunit.dinfo = &dinfo;
 
-    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit, &aux)) {
+    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
         status = TRDB_FAIL;
         goto fail;
     }
@@ -149,6 +148,7 @@ static int test_trdb_dinfo_init(char *path)
         bfd_map_over_sections(abfd, disassemble_section, &dunit);
 
 fail:
+    trdb_free_dinfo_with_bfd(c, abfd, &dunit);
     trdb_free(c);
     bfd_close(abfd);
     return status;
@@ -582,11 +582,10 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
 
     struct disassemble_info dinfo = {0};
     struct disassembler_unit dunit = {0};
-    struct trdb_disasm_aux aux = {0};
 
     dunit.dinfo = &dinfo;
 
-    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit, &aux)) {
+    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
         status = TRDB_FAIL;
         goto fail;
     }
@@ -595,6 +594,7 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
     }
 
 fail:
+    trdb_free_dinfo_with_bfd(c, abfd, &dunit);
     trdb_free(c);
     free(*samples);
     bfd_close(abfd);

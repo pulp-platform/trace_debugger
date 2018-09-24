@@ -32,6 +32,8 @@
 #include "list.h"
 #include "utils.h"
 
+struct disassembler_unit;
+
 struct trdb_config;
 struct trdb_state;
 struct branch_map_state;

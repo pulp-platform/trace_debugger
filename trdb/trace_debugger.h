@@ -50,6 +50,9 @@
 
 #define INSTR_STR_LEN 128
 
+/* forward declarations */
+struct disassembler_unit;
+
 /**
  * Retired instruction captured by the interface to the RISC-V CPU, with some
  * metadata.
