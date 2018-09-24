@@ -407,6 +407,60 @@ static int test_stimuli_to_tr_instr(const char *path)
 }
 
 
+static int test_stimuli_to_trace_list(const char *path)
+{
+    struct trdb_ctx *c = trdb_new();
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
+    int status = 0;
+    size_t sizea = trdb_stimuli_to_trace(c, path, samples, &status);
+    if (status != 0) {
+        LOG_ERRT("Stimuli to tr_instr failed\n");
+        return TRDB_FAIL;
+    }
+
+    LIST_HEAD(instr_list);
+    size_t sizel = trdb_stimuli_to_trace_list(c, path, &status, &instr_list);
+    if(status != 0){
+	LOG_ERRT("failed to parse stimuli\n");
+	goto fail;
+    }
+    if(sizel != sizea){
+	LOG_ERRT("list sizes don't match: %zu vs %zu\n", sizea, sizel);
+	goto fail;
+    }
+
+    if(list_empty(&instr_list)){
+	LOG_ERRT("list is empty even though we read data\n");
+	goto fail;
+    }
+
+    int i = 0;
+    struct tr_instr *instr;
+    list_for_each_entry_reverse(instr, &instr_list, list)
+    {
+	if(i >= sizea){
+	    LOG_ERRT("trying to access out of bounds index\n");
+	    goto fail;
+	}
+
+	if(!trdb_compare_instr(c, instr, &(*samples)[i])){
+	    LOG_ERRT("tr_instr are not equal\n");
+	    goto fail;
+	    trdb_print_instr(stdout, instr);
+	    trdb_print_instr(stdout, &(*samples)[i]);
+	}
+	i++;
+    }
+
+fail:
+    trdb_free(c);
+    trdb_free_instr_list(&instr_list);
+    free(*samples);
+    return TRDB_SUCCESS;
+}
+
+
 static int test_stimuli_to_packet_dump(const char *path)
 {
     trdb_init(); // TODO: remove, need for trdb_compress_trace
@@ -594,7 +648,8 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     /*     nread_compare = getline(&compare, &len, tmp_fp0); */
     /*     if (nread_compare == -1) { */
     /*         LOG_ERRT( */
-    /*             "Hit EOF too early in expected packets file, legacy compression\n"); */
+    /*             "Hit EOF too early in expected packets file, legacy
+     * compression\n"); */
     /*         status = TRDB_FAIL; */
     /*         goto fail; */
     /*     } */
@@ -733,7 +788,7 @@ fail:
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
     trdb_init();
-    struct trdb_ctx *ctx = NULL;
+    struct trdb_ctx *ctx = trdb_new();
 
     bfd_init();
     bfd *abfd = bfd_openr(bin_path, NULL);
@@ -757,7 +812,6 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     LIST_HEAD(packet1_head);
     LIST_HEAD(instr1_head);
 
-    ctx = trdb_new();
     if (!ctx) {
         LOG_ERRT("Library context allocation failed.\n");
         status = TRDB_FAIL;
@@ -832,7 +886,8 @@ fail:
 }
 
 
-int test_decompress_trace_differential(const char *bin_path, const char *trace_path)
+int test_decompress_trace_differential(const char *bin_path,
+                                       const char *trace_path)
 {
     trdb_init();
     struct trdb_ctx *ctx = NULL;
@@ -972,6 +1027,7 @@ int main(int argc, char *argv[argc + 1])
     /* RUN_TEST(test_trdb_write_packets); */
     RUN_TEST(test_parse_stimuli_line);
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
+    RUN_TEST(test_stimuli_to_trace_list, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");
     /* NOTE: there is a memory leak ~230 bytes in riscv-dis.c with struct
      * riscv_subset for each instantiation of a disassembler.

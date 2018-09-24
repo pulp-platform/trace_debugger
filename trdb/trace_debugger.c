@@ -1671,7 +1671,7 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
                                   int *status, struct list_head *instrs)
 {
     *status = 0;
-    struct tr_instr *samples = NULL;
+    struct tr_instr *sample = NULL;
 
     FILE *fp = fopen(path, "r");
     if (!fp) {
@@ -1692,13 +1692,6 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
     uint32_t instr = 0;
     int compressed = 0;
 
-    size_t size = 128;
-    samples = malloc(size * sizeof(*samples));
-    if (!samples) {
-        *status = -1;
-        goto fail;
-    }
-
     while (
         (ret = fscanf(fp,
                       "valid= %d exception= %d interrupt= %d cause= %" SCNx32
@@ -1712,41 +1705,27 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
         /* if (!valid) { */
         /*     continue; */
         /* } */
-        if (scnt >= size) {
-            size = 2 * size;
-            struct tr_instr *tmp = realloc(samples, size * sizeof(*samples));
-            if (!tmp) {
-                err(c, "realloc: %s\n", strerror(errno));
-                *status = -1;
-                goto fail;
-            }
-            samples = tmp;
+        sample = malloc(sizeof(*sample));
+        if (!sample) {
+            err(c, "malloc: %s\n", strerror(errno));
+            *status = -1;
+            goto fail;
         }
-        (samples)[scnt] = (struct tr_instr){0};
-        (samples)[scnt].valid = valid;
-        (samples)[scnt].exception = exception;
-        (samples)[scnt].interrupt = interrupt;
-        (samples)[scnt].cause = cause;
-        (samples)[scnt].tval = tval;
-        (samples)[scnt].priv = priv;
-        (samples)[scnt].iaddr = iaddr;
-        (samples)[scnt].instr = instr;
-        (samples)[scnt].compressed = compressed;
+
+        *sample = (struct tr_instr){0};
+        sample->valid = valid;
+        sample->exception = exception;
+        sample->interrupt = interrupt;
+        sample->cause = cause;
+        sample->tval = tval;
+        sample->priv = priv;
+        sample->iaddr = iaddr;
+        sample->instr = instr;
+        sample->compressed = compressed;
+
+        list_add(&sample->list, instrs);
+
         scnt++;
-    }
-
-    /* free the remaining unused memory */
-    struct tr_instr *tmp = realloc(samples, scnt * sizeof(*samples));
-    if (!tmp) {
-        err(c, "realloc: %s\n", strerror(errno));
-        *status = -1;
-        goto fail;
-    }
-    samples = tmp;
-
-    /* add entries to list */
-    for (size_t i = 0; i < scnt; i++) {
-        list_add(&((samples)[scnt].list), instrs);
     }
 
     if (ferror(fp)) {
@@ -1761,7 +1740,9 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
 fail:
     if (fp)
         fclose(fp);
-    free(samples);
+    // TODO: it's maybe better to not free the whole list, but just the part
+    // where failed
+    trdb_free_instr_list(instrs);
     return 0;
 }
 
@@ -2020,8 +2001,38 @@ void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
 }
 
 
+bool trdb_compare_packet()
+{
+    return false;
+}
+
+
+bool trdb_compare_instr(struct trdb_ctx *c, const struct tr_instr *instr0,
+                        const struct tr_instr *instr1)
+{
+    if (!instr0 || !instr1)
+        return false;
+
+    bool sum = true;
+    sum |= instr0->valid == instr1->valid;
+    sum |= instr0->exception == instr1->exception;
+    sum |= instr0->interrupt == instr1->interrupt;
+    sum |= instr0->cause == instr1->cause;
+    sum |= instr0->tval == instr1->tval;
+    sum |= instr0->priv == instr1->priv;
+    sum |= instr0->iaddr == instr1->iaddr;
+    sum |= instr0->instr == instr1->instr;
+    sum |= instr0->compressed == instr1->compressed;
+
+    return sum;
+}
+
+
 void trdb_free_packet_list(struct list_head *packet_list)
 {
+    if (list_empty(packet_list))
+        return;
+
     struct tr_packet *packet;
     struct tr_packet *packet_next;
     list_for_each_entry_safe(packet, packet_next, packet_list, list)
@@ -2032,6 +2043,9 @@ void trdb_free_packet_list(struct list_head *packet_list)
 
 void trdb_free_instr_list(struct list_head *instr_list)
 {
+    if (list_empty(instr_list))
+        return;
+
     struct tr_instr *instr;
     struct tr_instr *instr_next;
     list_for_each_entry_safe(instr, instr_next, instr_list, list)
