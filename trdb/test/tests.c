@@ -140,7 +140,7 @@ static int test_trdb_dinfo_init(char *path)
 
     dunit.dinfo = &dinfo;
 
-    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
+    if (trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
         status = TRDB_FAIL;
         goto fail;
     }
@@ -585,7 +585,7 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
 
     dunit.dinfo = &dinfo;
 
-    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
+    if (trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
         status = TRDB_FAIL;
         goto fail;
     }
