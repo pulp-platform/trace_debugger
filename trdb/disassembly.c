@@ -272,7 +272,7 @@ static long remove_useless_symbols(asymbol **symbols, long count)
  * If SKIP_ZEROES is TRUE, omit leading zeroes.
  */
 static void trdb_print_value(bfd_vma vma, struct disassemble_info *inf,
-                                bfd_boolean skip_zeroes)
+                             bfd_boolean skip_zeroes)
 {
     char buf[30];
     char *p;
@@ -294,7 +294,7 @@ static void trdb_print_value(bfd_vma vma, struct disassemble_info *inf,
 
 /* Print the name of a symbol.  */
 static void trdb_print_symname(bfd *abfd, struct disassemble_info *inf,
-                                  asymbol *sym, bool do_demangle)
+                               asymbol *sym, bool do_demangle)
 {
     char *alloc;
     const char *name, *version_string = NULL;
@@ -579,11 +579,9 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
 
 /* Print an address and the offset to the nearest symbol.  */
 static void trdb_print_addr_with_sym(bfd *abfd, asection *sec, asymbol *sym,
-                                        bfd_vma vma,
-                                        struct disassemble_info *inf,
-                                        bfd_boolean skip_zeroes,
-                                        bool do_demangle,
-                                        bool display_file_offsets)
+                                     bfd_vma vma, struct disassemble_info *inf,
+                                     bfd_boolean skip_zeroes, bool do_demangle,
+                                     bool display_file_offsets)
 {
     trdb_print_value(vma, inf, skip_zeroes);
 
@@ -639,8 +637,8 @@ static void trdb_print_addr_with_sym(bfd *abfd, asection *sec, asymbol *sym,
  * don't output leading zeroes.
  */
 static void trdb_print_addr(bfd_vma vma, struct disassemble_info *inf,
-                               bfd_boolean skip_zeroes, bool do_demangle,
-                               bool display_file_offsets)
+                            bfd_boolean skip_zeroes, bool do_demangle,
+                            bool display_file_offsets)
 {
     struct trdb_disasm_aux *aux;
     asymbol *sym = NULL;
@@ -675,25 +673,25 @@ static void trdb_print_addr(bfd_vma vma, struct disassemble_info *inf,
         sym = find_symbol_for_address(vma, inf, NULL);
 
     trdb_print_addr_with_sym(aux->abfd, aux->sec, sym, vma, inf, skip_zeroes,
-                                do_demangle, display_file_offsets);
+                             do_demangle, display_file_offsets);
 }
 
 
 /* Print VMA to INFO.  This function is passed to the disassembler
  * routine.
  */
-static void trdb_print_address(bfd_vma vma, struct disassemble_info *inf)
+void trdb_print_address(bfd_vma vma, struct disassemble_info *inf)
 {
     bool prefix_addresses = false; /* TODO: make this configurable */
     bool do_demangle = false;
     bool display_file_offsets = false;
     trdb_print_addr(vma, inf, !prefix_addresses, do_demangle,
-                       display_file_offsets);
+                    display_file_offsets);
 }
 
 
 /* Determine if the given address has a symbol associated with it.  */
-static int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf)
+int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf)
 {
     asymbol *sym;
 
@@ -704,8 +702,7 @@ static int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf)
 
 
 int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
-                              struct disassembler_unit *dunit,
-                              struct trdb_disasm_aux *aux)
+                              struct disassembler_unit *dunit)
 {
     /* TODO: make this configurable */
     char *machine = NULL;
@@ -715,6 +712,11 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
     int status = 0;
 
     struct disassemble_info *dinfo = dunit->dinfo;
+    struct trdb_disasm_aux *aux = malloc(sizeof(*aux));
+    if (!aux) {
+        err(c, "malloc: %s\n", strerror(errno));
+        return -ENOMEM;
+    }
 
     struct bfd_target *xvec = NULL;
 
@@ -857,18 +859,23 @@ fail:
 
 
 void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
-                              struct disassembler_unit *dunit,
-                              struct trdb_disasm_aux *aux)
+                              struct disassembler_unit *dunit)
+
 {
     /* if(abfd) */
     /* 	free(abfd->xvec); */
-    if (dunit && dunit->dinfo)
+    if (!dunit)
+        return;
+    if (dunit->dinfo)
         free(dunit->dinfo->symtab);
+
+    struct trdb_disasm_aux *aux = dunit->dinfo->application_data;
     if (aux) {
         free(aux->dynrelbuf);
         free(aux->symbols);
         free(aux->dynamic_symbols);
         free(aux->synthethic_symbols);
+        free(aux);
     }
 }
 
