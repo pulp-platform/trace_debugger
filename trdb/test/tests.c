@@ -100,7 +100,7 @@ static int test_disasm_bfd()
     disassemble_init_for_target(&dinfo);
 
     /* Tests for disassembly functions */
-    if (TRDB_VERBOSE_DEBUG) {
+    if (TRDB_VERBOSE_TESTS) {
         dump_target_list();
         dump_bin_info(abfd);
     }
@@ -114,7 +114,7 @@ static int test_disasm_bfd()
         return TRDB_FAIL;
     }
     /* TODO: use this path also in relase mode, but less noisy */
-    if (TRDB_VERBOSE_DEBUG) {
+    if (TRDB_VERBOSE_TESTS) {
         dump_section_names(abfd);
 
         LOG_INFOT("num_sections: %d\n", bfd_count_sections(abfd));
@@ -123,6 +123,35 @@ static int test_disasm_bfd()
     }
     bfd_close(abfd);
     return TRDB_SUCCESS;
+}
+
+
+static int test_trdb_dinfo_init(char *path)
+{
+    int status = TRDB_SUCCESS;
+    bfd *abfd = bfd_openr(path, NULL);
+    if (!(abfd && bfd_check_format(abfd, bfd_object)))
+        return TRDB_FAIL;
+
+    struct trdb_ctx *c = trdb_new();
+
+    struct disassemble_info dinfo = {0};
+    struct disassembler_unit dunit = {0};
+    struct trdb_disasm_aux aux = {0};
+
+    dunit.dinfo = &dinfo;
+
+    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit, &aux)) {
+        status = TRDB_FAIL;
+        goto fail;
+    }
+    if (TRDB_VERBOSE_TESTS)
+        bfd_map_over_sections(abfd, disassemble_section, &dunit);
+
+fail:
+    trdb_free(c);
+    bfd_close(abfd);
+    return status;
 }
 
 
@@ -421,36 +450,36 @@ static int test_stimuli_to_trace_list(const char *path)
 
     LIST_HEAD(instr_list);
     size_t sizel = trdb_stimuli_to_trace_list(c, path, &status, &instr_list);
-    if(status != 0){
-	LOG_ERRT("failed to parse stimuli\n");
-	goto fail;
+    if (status != 0) {
+        LOG_ERRT("failed to parse stimuli\n");
+        goto fail;
     }
-    if(sizel != sizea){
-	LOG_ERRT("list sizes don't match: %zu vs %zu\n", sizea, sizel);
-	goto fail;
+    if (sizel != sizea) {
+        LOG_ERRT("list sizes don't match: %zu vs %zu\n", sizea, sizel);
+        goto fail;
     }
 
-    if(list_empty(&instr_list)){
-	LOG_ERRT("list is empty even though we read data\n");
-	goto fail;
+    if (list_empty(&instr_list)) {
+        LOG_ERRT("list is empty even though we read data\n");
+        goto fail;
     }
 
     int i = 0;
     struct tr_instr *instr;
     list_for_each_entry_reverse(instr, &instr_list, list)
     {
-	if(i >= sizea){
-	    LOG_ERRT("trying to access out of bounds index\n");
-	    goto fail;
-	}
+        if (i >= sizea) {
+            LOG_ERRT("trying to access out of bounds index\n");
+            goto fail;
+        }
 
-	if(!trdb_compare_instr(c, instr, &(*samples)[i])){
-	    LOG_ERRT("tr_instr are not equal\n");
-	    goto fail;
-	    trdb_print_instr(stdout, instr);
-	    trdb_print_instr(stdout, &(*samples)[i]);
-	}
-	i++;
+        if (!trdb_compare_instr(c, instr, &(*samples)[i])) {
+            LOG_ERRT("tr_instr are not equal\n");
+            goto fail;
+            trdb_print_instr(stdout, instr);
+            trdb_print_instr(stdout, &(*samples)[i]);
+        }
+        i++;
     }
 
 fail:
@@ -483,7 +512,7 @@ static int test_stimuli_to_packet_dump(const char *path)
         status = TRDB_FAIL;
         goto fail;
     }
-    if (TRDB_VERBOSE_DEBUG)
+    if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &head);
 
 fail:
@@ -523,8 +552,47 @@ static int test_disassemble_trace(const char *bin_path, const char *trace_path)
     dunit.dinfo = &dinfo;
     init_disassembler_unit(&dunit, abfd, NULL);
 
-    if (TRDB_VERBOSE_DEBUG)
+    if (TRDB_VERBOSE_TESTS)
         trdb_disassemble_trace(samplecnt, *samples, &dunit);
+
+fail:
+    trdb_free(c);
+    free(*samples);
+    bfd_close(abfd);
+    return status;
+}
+
+
+static int test_disassemble_trace_with_bfd(const char *bin_path,
+                                           const char *trace_path)
+{
+    bfd *abfd = bfd_openr(bin_path, NULL);
+    if (!(abfd && bfd_check_format(abfd, bfd_object)))
+        return TRDB_FAIL;
+
+    struct trdb_ctx *c = trdb_new();
+    struct tr_instr *tmp;
+    struct tr_instr **samples = &tmp;
+    int status = 0;
+    size_t samplecnt = trdb_stimuli_to_trace(c, trace_path, samples, &status);
+    if (status != 0) {
+        LOG_ERRT("Stimuli to tr_instr failed\n");
+        return TRDB_FAIL;
+    }
+
+    struct disassemble_info dinfo = {0};
+    struct disassembler_unit dunit = {0};
+    struct trdb_disasm_aux aux = {0};
+
+    dunit.dinfo = &dinfo;
+
+    if (!trdb_alloc_dinfo_with_bfd(c, abfd, &dunit, &aux)) {
+        status = TRDB_FAIL;
+        goto fail;
+    }
+    if (TRDB_VERBOSE_TESTS) {
+        trdb_disassemble_trace(samplecnt, *samples, &dunit);
+    }
 
 fail:
     trdb_free(c);
@@ -728,12 +796,12 @@ int test_decompress_trace_legacy(const char *bin_path, const char *trace_path)
     }
 
 
-    if (TRDB_VERBOSE_DEBUG)
+    if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet0_head);
 
     trdb_decompress_trace(ctx, abfd, &packet0_head, &instr0_head);
 
-    if (TRDB_VERBOSE_DEBUG) {
+    if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
         struct tr_instr *instr;
         list_for_each_entry_reverse(instr, &instr0_head, list)
@@ -831,12 +899,12 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     printf("(Compression) Bits per instruction:%lf\n",
            ctx->stats.packetbits / (double)ctx->stats.instrs);
 
-    if (TRDB_VERBOSE_DEBUG)
+    if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
 
     trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
 
-    if (TRDB_VERBOSE_DEBUG) {
+    if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
         struct tr_instr *instr;
         list_for_each_entry_reverse(instr, &instr1_head, list)
@@ -935,12 +1003,12 @@ int test_decompress_trace_differential(const char *bin_path,
     printf("(Compression) Bits per instruction:%lf\n",
            ctx->stats.packetbits / (double)ctx->stats.instrs);
 
-    if (TRDB_VERBOSE_DEBUG)
+    if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
 
     trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
 
-    if (TRDB_VERBOSE_DEBUG) {
+    if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
         struct tr_instr *instr;
         list_for_each_entry_reverse(instr, &instr1_head, list)
@@ -1026,6 +1094,8 @@ int main(int argc, char *argv[argc + 1])
     RUN_TEST(test_disasm_bfd);
     /* RUN_TEST(test_trdb_write_packets); */
     RUN_TEST(test_parse_stimuli_line);
+    RUN_TEST(test_trdb_dinfo_init, "data/interrupt");
+
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_trace_list, "data/trdb_stimuli");
     RUN_TEST(test_stimuli_to_packet_dump, "data/trdb_stimuli");
@@ -1033,6 +1103,9 @@ int main(int argc, char *argv[argc + 1])
      * riscv_subset for each instantiation of a disassembler.
      */
     RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
+    RUN_TEST(test_disassemble_trace_with_bfd, "data/interrupt",
+             "data/trdb_stimuli");
+
     RUN_TEST(test_compress_trace, "data/trdb_stimuli", "data/trdb_packets");
 
     if (TRDB_ARRAY_SIZE(tv) % 2 != 0)

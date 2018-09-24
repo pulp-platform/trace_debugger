@@ -31,6 +31,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include "bfd.h"
+#include "demangle.h"
 #include "dis-asm.h"
 
 /* TODO: berkley */
@@ -53,6 +54,40 @@ struct disassembler_unit {
     struct disassemble_info *dinfo;    /**< context for disassembly */
 };
 
+struct trdb_disasm_aux {
+    bfd *abfd;
+    asection *sec;
+    bfd_boolean require_sec;
+
+    arelent **dynrelbuf;
+    long dynrelcount;
+
+    arelent *reloc;
+
+    asymbol **symbols;
+    long symcount;
+    asymbol **dynamic_symbols;
+    long dynsymcount;
+    asymbol *synthethic_symbols;
+    long synthcount;
+    asymbol **sorted_symbols;
+    long sorted_symcount;
+};
+
+/* The number of zeroes we want to see before we start skipping them. The number
+ * is arbitrarily chosen.
+ */
+
+#define DEFAULT_SKIP_ZEROES 8
+
+/* The number of zeroes to skip at the end of a section. If the number of zeroes
+ * at the end is between SKIP_ZEROES_AT_END and SKIP_ZEROES, they will be
+ * disassembled. If there are fewer than SKIP_ZEROES_AT_END, they will be
+ * skipped. This is a heuristic attempt to avoid disassembling zeroes inserted
+ * by section alignment.
+ */
+
+#define DEFAULT_SKIP_ZEROES_AT_END 3
 
 /**
  * Computes the length of a the given RISC-V instruction instr.

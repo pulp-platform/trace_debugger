@@ -29,7 +29,7 @@ static inline void prefetch(const void *p)
 /**
  * Get offset of a member
  */
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#define listh_offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 /**
  * Casts a member of a structure out to the containing structure
@@ -40,7 +40,7 @@ static inline void prefetch(const void *p)
  */
 #define container_of(ptr, type, member) ({                      \
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-	(type *)( (char *)__mptr - offsetof(type,member) );})
+	(type *)( (char *)__mptr - listh_offsetof(type,member) );})
 /*@}*/
 
 

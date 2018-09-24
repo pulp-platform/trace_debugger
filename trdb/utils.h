@@ -33,16 +33,16 @@
 #ifdef NDEBUG
 #    define TRDB_LEVEL 1
 #    define TRDB_TRACE 0
-#    define TRDB_VERBOSE_DEBUG 0
+#    define TRDB_VERBOSE_TESTS 0
 #else
 #    ifdef VERBOSE
 #        define TRDB_LEVEL 3
 #        define TRDB_TRACE 1
-#        define TRDB_VERBOSE_DEBUG 1
+#        define TRDB_VERBOSE_TESTS 1
 #    else
 #        define TRDB_LEVEL 1
 #        define TRDB_TRACE 0
-#        define TRDB_VERBOSE_DEBUG 0
+#        define TRDB_VERBOSE_TESTS 0
 #    endif
 #endif
 
