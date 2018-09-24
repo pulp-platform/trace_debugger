@@ -31,7 +31,11 @@ PREFIX		= $(DESTDIR)/usr/local
 BINDIR		= $(PREFIX)/bin
 
 QUESTASIM_PATH	= /usr/pack/modelsim-10.5c-kgf/questasim
-PULP_BINUTILS_PATH = /scratch/balasr/pulp-riscv-binutils-gdb
+
+# Prebuilt libbfd, libopcodes, libz and libiberty because it is annoying to
+# build pulp-riscv-binutils-gdb. If you decide to use your own build, then
+# change this path
+PULP_BINUTILS_PATH = lib
 
 LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
 		$(PULP_BINUTILS_PATH)/bfd \
