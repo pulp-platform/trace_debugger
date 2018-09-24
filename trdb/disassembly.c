@@ -807,7 +807,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     /* Use libopcodes to locate a suitable disassembler.  */
     dunit->disassemble_fn = disassembler(abfd);
-    if (dunit->disassemble_fn) {
+    if (!dunit->disassemble_fn) {
         err(c, "can't disassemble for architecture %s\n",
             bfd_printable_arch_mach(bfd_get_arch(abfd), 0));
         status = -1;
