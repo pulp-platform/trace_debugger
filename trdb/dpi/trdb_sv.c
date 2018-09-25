@@ -34,7 +34,6 @@
 #include "../trace_debugger.h"
 
 LIST_HEAD(packets);
-LIST_HEAD(instructions);
 
 // TODO: send context to simulator per userdata methods
 struct trdb_ctx *ctx;
@@ -66,6 +65,7 @@ void trdb_sv_alloc()
 
 void trdb_sv_free()
 {
+    trdb_free_packet_list(&packets);
     free(ctx);
 }
 
