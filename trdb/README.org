@@ -18,16 +18,41 @@
    #+END_SRC
 
 ** Build
-   Run =make all= for a release build or =make debug= for debug symbols and more
-   runtime information printed to stdout. Run =make docs= to build the
-   documentation with doxygen. It will be put under =doc/=.
+   Run =make all= for a release build of =trdb= or =make debug= for a debug
+   build (debug symbols, asserts, address sanitizer, debug level logging, no
+   optimizations). Run =make lib= to build =libtrdb.so=, a library for using the
+   C-model, the decompression and disassembly functionality. Run =make docs= to
+   build the documentation with doxygen. It will be put under =doc/=.
+
+** Usage of trdb, the decompression tool
+   Run =trdb --help=.
+
+** Usage of libtrdb.so
+   Always first initialize and hold a =trdb_ctx= struct by calling =trdb_new()=,
+   which contains the context and state of the trace debugger functions. On
+   creation it will use some sane configuration settings.
+
+   Feel free to control the logging level by setting either the environment
+   variable =TRDB_LOG= to err, info or debug before calling =trdb_new()= or
+   during runtime with =trdb_set_log_priority=. Furthermore you can also hook
+   your own logging function by setting it with =trdb_set_log_fn=. By default
+   everything will be printf'd to stderr.
+
+   To run the C-model call =trdb_compress_trace_step= for each cycle and keep
+   passing in =struct tr_instr= describing the retired instruction of the CPU.
+   The state of the execution will be recorded in =trdb_ctx=. Generated packet
+   will be added to the =struct list_head= pointer. Such a packet list must be
+   freed by the user by calling =trdb_free_packet_list=.
+
+   To reset a =trdb_ctx= to it's initial state use =trdb_reset_compression= or
+   =trdb_reset_decompression= depending on your usage.
+
+   Remember to release the library context after you are finished with
+   =trdb_free=.
 
 ** Tests
-   There are a few tests which can be run through =make test=.
+   There are a few tests which can be run through =make test= or =make check=.
 
 ** parse-opcodes
    The code in riscv_encoding.h was generated with [[https://github.com/pulp-platform/riscv-opcodes][riscv-opcodes]], a forked
    version which also incorporates PULP specific instructions.
-
-** Usage
-   Run =trdb --help=.
