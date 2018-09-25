@@ -866,10 +866,14 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
     /* 	free(abfd->xvec); */
     if (!dunit)
         return;
-    if (dunit->dinfo)
-        free(dunit->dinfo->symtab);
 
-    struct trdb_disasm_aux *aux = dunit->dinfo->application_data;
+    struct trdb_disasm_aux *aux = NULL;
+
+    if (dunit->dinfo) {
+        aux = dunit->dinfo->application_data;
+        free(dunit->dinfo->symtab);
+    }
+
     if (aux) {
         free(aux->dynrelbuf);
         free(aux->symbols);

@@ -14,10 +14,12 @@
 
 
 ** PULP bridge commands
-   + ~plpbridge --chip=pulpissimo --binary=build/pulpissimo/test/test~
+   + ~plpbridge --config build/pulpissimo-riscy/rtl_config.json~
+   + ~ +plpbridge --chip=pulpissimo --binary=build/pulpissimo/test/test+ ~
    + ~plpbridge --chip=pulpissimo stop~
    + ~plpbridge --chip=pulpissimo read --addr=0x1c000000 --size=1000~
    + ~plpbridge --chip=pulpissimo write --addr=0x1c000000 --value=0x12345678 --size=1000~
+   + ~plpbridge --config build/pulpissimo-riscy/rtl_config.json~
 ** Compiler settings
    Run =/home/msc18f22/projects/pulp-sdk/pkg/pulp_riscv_gcc/1.0.5/bin/riscv32-unknown-elf-gcc -march=rv32imcxpulpv2 -Q --help=target=
    The following settings are available
