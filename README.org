@@ -49,7 +49,7 @@ The used packet format is described [[https://github.com/riscv/riscv-trace-spec]
 
 ** Dependencies for TRDB
    Requires =libbfd.a=, =libopcodes.a=, =libiberty.a= and =libzlib.a= from
-   binutils built using [[https://github.com/pulp-platform/pulp-riscv-gnu-toolchain][this]] with the =trace_dbg_dev= branch. Build it by
+   binutils built using [[https://github.com/pulp-platform/pulp-riscv-binutils-gdb][binutils]] with the =trace_dbg_dev= branch. Build it by
    calling
    #+BEGIN_SRC bash
      export CFLAGS="-g -O2 -fPIC"
