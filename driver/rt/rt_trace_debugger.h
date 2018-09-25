@@ -22,6 +22,19 @@
 /* TODO: make this include via rt_data.h, like the other drivers do */
 #include "rt_data_trace_debugger.h"
 
+/* address of memory mapped register and controlflags settings the desired
+ * bits
+ */
+#define TRDB_REG_CFG 0x1a120000
+#define TRDB_FLAG_ENABLE 1
+#define TRDB_FLAG_DISABLE 0
+
+#define TRDB_REG_CTRL 0x1a120004
+#define TRDB_FLAG_FLUSH 1
+
+#define TRDB_REG_DUMP 0x1a120008
+
+
 void rt_trace_debugger_conf_init(rt_trace_dbg_conf_t *conf);
 rt_trace_dbg_t *rt_trace_debugger_open(char *, rt_trace_dbg_conf_t *,
 				       rt_event_sched_t *, rt_event_t *);
@@ -29,5 +42,4 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *, rt_trace_dbg_conf_t *,
 void rt_trace_debugger_control(rt_trace_dbg_t *);
 void rt_trace_debugger_close(rt_trace_dbg_t *, rt_event_t *);
 void __rt_trace_debugger_eot(void *);
-void __rt_trace_debugger_cleanup();
 #endif
