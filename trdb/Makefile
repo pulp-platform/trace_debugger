@@ -123,6 +123,9 @@ run:
 test:
 	./$(TEST_BIN)
 
+.PHONY: check
+check: test
+
 .PHONY: valgrind-test
 valgrind-test:
 	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(TEST_BIN)
