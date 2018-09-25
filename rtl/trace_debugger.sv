@@ -15,6 +15,7 @@
 import trdb_pkg::*;
 
 module trace_debugger
+    #(parameter APB_ADDR_WIDTH = 32)
     (input logic                clk_i,
      input logic                rst_ni,
 

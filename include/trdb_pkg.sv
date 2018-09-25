@@ -26,8 +26,6 @@ parameter PACKET_TOTAL = PACKET_LEN + PACKET_HEADER_LEN;
 
 parameter PACKET_BUFFER_STAGES = 4;
 
-parameter APB_ADDR_WIDTH = 12;
-
 // available packet types
 typedef enum logic[1:0]
 {

@@ -34,7 +34,7 @@ interface trace_debugger_if
     logic [XLEN-1:0]     packet_word;
     logic                packet_word_valid;
 
-    APB_BUS #(.APB_ADDR_WIDTH(APB_ADDR_WIDTH)) apb_bus();
+    APB_BUS #(.APB_ADDR_WIDTH(32)) apb_bus();
 
 
     modport duv
