@@ -222,7 +222,7 @@ module trace_debugger
     trdb_branch_map i_trdb_branch_map
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-         .valid_i(tc_is_branch && ivalid_i),
+         .valid_i(tc_is_branch && trace_valid),
          .branch_taken_i(tc_branch_taken),
          .flush_i(branch_map_flush),
          .map_o(branch_map),
