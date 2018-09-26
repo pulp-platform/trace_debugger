@@ -32,7 +32,9 @@ module trdb_apb_if
      output logic                      per_valid_o);
 
 
-    assign per_addr_o = paddr;
+    // we always get the whole 32 bit address, but if we get an access,
+    // indicated through psel we don't really need to check the upper bits.
+    assign per_addr_o = paddr[11:0];
     assign per_we_o = pwrite;
     assign per_wdata_o = pwdata;
     // psel indicates if your device is selected
