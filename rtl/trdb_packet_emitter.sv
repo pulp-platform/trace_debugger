@@ -102,8 +102,11 @@ module trdb_packet_emitter
 
         if(valid_i) begin
 
+            // TODO: adapt msg type
+            packet_bits[1:0]   = 2'h2;
+
             // packet format
-            packet_bits[1:0] = packet_format_i;
+            packet_bits[3:2]   = packet_format_i;
 
             // always flush branchmap
             branch_map_flush_d = '1;
@@ -116,33 +119,34 @@ module trdb_packet_emitter
                 // immediately changes branch_map_cnt_i
                 //  assert(branch_map_cnt_i != 0);
 
-                packet_bits[6:2]   = branch_map_cnt_i;
+                packet_bits[8:4]   = branch_map_cnt_i;
                 branch_map_flush_d = '1;
 
                 if(branch_packet_off == 1) begin
-                    packet_bits[7+:XLEN] = {iaddr_i, branch_map_i[0]};
-                    packet_len = 2 + 7 + 1 + XLEN;
+                    packet_bits[9+:1+XLEN] = {iaddr_i, branch_map_i[0]};
+                    packet_len = 2 + FORMATLEN + BRANCHLEN + 1 + XLEN;
 
                 end else if(branch_packet_off == 9) begin
-                    packet_bits[7+:9+XLEN] = {iaddr_i, branch_map_i[8:0]};
-                    packet_len = 2 + 7 + 9 + XLEN;
+                    packet_bits[9+:9+XLEN] = {iaddr_i, branch_map_i[8:0]};
+                    packet_len = 2 + FORMATLEN + BRANCHLEN + 9 + XLEN;
 
                 end else if(branch_packet_off == 17) begin
-                    packet_bits[7+:17+XLEN] = {iaddr_i, branch_map_i[16:0]};
-                    packet_len = 2 + 7 + 17 + XLEN;
+                    packet_bits[9+:17+XLEN] = {iaddr_i, branch_map_i[16:0]};
+                    packet_len = 2 + FORMATLEN + BRANCHLEN + 17 + XLEN;
 
                 end else if(branch_packet_off == 25) begin
-                    packet_bits[7+:25+XLEN] = {iaddr_i, branch_map_i[24:0]};
-                    packet_len = 2 + 7 + 25 + XLEN;
+                    packet_bits[9+:25+XLEN] = {iaddr_i, branch_map_i[24:0]};
+                    packet_len = 2 + FORMATLEN + BRANCHLEN + 25 + XLEN;
 
                 end else if (branch_packet_off == 31 && !branch_map_full_i) begin
-                    packet_bits[7+:31+XLEN] = {iaddr_i, branch_map_i[30:0]};
-                    packet_len = 2 + 7 + 31 + XLEN;
+                    packet_bits[9+:31+XLEN] = {iaddr_i, branch_map_i[30:0]};
+                    packet_len = 2 + FORMATLEN + BRANCHLEN + 31 + XLEN;
 
                 end else begin
-                    packet_bits[7+:31+XLEN] = {branch_map_edge_case ? iaddr_i :
+                    packet_bits[9+:31+XLEN] = {branch_map_edge_case ? iaddr_i :
                                                32'b0, branch_map_i[30:0]};
-                    packet_len = 2 + 7 + 31 + (branch_map_edge_case ? XLEN : 0);
+                    packet_len = 2 + FORMATLEN + BRANCHLEN + 31 +
+                                 (branch_map_edge_case ? XLEN : 0);
                 end
             end
 
@@ -151,8 +155,8 @@ module trdb_packet_emitter
             end
 
             F_ADDR_ONLY: begin
-                packet_bits[2+:XLEN] = iaddr_i;
-                packet_len           = 2 + XLEN; //TODO: variable len add
+                packet_bits[4+:XLEN] = iaddr_i;
+                packet_len           = 2 + FORMATLEN + XLEN; //TODO: variable len add
             end
 
             F_SYNC: begin
@@ -168,16 +172,17 @@ module trdb_packet_emitter
                 case(packet_subformat_i)
 
                 SF_START: begin
-                    packet_bits[2+:2+PRIVLEN+1+XLEN]
+                    packet_bits[4+:2+PRIVLEN+1+XLEN]
                         = {iaddr_i, is_branch_i, priv_i, packet_subformat_i};
-                    packet_len = 2 + 2 + PRIVLEN + 1 + XLEN;
+                    packet_len = 2 + FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
                 end
 
                 SF_EXCEPTION: begin
-                    packet_bits[2+:2+PRIVLEN+1+XLEN+CAUSELEN+1]
+                    packet_bits[4+:2+PRIVLEN+1+XLEN+CAUSELEN+1]
                         = {interrupt_i, cause_i, iaddr_i, is_branch_i, priv_i,
                            packet_subformat_i};
-                    packet_len = 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+                    packet_len = 2 + FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN
+                                 + CAUSELEN + 1;
                 end
 
                 SF_CONTEXT: begin

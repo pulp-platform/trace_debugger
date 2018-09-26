@@ -38,6 +38,7 @@
 
 /* custom header */
 #define PACKETLEN 7
+#define MSGTYPELEN 2
 
 /* given header */
 #define FORMATLEN 2
@@ -81,6 +82,8 @@ enum tr_packet_format {
 
 enum tr_packet_subformat { SF_START = 0, SF_EXCEPTION = 1, SF_CONTEXT = 2 };
 
+enum tr_msg_type { SW_DATA = 0, TIMESTAMP = 1, PACKET = 2 };
+
 /**
  * Canonical trace packet representation. This is the high level definition of a
  * packet with some meta information (first part of tr_packet) about the payload
@@ -95,11 +98,11 @@ enum tr_packet_subformat { SF_START = 0, SF_EXCEPTION = 1, SF_CONTEXT = 2 };
  */
 struct tr_packet {
     /* transport layer header */
-    uint32_t length : PACKETLEN;
-    /* actual payload of spec */
-    uint32_t msg_type : 2; /**< UltraSoC specific TODO: remove */
-    uint32_t format : 2;   /**< header denoting the packet type */
+    uint32_t length : PACKETLEN; /**< length of packet in bits */
+    uint32_t msg_type : 2;       /**<  */
 
+    /* actual payload of spec */
+    uint32_t format : 2;    /**< header denoting the packet type */
     uint32_t branches : 5;  /**< number of branches saved in branch_map */
     uint32_t branch_map;    /**< bits indicating taken=1 branches */
     uint32_t subformat : 2; /**< further specifies F_SYNC packets */
@@ -123,7 +126,7 @@ struct tr_packet {
         perror("malloc");                                                      \
         goto fail_malloc;                                                      \
     }                                                                          \
-    *name = (struct tr_packet){.msg_type = 2};
+    *name = (struct tr_packet){.msg_type = PACKET};
 
 #define ALLOC_PACKET(name)                                                     \
     name = malloc(sizeof(*name));                                              \
@@ -131,7 +134,7 @@ struct tr_packet {
         err(ctx, "malloc: %s\n", strerror(errno));                             \
         goto fail_malloc;                                                      \
     }                                                                          \
-    *name = (struct tr_packet){0};
+    *name = (struct tr_packet){.msg_type = PACKET};
 
 /**
  * Library/trace debugger context, needs to be hold by program and passed to

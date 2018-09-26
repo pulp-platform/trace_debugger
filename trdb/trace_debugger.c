@@ -43,14 +43,28 @@ struct filter_state;
  * decompression routine
  */
 struct trdb_config {
-    /* TODO: inspect full-address, iaddress-lsb-p, implicit-except, set-trace */
+    /* TODO: Unused, inspect full-address, iaddress-lsb-p, implicit-except,
+     * set-trace
+     */
     uint64_t resync_max;
+    /* bool iaddress_lsb_p; */
+    /* bool implicit_except; */
+    /* bool set_trace; */
+
+    /* set to true to always use absolute addresses in packets, this is used for
+     * decompression and compression
+     */
     bool full_address;
-    bool iaddress_lsb_p;
-    bool implicit_except;
-    bool set_trace;
+
+    /* TODO: move this */
     /* set to true to always diassemble to most general representation */
     bool no_aliases;
+    /* different address format, TODO: doesn't work */
+    bool prefix_addresses;
+    /* demangle symbols using bfd */
+    bool do_demangle;
+    /* display file offsets for displayed symbols */
+    bool display_file_offsets;
 };
 
 /* Records the state of the CPU. The compression routine looks at a sequence of
@@ -92,6 +106,14 @@ struct branch_map_state {
  * we do.
  */
 struct filter_state {
+
+    /* if we should output periodic timestamps (not implemented) */
+    bool enable_timestamps;
+
+    /* for tracing only certain privilege levels (not implemented) */
+    bool trace_privilege;
+    uint32_t privilege;
+
     /* TODO: look at those variables */
     uint64_t resync_cnt;
     bool resync_pend;
@@ -1526,19 +1548,22 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         uint32_t len = branch_map_len(packet->branches);
 
         /* we need enough space to do the packing it in uint128 */
-        assert(128 > PACKETLEN + 2 + 5 + 31 + XLEN);
+        assert(128 > PACKETLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
         /* TODO: assert branch map to overfull */
         /* TODO: branch map full logic handling */
         /* TODO: for now we put the address always */
-        data.bits = (packet->length) | (packet->format << PACKETLEN)
-                    | (packet->branches << (PACKETLEN + 2));
+        data.bits =
+            (packet->length) | (packet->msg_type << PACKETLEN)
+            | (packet->format << (PACKETLEN + MSGTYPELEN))
+            | (packet->branches << (PACKETLEN + MSGTYPELEN + FORMATLEN));
         data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len))
-                     << (PACKETLEN + 2 + 5);
+                     << (PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN);
         data.bits |=
-            ((__uint128_t)packet->address << (PACKETLEN + 2 + 5 + len));
+            ((__uint128_t)packet->address
+             << (PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
 
         data.bits <<= align;
-        *bitcnt = PACKETLEN + 2 + 5 + len + XLEN;
+        *bitcnt = PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len + XLEN;
         memcpy(bin, data.bin,
                (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
 
@@ -1551,11 +1576,13 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         return -1;
 
     case F_ADDR_ONLY:
-        assert(128 > PACKETLEN + 2 + XLEN);
-        data.bits = (packet->length) | (packet->format << PACKETLEN)
-                    | ((__uint128_t)packet->address << (PACKETLEN + 2));
+        assert(128 > PACKETLEN + MSGTYPELEN + FORMATLEN + XLEN);
+        data.bits = (packet->length) | (packet->msg_type << PACKETLEN)
+                    | (packet->format << (PACKETLEN + MSGTYPELEN))
+                    | ((__uint128_t)packet->address
+                       << (PACKETLEN + MSGTYPELEN + FORMATLEN));
 
-        *bitcnt = PACKETLEN + 2 + XLEN;
+        *bitcnt = PACKETLEN + MSGTYPELEN + FORMATLEN + XLEN;
 
         data.bits <<= align;
         memcpy(bin, data.bin,
@@ -1571,27 +1598,29 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
          */
 
         /* common part to all sub formats */
-        data.bits = (packet->length) | (packet->format << PACKETLEN)
-                    | (packet->subformat << (PACKETLEN + 2))
-                    | (packet->privilege << (PACKETLEN + 4));
-        *bitcnt = PACKETLEN + 4 + PRIVLEN;
+        data.bits =
+            (packet->length) | (packet->msg_type << PACKETLEN)
+            | (packet->format << (PACKETLEN + MSGTYPELEN))
+            | (packet->subformat << (PACKETLEN + MSGTYPELEN + FORMATLEN))
+            | (packet->privilege << (PACKETLEN + MSGTYPELEN + 2 * FORMATLEN));
+        *bitcnt = PACKETLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
 
+        /* to reduce repetition */
+        uint32_t suboffset = PACKETLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
         switch (packet->subformat) {
         case SF_START:
-            data.bits |= (packet->branch << (PACKETLEN + 4 + PRIVLEN))
-                         | ((__uint128_t)packet->address
-                            << (PACKETLEN + 4 + PRIVLEN + 1));
+            data.bits |= ((__uint128_t)packet->branch << suboffset)
+                         | ((__uint128_t)packet->address << (suboffset + 1));
             *bitcnt += 1 + XLEN;
             break;
 
         case SF_EXCEPTION:
-            data.bits |= (packet->branch << (PACKETLEN + 4 + PRIVLEN))
-                         | ((__uint128_t)packet->address
-                            << (PACKETLEN + 4 + PRIVLEN + 1))
-                         | ((__uint128_t)packet->ecause
-                            << (PACKETLEN + 4 + PRIVLEN + 1 + XLEN))
-                         | ((__uint128_t)packet->interrupt
-                            << (PACKETLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN));
+            data.bits |=
+                (packet->branch << suboffset)
+                | ((__uint128_t)packet->address << (suboffset + 1))
+                | ((__uint128_t)packet->ecause << (suboffset + 1 + XLEN))
+                | ((__uint128_t)packet->interrupt
+                   << (suboffset + 1 + XLEN + CAUSELEN));
             // going to be zero anyway in our case
             //  | ((__uint128_t)packet->tval
             //   << (PACKETLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1));
@@ -2055,7 +2084,6 @@ void trdb_free_instr_list(struct list_head *instr_list)
         free(instr);
     }
 }
-
 
 /* --------------------------------------------------------------------------*/
 /* Below are just old, deprecated functions which are just used for regression

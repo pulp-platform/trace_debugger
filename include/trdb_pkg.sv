@@ -15,6 +15,8 @@ package trdb_pkg;
 
 // number of bits required to encode address, instruction, privilege mode,
 // exception cause, context switch etc.
+parameter FORMATLEN = 2;
+parameter BRANCHLEN = 5;
 parameter ILEN = 32;
 parameter XLEN = 32;
 parameter PRIVLEN = 3;
