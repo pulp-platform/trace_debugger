@@ -64,7 +64,7 @@ module tracer_if
     tracer_reg_if
         #(.L2_AWIDTH_NOAL(L2_AWIDTH_NOAL),
           .TRANS_SIZE(TRANS_SIZE))
-    i_tracer_reg_if // TODO: maybe do auto port assignment?
+    i_tracer_reg_if
         (.clk_i              (clk_i),
          .rst_ni             (rst_ni),
 

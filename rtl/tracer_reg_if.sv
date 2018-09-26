@@ -46,7 +46,7 @@ module tracer_reg_if
     // This peripheral only outputs data, keep necessary state
     logic [L2_AWIDTH_NOAL-1:0] rx_startaddr_q;
     logic [TRANS_SIZE-1 : 0]   rx_size_q;
-    logic [1 : 0]              rx_datasize_q;
+    // logic [1 : 0]              rx_datasize_q;
     logic                      rx_continuous_q;
     logic                      rx_en_q;
     logic                      rx_filter_q;
@@ -58,7 +58,7 @@ module tracer_reg_if
 
     assign cfg_rx_startaddr_o  = rx_startaddr_q;
     assign cfg_rx_size_o       = rx_size_q;
-    assign cfg_rx_datasize_o   = rx_datasize_q;
+    assign cfg_rx_datasize_o   = 2'h2; //rx_datasize_q;
     assign cfg_rx_continuous_o = rx_continuous_q;
     assign cfg_rx_en_o         = rx_en_q;
     assign cfg_rx_filter_o     = rx_filter_q;
@@ -79,7 +79,7 @@ module tracer_reg_if
             cfg_data_o[TRANS_SIZE-1:0] = cfg_rx_bytes_left_i;
         `REG_RX_CFG:
             cfg_data_o = {26'h0, cfg_rx_pending_i, cfg_rx_en_i,
-                          rx_filter_q, rx_datasize_q, rx_continuous_q};
+                          rx_filter_q, 2'h2, rx_continuous_q};
         default:
             cfg_data_o = 'h0;
         endcase
@@ -94,7 +94,7 @@ module tracer_reg_if
             rx_filter_q     <= 'h0;
             rx_en_q          = 'h0; // TODO: figure this out
             rx_clr_q         = 'h0;
-            rx_datasize_q   <= 'h0; //b -> h
+            // rx_datasize_q   <= 'h2; //b -> h
         end else begin
             rx_en_q  = 'h0;
             rx_clr_q = 'h0;
@@ -110,7 +110,7 @@ module tracer_reg_if
                     rx_clr_q         = cfg_data_i[5];
                     rx_en_q          = cfg_data_i[4];
                     rx_filter_q     <= cfg_data_i[3];
-                    rx_datasize_q   <= cfg_data_i[2:1];
+                    // rx_datasize_q   <= cfg_data_i[2:1];
                     rx_continuous_q <= cfg_data_i[0];
                 end
                 //TODO: default case
