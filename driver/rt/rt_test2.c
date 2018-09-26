@@ -19,13 +19,34 @@ int main()
 #endif
     unsigned int test_runs = 5;
 
-    rt_trace_dbg_conf_t *conf =
-	rt_alloc(RT_ALLOC_FC_DATA, sizeof(rt_trace_dbg_conf_t));
-    rt_trace_debugger_conf_init(conf);
+    /* First configure the SPI device */
+    rt_spim_conf_t spi_conf;
+    /* Get default configuration */
+    rt_spim_conf_init(&spi_conf);
+    /* Set maximum baudrate. Can actually be lower than
+     * that depending on the best divider found
+     */
+    spi_conf.max_baudrate = 1000000;
+    /* SPI interface identifier as the Pulp chip can have
+     * several interfaces
+     */
+    spi_conf.id = 0;
+    /* Chip select */
+    spi_conf.cs = 1;
 
-    rt_trace_dbg_t *handle =
-	rt_trace_debugger_open("test000", conf, NULL, NULL);
-    if (!handle){
+    /* Then open the device */
+    rt_spim_t *spim = rt_spim_open(NULL, &spi_conf, NULL);
+    if (spim == NULL)
+	return -1;
+
+    /* setup trace debugger configuration */
+    rt_trace_dbg_conf_t trdb_conf;
+    rt_trace_debugger_conf_init(&trdb_conf);
+
+    /* and open it */
+    rt_trace_dbg_t *trdb =
+	rt_trace_debugger_open("test000", &trdb_conf, spim, NULL, NULL);
+    if (!trdb) {
 	rt_error("[TEST] failed to open trace debugger\n");
 	return -1;
     }
@@ -36,9 +57,9 @@ int main()
 	test_runs--;
 	rt_event_yield(NULL);
     }
-    rt_trace_debugger_close(handle, NULL);
+    rt_trace_debugger_close(trdb, NULL);
 
-    rt_free(RT_ALLOC_FC_DATA, conf, sizeof(rt_trace_dbg_conf_t));
+    rt_spim_close(spim, NULL);
 
     return 0;
 }

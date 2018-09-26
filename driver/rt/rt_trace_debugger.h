@@ -37,9 +37,11 @@
 
 void rt_trace_debugger_conf_init(rt_trace_dbg_conf_t *conf);
 rt_trace_dbg_t *rt_trace_debugger_open(char *, rt_trace_dbg_conf_t *,
-				       rt_event_sched_t *, rt_event_t *);
+				       rt_spim_t *spi, rt_event_sched_t *,
+				       rt_event_t *);
 
 void rt_trace_debugger_control(rt_trace_dbg_t *);
 void rt_trace_debugger_close(rt_trace_dbg_t *, rt_event_t *);
-void __rt_trace_debugger_eot(void *);
+void __rt_trace_debugger_eot(void *arg);
+void __rt_spim_eot(void *arg);
 #endif

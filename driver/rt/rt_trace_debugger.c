@@ -28,6 +28,7 @@ uint8_t *trace_buffs[2];
 unsigned int buffer_size;
 unsigned int dummy;
 rt_event_sched_t *sched_i;
+rt_spim_t *trdb_spi;
 
 /* for type conversions */
 union uint2ptr {
@@ -53,7 +54,7 @@ static void write_reg_l2(unsigned int addr, unsigned int value)
 /* Initialize rt_trace_dbg_conf_t with default values */
 void rt_trace_debugger_conf_init(rt_trace_dbg_conf_t *conf)
 {
-    conf->buffer_size = 16; /* TODO: turn that up */
+    conf->buffer_size = 128; /* TODO: turn that up */
     conf->dummy = 1;
     return;
 }
@@ -62,12 +63,16 @@ void rt_trace_debugger_conf_init(rt_trace_dbg_conf_t *conf)
 /* Allocate trace debugger device */
 rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
 				       rt_trace_dbg_conf_t *conf,
-				       rt_event_sched_t *sched,
+				       rt_spim_t *spi, rt_event_sched_t *sched,
 				       rt_event_t *event)
 {
     /* TODO: open only once */
     if (!conf || !dev_name)
 	return NULL;
+
+    if (!spi)
+	return NULL;
+    trdb_spi = spi;
 
     /* TODO: do I need to disable irq, what could potentially go wrong? */
     int irq = rt_irq_disable();
@@ -164,18 +169,29 @@ void rt_trace_debugger_close(rt_trace_dbg_t *handle, rt_event_t *event)
 /* ensure continous transfer */
 void __rt_trace_debugger_eot(void *arg)
 {
-    rt_trace(RT_TRACE_DEV_CTRL, "[TRDB] end of transfer, re-enqueue\n");
     int index = (int)arg;
-    rt_trace(RT_TRACE_DEV_CTRL, "[TRDB] index of buffer: %d\n", index);
 
-    /* TODO: remove this quick and dirty debugging stuff*/
-    for (unsigned int i = 0; i < buffer_size; i++) {
-	rt_trace(RT_TRACE_DEV_CTRL, "Mem@%p: 0x%x\n", (trace_buffs[index] + i),
-		 *(trace_buffs[index] + i));
-    }
+    rt_trace(RT_TRACE_DEV_CTRL,
+	     "[TRDB] end of transfer, re-enqueue buffer: %d\n", index);
 
-    rt_periph_copy(
-	NULL, 2 * ARCHI_UDMA_TRACER_ID(0), (unsigned int)trace_buffs[index],
-	buffer_size, 0,
-	rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)index));
+    /* /\* TODO: remove this quick and dirty debugging stuff*\/ */
+    /* for (unsigned int i = 0; i < buffer_size; i++) { */
+    /* 	rt_trace(RT_TRACE_DEV_CTRL, "Mem@%p: 0x%x\n", (trace_buffs[index] + i),
+     */
+    /* 		 *(trace_buffs[index] + i)); */
+    /* } */
+
+    rt_spim_send_qspi(trdb_spi, trace_buffs[(int)arg], buffer_size * 8,
+		      RT_SPIM_CS_AUTO,
+		      rt_event_get(sched_i, __rt_spim_eot, (void *)index));
+    /* rt_periph_copy( */
+    /* 	NULL, 2 * ARCHI_UDMA_TRACER_ID(0), (unsigned int)trace_buffs[index], */
+    /* 	buffer_size, 0, */
+    /* 	rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)index)); */
+}
+
+void __rt_spim_eot(void *arg)
+{
+    rt_trace(RT_TRACE_DEV_CTRl, "[TRDB] spi end of transfer of buffer: %d\n",
+	     (int)arg);
 }
