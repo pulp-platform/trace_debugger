@@ -138,6 +138,12 @@ struct tr_packet {
     }                                                                          \
     *name = (struct tr_packet){.msg_type = PACKET};
 
+/* for type punning */
+union trdb_pack {
+    __uint128_t bits;
+    uint8_t bin[16];
+};
+
 /**
  * Library/trace debugger context, needs to be hold by program and passed to
  * quite a few functions.
@@ -263,11 +269,11 @@ struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
  * @param packet_list the compressed instruction trace
  * @param instr_list list to which the reconstruction instructions will be
  * appended
- * @return the provided @packet_list
+ * @return 0 on success, -1 on failure
  */
-struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
-                                        struct list_head *packet_list,
-                                        struct list_head *instr_list);
+int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
+                          struct list_head *packet_list,
+                          struct list_head *instr_list);
 
 /**
  * Outputs disassembled trace using fprintf_func in #disassembler_unit.dinfo.

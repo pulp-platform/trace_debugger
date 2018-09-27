@@ -967,9 +967,9 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
 }
 
 
-struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
-                                        struct list_head *packet_list,
-                                        struct list_head *instr_list)
+int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
+                          struct list_head *packet_list,
+                          struct list_head *instr_list)
 {
     /* We assume our hw block in the pulp generated little endian
      * addresses, thus we should make sure that before we interact
@@ -1041,8 +1041,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
          * appropriate section and remove the old one
          */
         if (pc >= section->vma + stop_offset || pc < section->vma) {
-            free_section_for_debugging(&dinfo);
-
             section = get_section_for_vma(abfd, pc);
             if (!section) {
                 err(c, "VMA (PC) not pointing to any section\n");
@@ -1050,6 +1048,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             }
             stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
 
+            free_section_for_debugging(&dinfo);
             if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
                 err(c, "Failed alloc_section_for_debugging\n");
                 goto fail;
@@ -1354,8 +1353,6 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * TODO: fix
              */
             if (pc >= section->vma + stop_offset || pc < section->vma) {
-                free_section_for_debugging(&dinfo);
-
                 section = get_section_for_vma(abfd, pc);
                 if (!section) {
                     err(c, "VMA (PC) not pointing to any section\n");
@@ -1364,6 +1361,7 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 stop_offset =
                     bfd_get_section_size(section) / dinfo.octets_per_byte;
 
+                free_section_for_debugging(&dinfo);
                 if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
                     err(c, "Failed alloc_section_for_debugging\n");
                     goto fail;
@@ -1506,10 +1504,11 @@ struct list_head *trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             }
         }
     }
+    return 0;
 
 fail:
     free_section_for_debugging(&dinfo);
-    return NULL;
+    return -1;
 }
 
 
@@ -1870,7 +1869,7 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
 {
     struct disassemble_info *dinfo = dunit->dinfo;
     for (size_t i = 0; i < len; i++) {
-        (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
+        (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ",
                                (uintmax_t)trace[i].iaddr);
         (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ",
                                (uintmax_t)trace[i].instr);
@@ -1885,7 +1884,7 @@ void trdb_disassemble_instr(struct tr_instr *instr,
                             struct disassembler_unit *dunit)
 {
     struct disassemble_info *dinfo = dunit->dinfo;
-    (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
+    (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ",
                            (uintmax_t)instr->iaddr);
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ", (uintmax_t)instr->instr);
     (*dinfo->fprintf_func)(dinfo->stream, "%s",

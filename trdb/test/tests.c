@@ -35,6 +35,8 @@
 #include "../disassembly.c"
 #include "../utils.h"
 #include "../utils.c"
+#include "../parse.h"
+#include "../parse.c"
 
 #define TRDB_SUCCESS 0
 #define TRDB_FAIL -1
@@ -151,6 +153,35 @@ fail:
     trdb_free_dinfo_with_bfd(c, abfd, &dunit);
     trdb_free(c);
     bfd_close(abfd);
+    return status;
+}
+
+
+static int test_parse_packets(const char *path)
+{
+    int status = TRDB_SUCCESS;
+    struct trdb_ctx *c = trdb_new();
+    LIST_HEAD(packet_list);
+    if (trdb_pulp_read_all_packets(c, path, &packet_list)) {
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    if (list_empty(&packet_list)) {
+        LOG_ERRT("packet list empty\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+    struct tr_packet *packet;
+    if (TRDB_VERBOSE_TESTS) {
+        list_for_each_entry_reverse(packet, &packet_list, list)
+        {
+            trdb_print_packet(stdout, packet);
+        }
+    }
+fail:
+    trdb_free(c);
+    trdb_free_packet_list(&packet_list);
     return status;
 }
 
@@ -1091,9 +1122,11 @@ int main(int argc, char *argv[argc + 1])
     /* for (size_t i = 0; i < 8; i++) */
     /*     RUN_TEST(test_trdb_serialize_packet, i); */
 
-    RUN_TEST(test_disasm_bfd);
+    /* RUN_TEST(test_disasm_bfd); */
     /* RUN_TEST(test_trdb_write_packets); */
     RUN_TEST(test_parse_stimuli_line);
+
+    RUN_TEST(test_parse_packets, "data/tx_spi");
     RUN_TEST(test_trdb_dinfo_init, "data/interrupt");
 
     RUN_TEST(test_stimuli_to_tr_instr, "data/trdb_stimuli");
@@ -1102,7 +1135,8 @@ int main(int argc, char *argv[argc + 1])
     /* NOTE: there is a memory leak ~230 bytes in riscv-dis.c with struct
      * riscv_subset for each instantiation of a disassembler.
      */
-    RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
+    /* RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
+     */
     RUN_TEST(test_disassemble_trace_with_bfd, "data/interrupt",
              "data/trdb_stimuli");
 

@@ -19,8 +19,8 @@
 
 /*
  * Author: Robert Balas (balasr@student.ethz.ch)
- * Description: trdb -- trace debugger for the  PULP platform, compress and
- * decompress instruction traces
+ * Description: trdb -- trace debugger tools for the  PULP platform, compress
+ * and decompress instruction traces
  */
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
@@ -34,13 +34,14 @@
 #include "../list.h"
 #include "../trace_debugger.h"
 #include "../disassembly.h"
+#include "../parse.h"
 
 #define TRDB_NUM_ARGS 1
 
 const char *argp_program_version = "trdb 0.1";
 const char *argp_program_bug_address = "<balasr@student.ethz.ch>";
 
-static char doc[] = "trdb -- trace debugger for the PULP platform";
+static char doc[] = "trdb -- trace debugger tools for the PULP platform";
 static char args_doc[] = "TRACE-OR-PACKETS";
 
 static struct argp_option options[] = {
@@ -50,14 +51,14 @@ static struct argp_option options[] = {
     {"bfd", 'b', "ELF", 0,
      "ELF binary with which the traces/packets were produced"},
     {"compress", 'c', 0, 0, "Take a stimuli file and compress to packets"},
-    {"disassemble", 'd', 0, 0,
-     "Take a stimuli file and disassemble. Specify an elf file additionaly for more information"},
+    {"extract", 'x', 0, 0, "Take a packet file and produce a stimuli file"},
+    {"disassemble", 'd', 0, 0, "disassemble the output"},
     {"output", 'o', "FILE", 0, "Output to FILE instead of stdout"},
     {0}};
 
 struct arguments {
     char *args[TRDB_NUM_ARGS];
-    bool silent, verbose, compress, has_elf, disassemble;
+    bool silent, verbose, compress, has_elf, disassemble, decompress;
     char *output_file;
     char *elf_file;
 };
@@ -84,6 +85,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
     case 'd':
         arguments->disassemble = true;
         break;
+    case 'x':
+        arguments->decompress = true;
+        break;
     case ARGP_KEY_ARG:
         if (state->arg_num >= TRDB_NUM_ARGS)
             argp_usage(state);
@@ -103,7 +107,11 @@ static struct argp argp = {options, parse_opt, args_doc, doc};
 
 static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
                           struct arguments *);
-static int decompress_packets_from_bfd_and_file(struct arguments *);
+
+static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
+                              struct arguments *arguments);
+
+
 static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *);
 
@@ -157,6 +165,8 @@ int main(int argc, char *argv[argc + 1])
 
     if (arguments.compress) {
         status = compress_trace(ctx, output_fp, &arguments);
+    } else if (arguments.decompress) {
+        status = decompress_packets(ctx, output_fp, abfd, &arguments);
     } else if (arguments.disassemble) {
         status = disassemble_trace(ctx, output_fp, abfd, &arguments);
     }
@@ -171,15 +181,14 @@ fail:
     return status;
 }
 
-/* TODO: compress to binary too */
+
+/* TODO: compress to pulp binary output too */
 static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
                           struct arguments *arguments)
 {
     int status = EXIT_SUCCESS;
 
-    /* init trace debugger structs */
-    trdb_init();
-
+    LIST_HEAD(packet_list);
     /* read stimuli file and convert to internal data structure */
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
@@ -187,26 +196,26 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     size_t samplecnt =
         trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
     if (success != 0) {
-        LOG_ERRT("trdb_stimuli_to_trace failed\n");
+        fprintf(stderr, "trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }
 
-    /* actual compression step */
-    LIST_HEAD(packet_list);
-    struct list_head *ret =
-        trdb_compress_trace(&packet_list, samplecnt, *samples);
-    if (!ret) {
-        LOG_ERRT("trdb_compress_trace faile\n");
-        status = EXIT_FAILURE;
-        goto fail;
+
+    /* step by step compression */
+    for (size_t i = 0; i < samplecnt; i++) {
+        int step = trdb_compress_trace_step(c, &packet_list, &(*samples)[i]);
+        if (step == -1) {
+            fprintf(stderr, "Compress trace failed.\n");
+            status = EXIT_FAILURE;
+            goto fail;
+        }
     }
 
     /* write to file or stdout */
     trdb_dump_packet_list(output_fp, &packet_list);
 
 fail:
-    trdb_close();
     free(*samples);
     trdb_free_packet_list(&packet_list);
 
@@ -214,12 +223,64 @@ fail:
 }
 
 
-static int decompress_packets(FILE *output_file, bfd *abfd,
+static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                               struct arguments *arguments)
 {
     int status = EXIT_SUCCESS;
+    const char *path = arguments->args[0];
+    struct disassemble_info dinfo;
+    struct disassembler_unit dunit;
+
+    LIST_HEAD(packet_list);
+    LIST_HEAD(instr_list);
+
+    if (!abfd) {
+        fprintf(stderr, "need to provide a binary for decompression\n");
+        status = EXIT_FAILURE;
+        goto fail;
+    }
+
+    /* by default we parse assuming data is generated from PULP */
+    if (trdb_pulp_read_all_packets(c, path, &packet_list)) {
+        fprintf(stderr, "failed to parse packets\n");
+        status = EXIT_FAILURE;
+        goto fail;
+    }
+
+    /* reconstruct the original instruction sequence */
+    if (trdb_decompress_trace(c, abfd, &packet_list, &instr_list)) {
+        fprintf(stderr,
+                "failed to decompress packets due to either corrupt"
+                "packets or wrong bfd, continuing anyway...\n");
+        status = EXIT_FAILURE;
+    }
+
+    /* setup the disassembler to consider data from the bfd */
+    dinfo = (struct disassemble_info){0};
+    dunit = (struct disassembler_unit){0};
+
+    dunit.dinfo = &dinfo;
+    if (trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
+        fprintf(stderr, "failed to configure bfd\n");
+        status = EXIT_FAILURE;
+        goto fail;
+    }
+
+    /* configure disassemble output */
+    dinfo.fprintf_func = (fprintf_ftype)fprintf;
+    dinfo.stream = output_fp;
 
 
+    struct tr_instr *instr;
+    list_for_each_entry_reverse(instr, &instr_list, list)
+    {
+        trdb_disassemble_instr(instr, &dunit);
+    }
+
+fail:
+    trdb_free_dinfo_with_bfd(c, abfd, &dunit);
+    trdb_free_packet_list(&packet_list);
+    trdb_free_instr_list(&instr_list);
     return status;
 }
 
@@ -228,7 +289,7 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *arguments)
 {
     if (!abfd) {
-        LOG_ERRT("Disassembling with no bfd is not supporte yet\n");
+        fprintf(stderr, "Disassembling with no bfd is not supporte yet\n");
         return EXIT_FAILURE;
     }
 
@@ -244,7 +305,7 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     size_t samplecnt =
         trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
     if (success != 0) {
-        LOG_ERRT("trdb_stimuli_to_trace failed\n");
+        fprintf(stderr, "trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }
