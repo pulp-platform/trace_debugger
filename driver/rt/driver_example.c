@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "pulp.h"
 #include "rt/rt_api.h"
 #include "rt_trace_debugger.h"
 
@@ -42,6 +43,7 @@ int main()
     /* setup trace debugger configuration */
     rt_trace_dbg_conf_t trdb_conf;
     rt_trace_debugger_conf_init(&trdb_conf);
+    trdb_conf.buffer_size = 512;
 
     /* and open it */
     rt_trace_dbg_t *trdb =
@@ -51,8 +53,16 @@ int main()
 	return -1;
     }
 
-    printf("[TEST] looping\n");
 
+    /* Let's call some functions to generated some code */
+    printf("Hello World!\n");
+    printf("Memory base address: %x\n", (unsigned int)rt_l2_base());
+    printf("Memory CAMERA RX: %x\n", UDMA_CAM_RX_ADDR(0));
+    printf("Memory TRACER RX: %x\n", UDMA_TRACER_RX_ADDR(0));
+    printf("Whoami: %d\n", (is_fc()));
+
+    /* just loop for now */
+    printf("[TEST] looping\n");
     while (test_runs > 0) {
 	test_runs--;
 	rt_event_yield(NULL);
