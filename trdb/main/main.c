@@ -126,6 +126,7 @@ int main(int argc, char *argv[argc + 1])
     arguments.compress = false;
     arguments.has_elf = false;
     arguments.disassemble = false;
+    arguments.decompress = false;
     arguments.output_file = "-";
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -274,7 +275,10 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     struct tr_instr *instr;
     list_for_each_entry_reverse(instr, &instr_list, list)
     {
-        trdb_disassemble_instr(instr, &dunit);
+        if (arguments->disassemble)
+            trdb_disassemble_instr(instr, &dunit);
+        else
+            trdb_print_instr(output_fp, instr);
     }
 
 fail:
@@ -288,15 +292,10 @@ fail:
 static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *arguments)
 {
-    if (!abfd) {
-        fprintf(stderr, "Disassembling with no bfd is not supporte yet\n");
-        return EXIT_FAILURE;
-    }
-
     int status = EXIT_SUCCESS;
 
-    /* init trace debugger structs */
-    trdb_init();
+    struct disassemble_info dinfo;
+    struct disassembler_unit dunit;
 
     /* read stimuli file and convert to internal data structure */
     struct tr_instr *tmp;
@@ -309,18 +308,35 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
         status = EXIT_FAILURE;
         goto fail;
     }
-    /* initialize disassembler based on bfd */
-    struct disassembler_unit dunit = {0};
-    struct disassemble_info dinfo = {0};
+
+    dinfo = (struct disassemble_info){0};
+    dunit = (struct disassembler_unit){0};
     dunit.dinfo = &dinfo;
-    init_disassembler_unit(&dunit, abfd, NULL);
-    dinfo.stream = output_fp; /* redirect output */
+
+    /* setup the disassembler to consider data from the bfd */
+    if (abfd) {
+        if (trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
+            fprintf(stderr, "failed to configure bfd\n");
+            status = EXIT_FAILURE;
+            goto fail;
+        }
+        /* configure disassemble output */
+        dinfo.fprintf_func = (fprintf_ftype)fprintf;
+        dinfo.stream = output_fp;
+
+    } else {
+        /* if we can't use a bfd assume its pulp riscv */
+        init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
+        init_disassemble_info_for_pulp(&dinfo);
+        dunit.disassemble_fn = print_insn_riscv;
+    }
+
 
     trdb_disassemble_trace(samplecnt, *samples, &dunit);
 
-
 fail:
-    trdb_close();
+    if (abfd)
+        trdb_free_dinfo_with_bfd(c, abfd, &dunit);
     free(*samples);
     return status;
 }
