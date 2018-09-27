@@ -32,6 +32,8 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <ctype.h>
+/* fix nameconflict with basename in libiberty and libgen */
+#define HAVE_DECL_BASENAME 1
 #include "bfd.h"
 #include "disassembly.h"
 #include "list.h"

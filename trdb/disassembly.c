@@ -39,6 +39,8 @@
 #include "bfd.h"
 #include "elf-bfd.h"
 #include "dis-asm.h"
+/* fix nameconflict with basename in libiberty and libgen */
+#define HAVE_DECL_BASENAME 1
 #include "libiberty.h"
 #include "demangle.h"
 
