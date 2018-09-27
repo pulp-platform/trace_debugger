@@ -130,8 +130,7 @@ class Scoreboard;
             gm_packet  = gm_response.packet;
             duv_packet = duv_response.packet;
             stats.total_packets = packetcnt++;
-            //TODO: remove this range when packet length is fixed
-            if(gm_packet.bits[127:7] != duv_packet.bits[127:7]) begin
+            if(gm_packet.bits[127:0] != duv_packet.bits[127:0]) begin
                 $display("[SCORE]  @%t: ERROR - Packet mismatch for number %0d",
                          $time, packetcnt);
                 $display("[SCORE]  @%t: Expected: %h", $time, gm_packet.bits);
