@@ -1099,7 +1099,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              */
             if ((dec_ctx.branch_map.full
                  && (packet->length
-                     > FORMATLEN + BRANCHLEN
+                     > MSGTYPELEN + FORMATLEN + BRANCHLEN
                            + branch_map_len(dec_ctx.branch_map.cnt)))
                 || !dec_ctx.branch_map.full) {
                 dec_ctx.last_packet_addr = packet->address;
@@ -1237,7 +1237,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              */
             if ((dec_ctx.branch_map.full
                  && (packet->length
-                     > FORMATLEN + BRANCHLEN
+                     > MSGTYPELEN + FORMATLEN + BRANCHLEN
                            + branch_map_len(dec_ctx.branch_map.cnt)))
                 || !dec_ctx.branch_map.full)
                 dec_ctx.last_packet_addr = absolute_addr;
