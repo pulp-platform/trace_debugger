@@ -426,7 +426,8 @@ static void emit_exception_packet(struct tr_packet *tr,
     tr->ecause = lc_instr->cause;
     tr->interrupt = lc_instr->interrupt;
     tr->tval = lc_instr->tval;
-    tr->length = 2 + 2 + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+    tr->length =
+        MSGTYPELEN + FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
 }
 
 
@@ -444,7 +445,7 @@ static void emit_start_packet(struct tr_packet *tr, struct tr_instr *tc_instr,
     else
         tr->branch = 0;
     tr->address = tc_instr->iaddr;
-    tr->length = 2 + 2 + PRIVLEN + 1 + XLEN;
+    tr->length = MSGTYPELEN + FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
 }
 
 
@@ -464,7 +465,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             tr->address = last_iaddr - tc_instr->iaddr;
         }
         /* TODO: compress length with differential */
-        tr->length = FORMATLEN + XLEN;
+        tr->length = MSGTYPELEN + FORMATLEN + XLEN;
         assert(branch_map->bits == 0);
     } else {
         if (branch_map->full && is_u_discontinuity)
@@ -473,8 +474,8 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
         if (full_address) {
             tr->format = F_BRANCH_FULL;
             tr->address = tc_instr->iaddr;
-            tr->length =
-                FORMATLEN + BRANCHLEN + branch_map_len(branch_map->cnt);
+            tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
+                         + branch_map_len(branch_map->cnt);
             if (branch_map->full) {
                 if (is_u_discontinuity)
                     tr->length += XLEN;
@@ -498,8 +499,8 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                 tr->format = F_BRANCH_FULL;
                 tr->address = full;
             }
-            tr->length =
-                FORMATLEN + BRANCHLEN + branch_map_len(branch_map->cnt);
+            tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
+                         + branch_map_len(branch_map->cnt);
             if (branch_map->full) {
                 if (is_u_discontinuity)
                     tr->length += XLEN;
@@ -527,7 +528,7 @@ static void emit_full_branch_map(struct tr_packet *tr,
     tr->branches = branch_map->cnt;
     tr->branch_map = branch_map->bits;
     /* No address needed */
-    tr->length = FORMATLEN + BRANCHLEN + branch_map_len(31);
+    tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + branch_map_len(31);
     *branch_map = (struct branch_map_state){0};
 }
 
@@ -1884,8 +1885,7 @@ void trdb_disassemble_instr(struct tr_instr *instr,
                             struct disassembler_unit *dunit)
 {
     struct disassemble_info *dinfo = dunit->dinfo;
-    (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ",
-                           (uintmax_t)instr->iaddr);
+    (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ", (uintmax_t)instr->iaddr);
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ", (uintmax_t)instr->instr);
     (*dinfo->fprintf_func)(dinfo->stream, "%s",
                            instr->exception ? "TRAP!  " : "");
