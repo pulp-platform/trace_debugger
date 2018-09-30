@@ -1881,6 +1881,18 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
 }
 
 
+void trdb_disassemble_trace_with_bfd(struct trdb_ctx *c, size_t len,
+                                     struct tr_instr trace[len], bfd *abfd,
+                                     struct disassembler_unit *dunit)
+{
+    struct disassemble_info *dinfo = dunit->dinfo;
+    for (size_t i = 0; i < len; i++) {
+        (*dinfo->fprintf_func)(dinfo->stream, "%s",
+                               trace[i].exception ? "TRAP!  " : "");
+        trdb_disassemble_instruction_with_bfd(c, abfd, trace[i].iaddr, dunit);
+    }
+}
+
 void trdb_disassemble_instr(struct tr_instr *instr,
                             struct disassembler_unit *dunit)
 {

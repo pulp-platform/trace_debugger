@@ -59,6 +59,7 @@ struct disassembler_unit {
 };
 
 struct trdb_disasm_aux {
+    /* current disassembly context */
     bfd *abfd;
     asection *sec;
     bfd_boolean require_sec;
@@ -68,6 +69,7 @@ struct trdb_disasm_aux {
 
     arelent *reloc;
 
+    /* symbols extracted from bfd */
     asymbol **symbols;
     long symcount;
     asymbol **dynamic_symbols;
@@ -76,6 +78,15 @@ struct trdb_disasm_aux {
     long synthcount;
     asymbol **sorted_symbols;
     long sorted_symcount;
+
+    /* set to true to always diassemble to most general representation */
+    bool no_aliases;
+    /* different address format, TODO: doesn't work */
+    bool prefix_addresses;
+    /* demangle symbols using bfd */
+    bool do_demangle;
+    /* display file offsets for displayed symbols */
+    bool display_file_offsets;
 };
 
 /* The number of zeroes we want to see before we start skipping them. The number
@@ -302,4 +313,7 @@ void disassemble_block(size_t len, bfd_byte data[len],
 void disassemble_single_instruction(uint32_t instr, uint32_t addr,
                                     struct disassembler_unit *dunit);
 
+void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
+                                           bfd_vma addr,
+                                           struct disassembler_unit *dunit);
 #endif

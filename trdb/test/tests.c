@@ -622,7 +622,9 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
     }
     if (TRDB_VERBOSE_TESTS) {
         trdb_disassemble_trace(samplecnt, *samples, &dunit);
+        trdb_disassemble_trace_with_bfd(c, samplecnt, *samples, abfd, &dunit);
     }
+
 
 fail:
     trdb_free_dinfo_with_bfd(c, abfd, &dunit);
