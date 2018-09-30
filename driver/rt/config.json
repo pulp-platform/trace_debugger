@@ -1,0 +1,15 @@
+{
+  "devices": {
+    "spim": {
+      "type": "spim_verif",
+      "interface": "spim0",
+      "cs": 1,
+      "config": {
+        "tx_file": {
+          "path": "tx_spi",
+          "qpi": "true"
+        }
+      }
+    }
+  }
+}

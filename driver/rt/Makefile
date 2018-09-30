@@ -1,6 +1,6 @@
-PULP_APP = rt_test2
-PULP_APP_FC_SRCS = rt_test2.c rt_trace_debugger.c
-PULP_APP_HOST_SRCS = rt_test2.c
+PULP_APP = driver_example
+PULP_APP_FC_SRCS = driver_example.c rt_trace_debugger.c
+PULP_APP_HOST_SRCS = driver_example.c
 PULP_CFLAGS = -O1 -g -mnohwloop
 
 PULP_USER_CONFIG = $(CURDIR)/config.json
