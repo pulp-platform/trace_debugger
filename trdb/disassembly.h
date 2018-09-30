@@ -28,12 +28,12 @@
 #define __DISASSEMBLY_H__
 
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
-#include <stdbool.h>
-#include <inttypes.h>
 #include "bfd.h"
 #include "demangle.h"
 #include "dis-asm.h"
 #include "trace_debugger.h"
+#include <inttypes.h>
+#include <stdbool.h>
 
 /* forward declarations */
 struct trdb_ctx;
@@ -58,6 +58,17 @@ struct disassembler_unit {
     struct disassemble_info *dinfo;    /**< context for disassembly */
 };
 
+#define TRDB_NO_ALIASES 1
+#define TRDB_PREFIX_ADDRESSES 2
+#define TRDB_DO_DEMANGLE 4
+#define TRDB_DISPLAY_FILE_OFFSETS 8
+#define TRDB_LINE_NUMBERS 16
+#define TRDB_SOURCE_CODE 32
+#define TRDB_FUNCTION_CONTEXT 64
+
+/**
+ * Store disassembly configuration and context.
+ */
 struct trdb_disasm_aux {
     /* current disassembly context */
     bfd *abfd;
@@ -79,14 +90,18 @@ struct trdb_disasm_aux {
     asymbol **sorted_symbols;
     long sorted_symcount;
 
-    /* set to true to always diassemble to most general representation */
-    bool no_aliases;
-    /* different address format, TODO: doesn't work */
-    bool prefix_addresses;
-    /* demangle symbols using bfd */
-    bool do_demangle;
-    /* display file offsets for displayed symbols */
-    bool display_file_offsets;
+    uint32_t config;       /**< stores the below settings as bitfield */
+    bool no_aliases;       /**< set to true to always diassemble to most general
+                              representation */
+    bool prefix_addresses; /**< different address format */
+    bool do_demangle;      /**< demangle symbols using bfd */
+    bool display_file_offsets;  /** < display file offsets for displayed symbols
+                                 */
+    bool with_line_numbers;     /**< periodically show line numbers mixed with
+                                   assembly */
+    bool with_source_code;      /**< show source code mixed with assembly */
+    bool with_function_context; /**< show when instruction lands on symbol value
+                                   of a function */
 };
 
 /* The number of zeroes we want to see before we start skipping them. The number
@@ -210,7 +225,6 @@ void trdb_print_address(bfd_vma vma, struct disassemble_info *inf);
  * @return
  */
 int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf);
-
 
 /**
  *  Print the bfd section header to stdout.

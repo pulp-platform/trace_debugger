@@ -54,10 +54,6 @@
 #define O_BINARY 0
 
 /* TODO: move that stuff below into context object */
-static bool with_line_numbers = true;
-static bool with_source_code = true;
-static bool with_function_context = true;
-
 static const char *prefix;
 static int prefix_strip = 0;
 static size_t prefix_length;
@@ -98,13 +94,13 @@ typedef struct {
 
 static struct print_file_list *print_files;
 
-static int insn_width = 0;
+static int insn_width;
 static int show_raw_insn;
 
 static int dump_dynamic_reloc_info = 0;
 static int dump_reloc_info = 0;
 
-static bfd_boolean disassemble_all;
+static bool disassemble_all;
 static int wide_output;
 
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
@@ -785,6 +781,8 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
         err(c, "malloc: %s\n", strerror(errno));
         return -ENOMEM;
     }
+    /* make sure we properly initialize aux */
+    *aux = (struct trdb_disasm_aux){0};
 
     struct bfd_target *xvec = NULL;
 
@@ -940,6 +938,9 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
     if (dunit->dinfo) {
         aux = dunit->dinfo->application_data;
         free(dunit->dinfo->symtab);
+        free(dunit->dinfo->buffer);
+        dunit->dinfo->buffer_vma = 0;
+        dunit->dinfo->buffer_length = 0;
     }
 
     // TODO: free section in aux
@@ -948,10 +949,35 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
         free(aux->symbols);
         free(aux->dynamic_symbols);
         free(aux->synthethic_symbols);
+        /* free(aux->sorted_symbols); */
         free(aux);
     }
 }
 
+
+void trdb_set_disassembly_conf(struct disassembler_unit *dunit,
+                               uint32_t settings)
+{
+    struct trdb_disasm_aux *aux = dunit->dinfo->application_data;
+    if (!aux)
+        return;
+    aux->config = settings;
+    aux->no_aliases = settings & TRDB_NO_ALIASES;
+    aux->prefix_addresses = settings & TRDB_PREFIX_ADDRESSES;
+    aux->do_demangle = settings & TRDB_DO_DEMANGLE;
+    aux->display_file_offsets = settings & TRDB_DISPLAY_FILE_OFFSETS;
+    aux->with_line_numbers = settings & TRDB_LINE_NUMBERS;
+    aux->with_source_code = settings & TRDB_SOURCE_CODE;
+    aux->with_function_context = settings & TRDB_FUNCTION_CONTEXT;
+}
+
+uint32_t trdb_get_disassembly_conf(struct disassembler_unit *dunit)
+{
+    struct trdb_disasm_aux *aux = dunit->dinfo->application_data;
+    if (!aux)
+        return 0;
+    return aux->config;
+}
 
 /* The number of preceding context lines to show when we start
    displaying a file for the first time.  */
@@ -983,7 +1009,7 @@ static const char *slurp_file(const char *fn, size_t *size)
         return map;
     }
 #endif
-    map = (const char *)malloc(*size);
+    map = malloc(*size);
     if (!map || (size_t)read(fd, (char *)map, *size) != *size) {
         free((void *)map);
         map = NULL;
@@ -1049,7 +1075,10 @@ static struct print_file_list *try_print_file_open(const char *origname,
 {
     struct print_file_list *p;
 
-    p = (struct print_file_list *)xmalloc(sizeof(struct print_file_list));
+    p = malloc(sizeof(struct print_file_list));
+    /* TODO: improve this handling */
+    if (!p)
+        return NULL;
 
     p->map = slurp_file(modname, &p->mapsize);
     if (p->map == NULL) {
@@ -1137,7 +1166,7 @@ static void dump_lines(struct print_file_list *p, unsigned int start,
 /* Show the line number, or the source line, in a disassembly
    listing.  */
 static void show_line(bfd *abfd, asection *section, asymbol **syms,
-                      bfd_vma addr_offset)
+                      bfd_vma addr_offset, struct trdb_disasm_aux *aux)
 {
     const char *filename;
     const char *functionname;
@@ -1145,6 +1174,9 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
     unsigned int discriminator;
     bfd_boolean reloc;
     char *path = NULL;
+
+    bool with_line_numbers = aux->with_line_numbers;
+    bool with_source_code = aux->with_source_code;
 
     if (!with_line_numbers && !with_source_code)
         return;
@@ -1163,7 +1195,11 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
         char *path_up;
         const char *fname = filename;
 
-        path = xmalloc(prefix_length + PATH_MAX + 1);
+        path = malloc(prefix_length + PATH_MAX + 1);
+        /* TODO: improve this handling */
+        if (!path)
+            goto fail;
+
 
         if (prefix_length)
             memcpy(path, prefix, prefix_length);
@@ -1252,7 +1288,11 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
             || strcmp(functionname, prev_functionname) != 0)) {
         if (prev_functionname != NULL)
             free(prev_functionname);
-        prev_functionname = (char *)xmalloc(strlen(functionname) + 1);
+        prev_functionname = malloc(strlen(functionname) + 1);
+        /* TODO: improve this handling */
+        if (!prev_functionname)
+            goto fail;
+
         strcpy(prev_functionname, functionname);
     }
 
@@ -1262,8 +1302,12 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
     if (discriminator != prev_discriminator)
         prev_discriminator = discriminator;
 
+fail:
     if (path)
         free(path);
+    /* TODO: not sure if we are not freeing bad pointers */
+    /* if(prev_functionname) */
+    /* 	free(prev_functionname); */
 }
 
 
@@ -1311,9 +1355,15 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
     aux = inf->application_data;
     section = aux->sec;
     bool prefix_addresses = aux->prefix_addresses;
+    bool with_line_numbers = aux->with_line_numbers;
+    bool with_source_code = aux->with_source_code;
 
     sfile.alloc = 120;
-    sfile.buffer = (char *)xmalloc(sfile.alloc);
+    sfile.buffer = malloc(sfile.alloc);
+    /* TODO: improve this handling */
+    if (!sfile.buffer)
+        goto fail;
+
     sfile.pos = 0;
 
     if (insn_width)
@@ -1363,7 +1413,7 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
     int pb = 0;
 
     if (with_line_numbers || with_source_code)
-        show_line(aux->abfd, section, aux->symbols, addr_offset);
+        show_line(aux->abfd, section, aux->symbols, addr_offset, aux);
 
     if (!prefix_addresses) {
         char *s;
@@ -1531,8 +1581,9 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
 
     addr_offset += octets / opb;
 
-
-    free(sfile.buffer);
+fail:
+    if (sfile.buffer)
+        free(sfile.buffer);
 }
 
 
@@ -1566,6 +1617,8 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
     bool prefix_addresses = paux->prefix_addresses;
     bool do_demangle = paux->do_demangle;
     bool display_file_offsets = paux->display_file_offsets;
+    bool with_function_context = paux->with_function_context;
+
     /* get section section which vma points to, if any */
     asection *section = get_section_for_vma(abfd, addr);
     if (!section) {
@@ -1612,7 +1665,11 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
             }
 
             if (relsize > 0) {
-                rel_ppstart = rel_pp = (arelent **)xmalloc(relsize);
+                rel_ppstart = rel_pp = malloc(relsize);
+                if (!rel_pp) {
+                    err(c, "malloc: %s\n", strerror(errno));
+                    goto fail;
+                }
                 rel_count = bfd_canonicalize_reloc(abfd, section, rel_pp, syms);
                 if (rel_count < 0) {
                     err(c, "%s\n", bfd_get_filename(abfd));
@@ -1626,23 +1683,25 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
     }
     rel_ppend = rel_pp + rel_count;
 
-    // TODO: fix this memory leak
     /* load appropriate section, if we have to */
-    /* if(! paux->sec || paux->sec != section){ */
-    /*     if(!pinfo->buffer){ */
-    /* 	  free(pinfo->buffer); */
-    /* 	  pinfo->buffer = 0; */
-    /*     } */
-    data = (bfd_byte *)xmalloc(datasize);
-    bfd_get_section_contents(abfd, section, data, 0, datasize);
+    if (!paux->sec || strcmp(paux->sec->name, section->name) != 0) {
+        if (paux->sec && pinfo->buffer) {
+            free(pinfo->buffer);
+            pinfo->buffer = 0;
+        }
+        data = malloc(datasize);
+        if (!data) {
+            err(c, "malloc: %s\n", strerror(errno));
+            goto fail;
+        }
+        bfd_get_section_contents(abfd, section, data, 0, datasize);
 
-    paux->sec = section;
-    pinfo->buffer = data;
-    pinfo->buffer_vma = section->vma;
-    pinfo->buffer_length = datasize;
-    pinfo->section = section;
-    /* } */
-
+        paux->sec = section;
+        pinfo->buffer = data;
+        pinfo->buffer_vma = section->vma;
+        pinfo->buffer_length = datasize;
+        pinfo->section = section;
+    }
 
     /* Skip over the relocs belonging to addresses below the
        start address.  */
@@ -1747,17 +1806,21 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
     else
         insns = FALSE;
 
-    trdb_disassemble_bytes(pinfo, dunit->disassemble_fn, insns, data,
+    trdb_disassemble_bytes(pinfo, dunit->disassemble_fn, insns, pinfo->buffer,
                            addr - section->vma, rel_offset, &rel_pp, rel_ppend);
 
     addr_offset = nextstop_offset;
     sym = nextsym;
 
-
-    /* free (data); */
-
     if (rel_ppstart != NULL)
         free(rel_ppstart);
+    return;
+
+fail:
+    if (!rel_pp)
+        free(rel_pp);
+    if (!pinfo->buffer)
+        free(pinfo->buffer);
 }
 
 
