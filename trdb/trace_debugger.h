@@ -295,6 +295,21 @@ void trdb_disassemble_instr(struct tr_instr *instr,
                             struct disassembler_unit *dunit);
 
 /**
+ * Disassemble @p instr using fprint_func in #disassembler_unit.dinfo. This
+ * function additionaly uses information from the @p abfd and settings in @dp
+ * dunit to produce more useful disassembly, such as intermixing sourcecode,
+ * showing file and line numbers, resolving addresses to symbols etc.
+ *
+ * @param c trace debugger context
+ * @param instr instruction to disassemble, only #iaddr is relevant
+ * @param abfd the bfd which contains @p instr
+ * @param dunit the configured disassembler
+ */
+void trdb_disassemble_instr_with_bfd(struct trdb_ctx *c, struct tr_instr *instr,
+                                     bfd *abfd,
+                                     struct disassembler_unit *dunit);
+
+/**
  * Prints a list of tr_packet in a formatted manner to @p stream.
  *
  * @param stream output to write to

@@ -29,6 +29,7 @@
 #include <argp.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
 #include "bfd.h"
 #include "../utils.h"
 #include "../list.h"
@@ -44,21 +45,41 @@ const char *argp_program_bug_address = "<balasr@student.ethz.ch>";
 static char doc[] = "trdb -- trace debugger tools for the PULP platform";
 static char args_doc[] = "TRACE-OR-PACKETS";
 
+#define TRDB_OPT_DEMANGLE 1
+#define TRDB_OPT_NO_ALIASES 2
+#define TRDB_OPT_PREFIX_ADDRESSES 3
+
+
 static struct argp_option options[] = {
     {"verbose", 'v', 0, 0, "Produce verbose output"},
     {"quiet", 'q', 0, 0, "Don't produce any output"},
-    {"silent", 's', 0, OPTION_ALIAS},
+    /* {"silent", 's', 0, OPTION_ALIAS}, */
     {"bfd", 'b', "ELF", 0,
      "ELF binary with which the traces/packets were produced"},
     {"compress", 'c', 0, 0, "Take a stimuli file and compress to packets"},
+    {"trace-file", 't', 0, 0, "Input file is a trace file"},
     {"extract", 'x', 0, 0, "Take a packet file and produce a stimuli file"},
     {"disassemble", 'd', 0, 0, "disassemble the output"},
+    {"no-aliases", TRDB_OPT_NO_ALIASES, 0, 0,
+     "Do not use aliases for disassembled instructions"},
+    {"demangle", TRDB_OPT_DEMANGLE, 0, 0,
+     "Demangle symbols, sometimes helps readability"},
+    {"prefix-addresses", TRDB_OPT_PREFIX_ADDRESSES, 0, 0,
+     "Print complete address alongside disassembly"},
+    {"file-offsets", 'F', 0, 0,
+     "Include file offsets when displaying information"},
+    {"source", 'S', 0, 0, "Intermix source code with disassembly"},
+    {"function-context", 's', 0, 0,
+     "Show when address coincides with function name entrypoint"},
+    {"line-numbers", 'l', 0, 0, "Include line numbers and filenames in output"},
     {"output", 'o', "FILE", 0, "Output to FILE instead of stdout"},
     {0}};
 
 struct arguments {
     char *args[TRDB_NUM_ARGS];
-    bool silent, verbose, compress, has_elf, disassemble, decompress;
+    bool silent, verbose, compress, has_elf, disassemble, decompress,
+        trace_file;
+    uint32_t settings_disasm;
     char *output_file;
     char *elf_file;
 };
@@ -68,7 +89,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
     struct arguments *arguments = state->input;
     switch (key) {
     case 'q':
-    case 's':
         arguments->silent = true;
         break;
     case 'o':
@@ -82,11 +102,35 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
     case 'c':
         arguments->compress = true;
         break;
+    case 't':
+        arguments->trace_file = true;
+        break;
     case 'd':
         arguments->disassemble = true;
         break;
     case 'x':
         arguments->decompress = true;
+        break;
+    case TRDB_OPT_NO_ALIASES:
+        arguments->settings_disasm |= TRDB_NO_ALIASES;
+        break;
+    case TRDB_OPT_DEMANGLE:
+        arguments->settings_disasm |= TRDB_DO_DEMANGLE;
+        break;
+    case TRDB_OPT_PREFIX_ADDRESSES:
+        arguments->settings_disasm |= TRDB_PREFIX_ADDRESSES;
+        break;
+    case 'F':
+        arguments->settings_disasm |= TRDB_DISPLAY_FILE_OFFSETS;
+        break;
+    case 'S':
+        arguments->settings_disasm |= TRDB_SOURCE_CODE;
+        break;
+    case 's':
+        arguments->settings_disasm |= TRDB_FUNCTION_CONTEXT;
+        break;
+    case 'l':
+        arguments->settings_disasm |= TRDB_LINE_NUMBERS;
         break;
     case ARGP_KEY_ARG:
         if (state->arg_num >= TRDB_NUM_ARGS)
@@ -127,6 +171,7 @@ int main(int argc, char *argv[argc + 1])
     arguments.has_elf = false;
     arguments.disassemble = false;
     arguments.decompress = false;
+    arguments.settings_disasm = 0;
     arguments.output_file = "-";
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -164,12 +209,15 @@ int main(int argc, char *argv[argc + 1])
         }
     }
 
-    if (arguments.compress) {
-        status = compress_trace(ctx, output_fp, &arguments);
-    } else if (arguments.decompress) {
+    if (arguments.decompress) {
         status = decompress_packets(ctx, output_fp, abfd, &arguments);
-    } else if (arguments.disassemble) {
+    } else if (arguments.compress) {
+        status = compress_trace(ctx, output_fp, &arguments);
+    } else if (arguments.trace_file) {
         status = disassemble_trace(ctx, output_fp, abfd, &arguments);
+    } else {
+        /* by default we decompress */
+        status = decompress_packets(ctx, output_fp, abfd, &arguments);
     }
 
 
@@ -268,6 +316,7 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     }
 
     /* configure disassemble output */
+    trdb_set_disassembly_conf(&dunit, arguments->settings_disasm);
     dinfo.fprintf_func = (fprintf_ftype)fprintf;
     dinfo.stream = output_fp;
 
@@ -276,19 +325,20 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     list_for_each_entry_reverse(instr, &instr_list, list)
     {
         if (arguments->disassemble)
-            trdb_disassemble_instr(instr, &dunit);
+            trdb_disassemble_instr_with_bfd(c, instr, abfd, &dunit);
+        /* trdb_disassemble_instr(instr, &dunit); */
         else
             trdb_print_instr(output_fp, instr);
     }
 
 fail:
-    trdb_free_dinfo_with_bfd(c, abfd, &dunit);
+    /* trdb_free_dinfo_with_bfd(c, abfd, &dunit); */
     trdb_free_packet_list(&packet_list);
     trdb_free_instr_list(&instr_list);
     return status;
 }
 
-/* TODO: allow no bfd */
+
 static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *arguments)
 {

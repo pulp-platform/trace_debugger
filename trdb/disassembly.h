@@ -199,6 +199,26 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                               struct disassembler_unit *dunit);
 
 /**
+ * Configure the disassembler with flags. E.g. set @p settings to
+ * TRDB_SOURCE_CODE | TRDB_LINE_NUMBERS to show the source code and file line
+ * numbers mixed with disassembly.
+ *
+ * @param dunit the disassembler
+ * @param settings configuration flags which can be set as described
+ */
+void trdb_set_disassembly_conf(struct disassembler_unit *dunit,
+                               uint32_t settings);
+
+/**
+ * Read the disassembler configuration flags. Test for enabled features by
+ * and'ing the returned value with e.g. TRDB_SOURCE_CODE.
+ *
+ * @param dunit the disassembler whose settings should be read
+ * @return the settings flags
+ */
+uint32_t trdb_get_disassembly_conf(struct disassembler_unit *dunit);
+
+/**
  * A #print_address_func used in disassemble_info, set by
  * trdb_alloc_dinfo_with_bfd, which resolve addresses to symbols. This callback
  * is only well defined if its disassemble_info struct was initialized using

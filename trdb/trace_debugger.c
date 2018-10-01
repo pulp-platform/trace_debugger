@@ -1905,6 +1905,16 @@ void trdb_disassemble_instr(struct tr_instr *instr,
 }
 
 
+void trdb_disassemble_instr_with_bfd(struct trdb_ctx *c, struct tr_instr *instr,
+                                     bfd *abfd, struct disassembler_unit *dunit)
+{
+    struct disassemble_info *dinfo = dunit->dinfo;
+    (*dinfo->fprintf_func)(dinfo->stream, "%s",
+                           instr->exception ? "TRAP!  " : "");
+    trdb_disassemble_instruction_with_bfd(c, abfd, instr->iaddr, dunit);
+}
+
+
 void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list)
 {
     struct tr_packet *packet;
