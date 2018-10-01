@@ -38,7 +38,10 @@ module trdb_stream_align
     logic [4:0]                       residual_fill_q, residual_fill_d;
     logic                             valid_d, valid_q;
 
-    logic [4:0]                       instance_id = ID;
+    // TODO: this is not used for now, meant for multi core tracing
+    logic [4:0]                       instance_id;
+
+    assign instance_id = ID;
 
     assign valid_o = valid_q;
     assign data_o = data_q;

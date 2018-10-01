@@ -34,6 +34,7 @@ module trace_debugger_stimuli_gen
     logic [31:0]        iaddr_q, iaddr_d;
     logic [31:0]        instr_q, instr_d;
 
+`ifndef SYNTHESIS
     initial begin
 
         automatic string name = "trdb_stimuli";
@@ -62,5 +63,6 @@ module trace_debugger_stimuli_gen
 
         //$fclose(fd);
     end
+`endif
 
 endmodule // trace_debugger_stimuli_gen

@@ -75,7 +75,7 @@ module trdb_packet_emitter
         end
     end
 
-
+`ifndef SYNTHESIS
     branch_map_size_check: assert property
     (@(posedge clk_i) disable iff (~rst_ni) (branch_map_cnt_i < 32))
         else $error("[TRDB]    @%t: branch_map_cnt_i=%d is too large",
@@ -90,7 +90,7 @@ module trdb_packet_emitter
     packet_fifo_overflow: assert property
     (@(posedge clk_i) disable iff (~rst_ni) (packet_fifo_not_full == 1'b1))
             else $error("[TRDB]   @%t: Packet FIFO is overflowing.", $time);
-
+`endif
 
     always_comb begin: set_packet_bits
         packet_bits        = '0;

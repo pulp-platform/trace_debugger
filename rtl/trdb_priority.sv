@@ -50,10 +50,16 @@ module trdb_priority
      output       trdb_subformat_t packet_subformat_o);
 
     // TODO: temporarily put here to make it compile
-    logic         tc_unhalted_i     = '0;
-    logic         nc_halt_i         = '0;
-    logic         nc_unqualified_i  = '0;
-    logic         tc_context_change = '0;
+    logic         tc_unhalted_i;
+    logic         nc_halt_i;
+    logic         nc_unqualified_i;
+    logic         tc_context_change;
+
+    assign tc_unhalted_i     = '0;
+    assign nc_halt_i         = '0;
+    assign nc_unqualified_i  = '0;
+    assign tc_context_change = '0;
+
 
     // TODO: same as in C-code, differential address generation when
     // TODO: assert for X's

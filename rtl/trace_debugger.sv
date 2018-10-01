@@ -39,7 +39,7 @@ module trace_debugger
 
     // general control of this module
     logic                       trace_enable;
-    logic                       packet_after_exception = '1;
+    logic                       packet_after_exception;
 
     logic                       debug_mode;
     logic                       trace_valid;
@@ -65,6 +65,8 @@ module trace_debugger
     logic                       tc_qualified, lc_qualified;
     logic                       tc_compressed;
     logic [XLEN-1:0]            tc_iaddr, nc_iaddr;
+    logic                       lc_exception_sync;
+    logic                       lc_interrupt;
 
     // pass delayed data
     logic [CAUSELEN-1:0]        lc_cause;
@@ -126,11 +128,15 @@ module trace_debugger
     // whether we do tracing at all
     assign trace_valid = ivalid_i && debug_mode && trace_enable;
     assign debug_mode = priv_i[PRIVLEN-1];
+    // TODO: make this configurationr register mapped
+    assign packet_after_exception                      = '1;
 
+`ifndef SYNTHESIS
     trace_valid_and_debug: assert property
     (@(posedge clk_i) disable iff (~rst_ni) (trace_enable |-> debug_mode))
         else $info("[TRDB]    @%t: Tracing works only in debug mode",
                    $time);
+`endif
 
     // buffer variables. Certain variables we need to hold up to three cycles
     assign interrupt0_d = interrupt_i;
@@ -149,7 +155,6 @@ module trace_debugger
     // assign is_branch0_d (below)
 
     assign u_discontinuity1_d = u_discontinuity0_q;
-    assign is_branch1_d = is_branch0_q;
     // TODO: add feature to have selective tracing, add enable with regmap
     assign qualified0_d = trace_enable && ivalid_i;
     assign qualified1_d = qualified0_q;
