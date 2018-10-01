@@ -57,7 +57,10 @@ static struct argp_option options[] = {
     {"bfd", 'b', "ELF", 0,
      "ELF binary with which the traces/packets were produced"},
     {"compress", 'c', 0, 0, "Take a stimuli file and compress to packets"},
+    {"binary-format", 'p', "FORMAT", 0,
+     "Specify binary input/output format, by default like the pulp trace debugger"},
     {"trace-file", 't', 0, 0, "Input file is a trace file"},
+    {"dump", 'h', 0, 0, "Dump trace or packets in human readable format"},
     {"extract", 'x', 0, 0, "Take a packet file and produce a stimuli file"},
     {"disassemble", 'd', 0, 0, "disassemble the output"},
     {"no-aliases", TRDB_OPT_NO_ALIASES, 0, 0,
@@ -72,14 +75,15 @@ static struct argp_option options[] = {
     {"function-context", 's', 0, 0,
      "Show when address coincides with function name entrypoint"},
     {"line-numbers", 'l', 0, 0, "Include line numbers and filenames in output"},
-    {"output", 'o', "FILE", 0, "Output to FILE instead of stdout"},
+    {"output", 'o', "FILE", 0, "Write to FILE instead of stdout"},
     {0}};
 
 struct arguments {
     char *args[TRDB_NUM_ARGS];
     bool silent, verbose, compress, has_elf, disassemble, decompress,
-        trace_file;
+        trace_file, binary_output, human;
     uint32_t settings_disasm;
+    char *binary_format;
     char *output_file;
     char *elf_file;
 };
@@ -102,9 +106,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
     case 'c':
         arguments->compress = true;
         break;
+    case 'p':
+        arguments->binary_output = true;
+        arguments->binary_format = arg;
+        break;
     case 't':
         arguments->trace_file = true;
         break;
+    case 'h':
+        arguments->human = true;
     case 'd':
         arguments->disassemble = true;
         break;
@@ -159,6 +169,9 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
 static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *);
 
+static int dump_trace_or_packets(struct trdb_ctx *c, FILE *output_fp,
+                                 struct arguments *arguments);
+
 int main(int argc, char *argv[argc + 1])
 {
     int status = EXIT_SUCCESS;
@@ -168,11 +181,14 @@ int main(int argc, char *argv[argc + 1])
     arguments.silent = false;
     arguments.verbose = false;
     arguments.compress = false;
+    arguments.binary_output = false;
+    arguments.human = false;
     arguments.has_elf = false;
     arguments.disassemble = false;
     arguments.decompress = false;
     arguments.settings_disasm = 0;
     arguments.output_file = "-";
+    arguments.binary_format = "";
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
@@ -213,6 +229,8 @@ int main(int argc, char *argv[argc + 1])
         status = decompress_packets(ctx, output_fp, abfd, &arguments);
     } else if (arguments.compress) {
         status = compress_trace(ctx, output_fp, &arguments);
+    } else if (arguments.human) {
+        status = dump_trace_or_packets(ctx, output_fp, &arguments);
     } else if (arguments.trace_file) {
         status = disassemble_trace(ctx, output_fp, abfd, &arguments);
     } else {
@@ -255,15 +273,27 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     for (size_t i = 0; i < samplecnt; i++) {
         int step = trdb_compress_trace_step(c, &packet_list, &(*samples)[i]);
         if (step == -1) {
-            fprintf(stderr, "Compress trace failed.\n");
+            fprintf(stderr, "compress trace failed\n");
             status = EXIT_FAILURE;
             goto fail;
         }
     }
 
-    /* write to file or stdout */
-    trdb_dump_packet_list(output_fp, &packet_list);
-
+    /* we either produce binary or human readable output */
+    if (arguments->binary_output) {
+        struct tr_packet *packet;
+        list_for_each_entry_reverse(packet, &packet_list, list)
+        {
+            if (trdb_pulp_write_single_packet(c, packet, output_fp)) {
+                fprintf(stderr, "failed to serialize packets\n");
+                status = EXIT_FAILURE;
+                goto fail;
+            }
+        }
+    } else {
+        /* write to file or stdout */
+        trdb_dump_packet_list(output_fp, &packet_list);
+    }
 fail:
     free(*samples);
     trdb_free_packet_list(&packet_list);
@@ -299,7 +329,7 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     /* reconstruct the original instruction sequence */
     if (trdb_decompress_trace(c, abfd, &packet_list, &instr_list)) {
         fprintf(stderr,
-                "failed to decompress packets due to either corrupt"
+                "failed to decompress packets due to either corrupt "
                 "packets or wrong bfd, continuing anyway...\n");
         status = EXIT_FAILURE;
     }
@@ -388,5 +418,39 @@ fail:
     if (abfd)
         trdb_free_dinfo_with_bfd(c, abfd, &dunit);
     free(*samples);
+    return status;
+}
+
+static int dump_trace_or_packets(struct trdb_ctx *c, FILE *output_fp,
+                                 struct arguments *arguments)
+{
+    int status = EXIT_SUCCESS;
+
+    if (!strcmp(arguments->binary_format, "")) {
+        fprintf(
+            stderr,
+            "provide a --binary-format (-p) argument to interpret this file\n");
+        return EXIT_FAILURE;
+    }
+
+    const char *path = arguments->args[0];
+    LIST_HEAD(packet_list);
+
+    if (!strcmp(arguments->binary_format, "pulp")) {
+        if (trdb_pulp_read_all_packets(c, path, &packet_list)) {
+            fprintf(stderr, "failed to parse packets\n");
+            status = EXIT_FAILURE;
+            goto fail;
+        }
+        trdb_dump_packet_list(output_fp, &packet_list);
+
+    } else {
+        fprintf(stderr, "format not supported\n");
+        status = EXIT_FAILURE;
+        goto fail;
+    }
+
+fail:
+    trdb_free_packet_list(&packet_list);
     return status;
 }

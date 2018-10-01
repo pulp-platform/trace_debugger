@@ -146,3 +146,30 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
     }
     return 0;
 }
+
+
+int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
+                                  FILE *fp)
+{
+    size_t bitcnt = 0;
+    size_t bytecnt = 0;
+    uint8_t bin[16] = {0};
+    if (!fp) {
+        err(c, "bad file pointer\n");
+        return -1;
+    }
+    if (trdb_serialize_packet(c, packet, &bitcnt, 0, bin)) {
+        err(c, "failed to serialize packet\n");
+        return -1;
+    }
+    bytecnt = bitcnt / 8 + (bitcnt % 8 != 0);
+    if (fwrite(bin, 1, bytecnt, fp) != bytecnt) {
+        if (feof(fp)) {
+	    /* TODO: uhhh */
+        } else if (ferror(fp)) {
+            err(c, "ferror: %s\n", strerror(errno));
+            return -1;
+        }
+    }
+    return 0;
+}

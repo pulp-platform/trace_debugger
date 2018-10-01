@@ -31,3 +31,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
 
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
                                struct list_head *packet_list);
+
+int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
+                                  FILE *fp);
+
