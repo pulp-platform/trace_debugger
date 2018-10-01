@@ -26,12 +26,36 @@
 
 #include "trace_debugger.h"
 
+/**
+ * Read a packet from @p fp stored in the PULP binary format.
+ *
+ * @param c trace debugger context
+ * @param fp file to read from
+ * @param packet filled out with read packet data
+ * @return 0 on successful read, -1 on failure
+ */
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
                                  struct tr_packet *packet);
 
+/**
+ * Repeatedly calls trdb_pulp_read_single_packet until encountering EOF or an
+ * incomplete packet. The incomplete packet is just ignored and all the previous
+ * good packets are kept.
+ *
+ * @param c trace debugger context
+ * @param path file from which to read packet data
+ * @param packet_list appened with read packets
+ * @param 0 on succesfull read, -1 on failure
+ */
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
                                struct list_head *packet_list);
 
+/**
+ * Serialize a single packet, like the PULP trace debugger.
+ * @param c trace debugger context
+ * @param packet data to serialize
+ * @param fp file to write to
+ * @return 0 on successfull write, -1 on failure
+ */
 int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                   FILE *fp);
-
