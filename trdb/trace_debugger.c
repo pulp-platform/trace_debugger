@@ -844,7 +844,7 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
     dinfo->stream = c;
 
     /* print instr address */
-    (*dinfo->fprintf_func)(c, "0x%016jx  ", (uintmax_t)pc);
+    (*dinfo->fprintf_func)(c, "0x%08jx  ", (uintmax_t)pc);
 
     /* check if insn_info works */
     dinfo->insn_info_valid = 0;
@@ -1558,12 +1558,19 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
             | (packet->branches << (PACKETLEN + MSGTYPELEN + FORMATLEN));
         data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len))
                      << (PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN);
-        data.bits |=
-            ((__uint128_t)packet->address
-             << (PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
 
+        *bitcnt = PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len;
+
+        /* if we have a full branch we don't necessarily need to emit address */
+        if ((packet->branches == 31
+             && packet->length > MSGTYPELEN + FORMATLEN + BRANCHLEN + len)
+            || packet->branches < 31) {
+            data.bits |=
+                ((__uint128_t)packet->address
+                 << (PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
+            *bitcnt += XLEN;
+        }
         data.bits <<= align;
-        *bitcnt = PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len + XLEN;
         memcpy(bin, data.bin,
                (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
 
