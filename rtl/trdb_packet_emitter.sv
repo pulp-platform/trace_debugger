@@ -166,8 +166,10 @@ module trdb_packet_emitter
                 // XLEN: address
                 // CAUSELEN: exception cause
                 // 1: is interrupt?
+`ifndef SYNTHESIS
                 assert(packet_subformat_i != SF_CONTEXT);
                 assert(packet_subformat_i != SF_UNDEF);
+`endif
 
                 case(packet_subformat_i)
 

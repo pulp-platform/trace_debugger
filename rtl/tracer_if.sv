@@ -90,7 +90,8 @@ module tracer_if
     // Signal the trace debugger if we have to stall because of FIFO overflow in
     // UDMA
     always_comb begin
-        ns = cs;
+        ns    = cs;
+        stall = '0;
 
         case(cs)
 
