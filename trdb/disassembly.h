@@ -306,16 +306,6 @@ bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma);
 asection *get_section_for_vma(bfd *abfd, bfd_vma vma);
 
 /**
- * TODO: not implemented yet
- *
- * @param vma the virtual memory address where the symbol is located at
- * @param dinfo disassembly context, initialized with
- * init_disassemble_info_from_bfd().
- * @return the symbol belonging to the @p vma or @c NULL
- */
-asymbol *find_symbol_at_address(bfd_vma vma, struct disassemble_info *dinfo);
-
-/**
  * Disassemble the given asection and print it calling fprintf_func.
  *
  * @p inf must point to a disassembler_unit.
@@ -347,6 +337,16 @@ void disassemble_block(size_t len, bfd_byte data[len],
 void disassemble_single_instruction(uint32_t instr, uint32_t addr,
                                     struct disassembler_unit *dunit);
 
+/**
+ * Disassemble the given instruction, indicated by its address @p addr and the
+ * bfd @p abfd which contains it, using the settings in @p dunit and print it by
+ * calling fprintf_func.
+ *
+ * @param c the trace debugger context
+ * @param abfd the bfd which contains the instruction
+ * @param addr the address of the instruction
+ * @param dunit disassembly context
+ */
 void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
                                            bfd_vma addr,
                                            struct disassembler_unit *dunit);
