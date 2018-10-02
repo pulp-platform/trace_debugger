@@ -68,7 +68,7 @@
     #+END_SRC
     Now we can try to recover the original instruction sequence by running
     #+BEGIN_SRC bash
-    =./trdb --binary-format pulp --bfd data/interrupt --extract my_packets
+    ./trdb --binary-format pulp --bfd data/interrupt --extract my_packets
     #+END_SRC
     or even better to see some disassembly
     #+BEGIN_SRC bash
