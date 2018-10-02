@@ -195,3 +195,9 @@ void __rt_spim_eot(void *arg)
     rt_trace(RT_TRACE_DEV_CTRl, "[TRDB] spi end of transfer of buffer: %d\n",
 	     (int)arg);
 }
+
+/* TODO: make this inline or a macro */
+void rt_trace_debugger_userdata(unsigned int value)
+{
+    write_reg_l2(TRDB_REG_DUMP, value);
+}

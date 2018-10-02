@@ -44,4 +44,5 @@ void rt_trace_debugger_control(rt_trace_dbg_t *);
 void rt_trace_debugger_close(rt_trace_dbg_t *, rt_event_t *);
 void __rt_trace_debugger_eot(void *arg);
 void __rt_spim_eot(void *arg);
+void rt_trace_debugger_userdata(unsigned int value);
 #endif

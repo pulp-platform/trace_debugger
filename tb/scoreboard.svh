@@ -66,7 +66,6 @@ class Scoreboard;
 
         // reserve memory for golden model
         trdb_sv_alloc();
-        gm_box = new();
 
         // acquire stimuli
         inbox.get(stimuli);
@@ -102,6 +101,28 @@ class Scoreboard;
 
     endtask
 
+    task add_packet(logic [127:0] bits);
+        trdb_packet packet;
+        Response response;
+        packet.bits = bits;
+        response    = new(packet);
+        gm_box.put(response);
+    endtask
+
+    // generated the response for the sw dump writes TODO: a bit hacky
+    task generate_sw_dump();
+        logic [6:0] len;
+        logic [1:0] msgtype;
+        len     = 34;
+        msgtype = W_SOFTWARE;
+
+        add_packet({32'ha0a0a0a0a, msgtype,len});
+        add_packet({32'hb0b0b0b0b, msgtype,len});
+        add_packet({32'hc0c0c0c0c, msgtype,len});
+        add_packet({32'hd0d0d0d0d, msgtype,len});
+        add_packet({32'hf0f0f0f0f, msgtype,len});
+
+    endtask;
 
     task run(ref logic tb_eos);
         automatic int packetcnt;
@@ -110,9 +131,12 @@ class Scoreboard;
         Response duv_response;
         trdb_packet gm_packet;
         trdb_packet duv_packet;
+        trdb_marker_t msgtype;
 
+        gm_box = new();
         // generate responses
         run_gm();
+        generate_sw_dump();
 
         stats     = new();
         packetcnt = 0;
@@ -137,16 +161,28 @@ class Scoreboard;
                 $display("[SCORE]  @%t: Received: %h", $time, duv_packet.bits);
                 stats.packet_bad++;
             end else begin
-                $display("[SCORE] @%t: Packet number %0d ok", $time, packetcnt);
+                msgtype = trdb_marker_t'{duv_packet.bits[8:7]};
+                $display("[SCORE]  @%t: Packet with msgtype %s, number %0d ok",
+                         $time, msgtype.name, packetcnt);
             end
         end
 
         if(gm_box.num() > 0)
             $display ("[SCORE]  @%t: GM has %0d pending packets.", $time,
                       gm_box.num());
-        if(duv_box.num() > 0)
+        if(duv_box.num() > 0) begin
             $display ("[SCORE]  @%t: DUV has %0d pending packets.",
                       $time, duv_box.num());
+            while(duv_box.num > 0) begin
+                duv_box.get(duv_response);
+                duv_packet = duv_response.packet;
+                msgtype    = trdb_marker_t'{duv_packet.bits[8:7]};
+                $display("[SCORE]  @%t: Remaning: %h", $time, duv_packet.bits);
+                $display("[SCORE]  @%t: length: %0d msgtype: %s",
+                         $time, duv_packet.bits[6:0], msgtype.name);
+            end
+        end
+
 
         stats.print();
 

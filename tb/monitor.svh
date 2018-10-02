@@ -119,6 +119,9 @@ class Monitor;
 
             if(this.duv_if.packet_word_valid == 1'b1) begin
                 packet_word = this.duv_if.packet_word;
+                if(DEBUG)
+                    $display("[Monitor]@%t: slurping %h", $time, packet_word);
+
                 for(int i = 0; i < 4; i++) begin
                     packet_byte        = packet_word[i*8+:8];
 
@@ -129,6 +132,11 @@ class Monitor;
                         // read payload length, assuming its less than 8 bits
                         effective_bits = packet_byte[PACKET_HEADER_LEN-1:0]
                                          + PACKET_HEADER_LEN;
+
+                        // a zero length packet can't be good
+                        if(!(effective_bits > PACKET_HEADER_LEN))
+                           continue;
+
                         packet_byte_len
                             = effective_bits / 8
                               + ((effective_bits % 8) != 0 ? 1 : 0);

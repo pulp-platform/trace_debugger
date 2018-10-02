@@ -52,7 +52,8 @@ int main()
 	rt_error("[TEST] failed to open trace debugger\n");
 	return -1;
     }
-
+    /* dump some userdata through the traces */
+    rt_trace_debugger_userdata(0xdeadbeef);
 
     /* Let's call some functions to generated some code */
     printf("Hello World!\n");

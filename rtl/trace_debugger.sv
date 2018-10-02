@@ -122,7 +122,9 @@ module trace_debugger
 
     // software dumping: certain writes to the trace debugger are included in
     // the packet stream
-    logic [31:0]               sw_dump;
+    logic [31:0]               sw_word;
+    logic                      sw_valid;
+    logic                      sw_grant;
 
 
     // whether we do tracing at all
@@ -287,10 +289,13 @@ module trace_debugger
          .branch_map_full_i(branch_map_full),
          .is_branch_i(tc_is_branch),
          .branch_map_flush_o(branch_map_flush),
+         .sw_valid_i(sw_valid),
+         .sw_word_i(sw_word),
+         .sw_grant_o(sw_grant),
          .packet_bits_o(packet_bits),
          .packet_len_o(packet_len),
-         .valid_o(packet_gen_valid),
-         .grant_i(packet_is_read));
+         .packet_valid_o(packet_gen_valid),
+         .packet_grant_i(packet_is_read));
 
     trdb_stream_align8 i_trdb_stream_align
         (.clk_i(clk_i),
@@ -383,7 +388,9 @@ module trace_debugger
          .trace_enable_o(trace_enable),
          .flush_stream_o(flush_stream),
          .flush_confirm_i(flush_confirm),
-         .dump_o(sw_dump));
+         .sw_word_o(sw_word),
+         .sw_valid_o(sw_valid),
+         .sw_grant_i(sw_grant));
 
 
 endmodule // trace_debugger

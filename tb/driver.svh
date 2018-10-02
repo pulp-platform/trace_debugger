@@ -122,6 +122,15 @@ class Driver;
     endtask
 
 
+    task test_sw_dump();
+        write_apb(REG_TRDB_DUMP, 32'ha0a0a0a0a);
+        write_apb(REG_TRDB_DUMP, 32'hb0b0b0b0b);
+        write_apb(REG_TRDB_DUMP, 32'hc0c0c0c0c);
+        write_apb(REG_TRDB_DUMP, 32'hd0d0d0d0d);
+        write_apb(REG_TRDB_DUMP, 32'hf0f0f0f0f);
+    endtask
+
+
     task run(ref logic tb_eos);
         Stimuli stimuli;
         tb_eos = 1'b0;
@@ -175,10 +184,14 @@ class Driver;
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             // take response in monitor.svh
         end
-        $display("[DRIVER] @%t: Flushing buffers.", $time);
 
+        $display("[DRIVER] @%t: Testing software writes", $time);
+        test_sw_dump();
+
+        $display("[DRIVER] @%t: Flushing buffers.", $time);
         // write flush command to register
         write_apb(REG_TRDB_CTRL, 1);
+
 
         $display("[DRIVER] @%t: Driver finished.", $time);
 
@@ -193,6 +206,7 @@ class Driver;
         @(posedge this.duv_if.clk_i);
         #STIM_APPLICATION_DEL;
         apply_zero();
+
         tb_eos = 1'b1;
 
     endtask;

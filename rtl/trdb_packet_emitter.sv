@@ -19,6 +19,7 @@ module trdb_packet_emitter
     (input logic                   clk_i,
      input logic                   rst_ni,
 
+     // trace packet generation request with associated conditions
      input                         trdb_format_t packet_format_i,
      input                         trdb_subformat_t packet_subformat_i,
      input logic                   valid_i,
@@ -39,10 +40,17 @@ module trdb_packet_emitter
      input logic                   is_branch_i,
 
      output logic                  branch_map_flush_o,
+
+     // software packet generation request (dumping a write to stream)
+     input logic                   sw_valid_i,
+     input logic [XLEN-1:0]        sw_word_i,
+     output logic                  sw_grant_o,
+
+     // packet bits which were generated from request
      output logic [PACKET_LEN-1:0] packet_bits_o, //TODO: adjust sizes
      output logic [6:0]            packet_len_o,
-     output logic                  valid_o,
-     input logic                   grant_i
+     output logic                  packet_valid_o,
+     input logic                   packet_grant_i
      );
 
     logic [PACKET_LEN-1:0]         packet_bits;
@@ -58,7 +66,6 @@ module trdb_packet_emitter
     logic                          branch_map_edge_case;
 
     assign branch_map_flush_o = branch_map_flush_q;
-    assign packet_gen_valid = valid_i;
 
     always_comb begin: branch_map_offset
 
@@ -93,17 +100,19 @@ module trdb_packet_emitter
 `endif
 
     always_comb begin: set_packet_bits
-        packet_bits        = '0;
-        packet_len         = '0;
-        branch_map_flush_d = '0;
+        packet_bits          = '0;
+        packet_len           = '0;
+        branch_map_flush_d   = '0;
 
         // TODO: actually this might not be necessary
         branch_map_edge_case = lc_u_discontinuity_i;
+        packet_gen_valid     = '0;
+
+        sw_grant_o           = '0;
 
         if(valid_i) begin
-
-            // TODO: adapt msg type
-            packet_bits[1:0]   = 2'h2;
+            packet_gen_valid   = '1;
+            packet_bits[1:0]   = W_TRACE;
 
             // packet format
             packet_bits[3:2]   = packet_format_i;
@@ -194,6 +203,13 @@ module trdb_packet_emitter
 
             end
             endcase
+
+        end else if(sw_valid_i) begin
+            packet_gen_valid     = '1;
+            sw_grant_o           = '1;
+            packet_bits[1:0]     = W_SOFTWARE;
+            packet_bits[2+:XLEN] = sw_word_i;
+            packet_len           = 2 + XLEN;
         end
     end
 
@@ -203,6 +219,8 @@ module trdb_packet_emitter
     assign clear_fifo = 1'b0;
 
 
+    // this buffers our generated packet, since packets can be generated every
+    // cycle, but we only read atmost 32 bit per cycle
     generic_fifo_adv
         #(.DATA_WIDTH(PACKET_LEN + PACKET_HEADER_LEN),
           .DATA_DEPTH(PACKET_BUFFER_STAGES))
@@ -214,9 +232,9 @@ module trdb_packet_emitter
          .valid_i(packet_gen_valid),
          .grant_o(packet_fifo_not_full),
          .data_o({packet_bits_o, packet_len_o}),
-         .valid_o(valid_o),
-         .grant_i(grant_i),
-         .test_mode_i('0));
+         .valid_o(packet_valid_o),
+         .grant_i(packet_grant_i),
+         .test_mode_i('0)); // TODO: what to do with this
 
 
     always_ff @(posedge clk_i, negedge rst_ni) begin

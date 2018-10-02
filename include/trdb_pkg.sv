@@ -27,6 +27,7 @@ parameter PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
 parameter PACKET_TOTAL = PACKET_LEN + PACKET_HEADER_LEN;
 
 parameter PACKET_BUFFER_STAGES = 4;
+parameter SOFTWARE_BUFFER_STAGES = 2;
 
 // available packet types
 typedef enum logic[1:0]
@@ -46,16 +47,13 @@ typedef enum logic[1:0]
  SF_UNDEF     = 2'h3
  } trdb_subformat_t;
 
-// We tag each two 32 bit words with some information to aid decoding. We could
-// increase that to n words to decrease the overhead. Currently it is 5 bits for
-// the trace debugger ID (we have 9 cores on PULP) and 2 bits for information
-// such whether the packet starts at the first bit (after the header)
+// available message types
 typedef enum logic [1:0]
 {
- W_EMPTY = 2'h0,
- W_START = 2'h1,
- W_OTHER = 2'h2,
- W_SOFT  = 2'h3
+ W_EMPTY    = 2'h0,
+ W_TIMER    = 2'h1,
+ W_TRACE    = 2'h2,
+ W_SOFTWARE = 2'h3
  } trdb_marker_t;
 
 
@@ -63,7 +61,7 @@ typedef enum logic [1:0]
 // meaning of those bits offset of configuration registers from baseaddress
 parameter REG_TRDB_CFG  = 4'h0; //BASEADDR+0x00
 parameter REG_TRDB_CTRL = 4'h4; //BASEADDR+0x04
-parameter REG_DUMP      = 4'h8; //BASEADDR+0x08
+parameter REG_TRDB_DUMP = 4'h8; //BASEADDR+0x08
 
 
 parameter TRDB_ENABLE = 0;
