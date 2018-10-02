@@ -58,12 +58,23 @@
     [[https://github.com/pulp-platform/pulpissimo][PULPissimo]]. It contains the executed instruction sequence and some meta
     information. The executable itself is the compiled version of [[https://github.com/pulp-platform/trace_debugger/tree/master/driver/test_interrupt][this]] example.
 
-    Let us first emulate the trace debugger hardware by calling =./trdb
-    --binary-format pulp --compress -o my_packets data/trdb_stimuli=. Now we can
-    try to recover the original instruction sequence by running =./trdb
-    --binary-format pulp --bfd data/interrupt --extract my_packets= or even
-    better to see some disassembly =./trdb -dSsl --binary-format pulp --bfd
-    data/interrupt --extract my_packets=.
+    Let us first emulate the trace debugger hardware by calling
+    #+BEGIN_SRC bash
+    ./trdb --binary-format pulp --compress -o my_packets data/trdb_stimuli
+    #+END_SRC
+    . The generated packets can be inspected with
+    #+BEGIN_SRC bash
+    ./trdb --binary-format pulp --dump my_packets=.
+    #+END_SRC
+    Now we can try to recover the original instruction sequence by running
+    #+BEGIN_SRC bash
+    =./trdb --binary-format pulp --bfd data/interrupt --extract my_packets=
+    #+END_SRC
+    or even better to see some disassembly
+    #+BEGIN_SRC bash
+    ./trdb -dSsl --binary-format pulp --bfd data/interrupt --extract my_packets
+    #+END_SRC
+    .
 
 
 ** Usage of libtrdb.so
