@@ -532,6 +532,15 @@ static void emit_full_branch_map(struct tr_packet *tr,
     *branch_map = (struct branch_map_state){0};
 }
 
+/* helper macro to reduce boilerplate in trdb_compress_trace_step */
+#define ALLOC_PACKET(name)                                                     \
+    name = malloc(sizeof(*name));                                              \
+    if (!name) {                                                               \
+        err(ctx, "malloc: %s\n", strerror(errno));                             \
+        goto fail_malloc;                                                      \
+    }                                                                          \
+    *name = (struct tr_packet){.msg_type = W_TRACE};
+
 int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct list_head *packet_list,
                              struct tr_instr *instr)

@@ -84,7 +84,7 @@ enum tr_packet_format {
 
 enum tr_packet_subformat { SF_START = 0, SF_EXCEPTION = 1, SF_CONTEXT = 2 };
 
-enum tr_msg_type { SW_DATA = 0, TIMESTAMP = 1, PACKET = 2 };
+enum tr_msg_type { W_EMPTY = 0, W_TIMER = 1, W_TRACE = 2, W_SOFTWARE = 3 };
 
 /**
  * Canonical trace packet representation. This is the high level definition of a
@@ -101,9 +101,11 @@ enum tr_msg_type { SW_DATA = 0, TIMESTAMP = 1, PACKET = 2 };
 struct tr_packet {
     /* transport layer header */
     uint32_t length : PACKETLEN; /**< length of packet in bits */
-    uint32_t msg_type : 2;       /**<  */
+    uint32_t msg_type : 2;       /**< payload type */
+    /* custom data written by user, valid when msg_type = W_SOFTWARE*/
+    uint32_t userdata;
 
-    /* actual payload of spec */
+    /* actual payload of spec, valid  when msg_type = W_TRACE */
     uint32_t format : 2;    /**< header denoting the packet type */
     uint32_t branches : 5;  /**< number of branches saved in branch_map */
     uint32_t branch_map;    /**< bits indicating taken=1 branches */
@@ -122,21 +124,6 @@ struct tr_packet {
     struct list_head list; /**< used to make a linked list of tr_packet */
 };
 
-#define ALLOC_INIT_PACKET(name)                                                \
-    struct tr_packet *name = malloc(sizeof(*name));                            \
-    if (!name) {                                                               \
-        perror("malloc");                                                      \
-        goto fail_malloc;                                                      \
-    }                                                                          \
-    *name = (struct tr_packet){.msg_type = PACKET};
-
-#define ALLOC_PACKET(name)                                                     \
-    name = malloc(sizeof(*name));                                              \
-    if (!name) {                                                               \
-        err(ctx, "malloc: %s\n", strerror(errno));                             \
-        goto fail_malloc;                                                      \
-    }                                                                          \
-    *name = (struct tr_packet){.msg_type = PACKET};
 
 /* for type punning */
 union trdb_pack {

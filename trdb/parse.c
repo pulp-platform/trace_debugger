@@ -85,37 +85,54 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
 
     packet->length = payload.bits & MASK_FROM(PACKETLEN);
     packet->msg_type = (payload.bits >>= PACKETLEN) & MASK_FROM(MSGTYPELEN);
-    packet->format = (payload.bits >>= MSGTYPELEN) & MASK_FROM(FORMATLEN);
-    payload.bits >>= FORMATLEN;
 
-    switch (packet->format) {
-    case F_BRANCH_FULL:
-        packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
-        uint32_t len = p_branch_map_len(packet->branches);
-        packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(len);
-        packet->address = (payload.bits >>= len) & MASK_FROM(XLEN);
-        return 0;
-    case F_BRANCH_DIFF:
-        err(c, "not implemented yet\n");
-        return -1;
-    case F_ADDR_ONLY:
-        packet->address = payload.bits & MASK_FROM(XLEN);
-        return 0;
-    case F_SYNC:
-        packet->subformat = payload.bits & MASK_FROM(FORMATLEN);
-        packet->privilege = (payload.bits >>= FORMATLEN) & MASK_FROM(PRIVLEN);
-        if (packet->subformat == SF_CONTEXT) {
-            err(c, "not implemented\n");
+    switch (packet->msg_type) {
+    /* we are dealing with a regular trace packet */
+    case W_TRACE:
+        packet->format = (payload.bits >>= MSGTYPELEN) & MASK_FROM(FORMATLEN);
+        payload.bits >>= FORMATLEN;
+        switch (packet->format) {
+        case F_BRANCH_FULL:
+            packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
+            uint32_t len = p_branch_map_len(packet->branches);
+            packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(len);
+            packet->address = (payload.bits >>= len) & MASK_FROM(XLEN);
+            return 0;
+        case F_BRANCH_DIFF:
+            err(c, "not implemented yet\n");
             return -1;
+        case F_ADDR_ONLY:
+            packet->address = payload.bits & MASK_FROM(XLEN);
+            return 0;
+        case F_SYNC:
+            packet->subformat = payload.bits & MASK_FROM(FORMATLEN);
+            packet->privilege =
+                (payload.bits >>= FORMATLEN) & MASK_FROM(PRIVLEN);
+            if (packet->subformat == SF_CONTEXT) {
+                err(c, "not implemented\n");
+                return -1;
+            }
+            packet->branch = (payload.bits >>= PRIVLEN) & 1;
+            packet->address = (payload.bits >>= 1) & MASK_FROM(XLEN);
+            if (packet->subformat == SF_START)
+                return 0;
+            packet->ecause = (payload.bits >>= XLEN) & MASK_FROM(CAUSELEN);
+            packet->interrupt = (payload.bits >>= CAUSELEN) & 1;
+            if (packet->subformat == SF_EXCEPTION)
+                return 0;
         }
-        packet->branch = (payload.bits >>= PRIVLEN) & 1;
-        packet->address = (payload.bits >>= 1) & MASK_FROM(XLEN);
-        if (packet->subformat == SF_START)
-            return 0;
-        packet->ecause = (payload.bits >>= XLEN) & MASK_FROM(CAUSELEN);
-        packet->interrupt = (payload.bits >>= CAUSELEN) & 1;
-        if (packet->subformat == SF_EXCEPTION)
-            return 0;
+        break;
+    /* this is user defined payload, written through the APB */
+    case W_SOFTWARE:
+        packet->userdata = payload.bits & MASK_FROM(XLEN);
+        break;
+    /* timer data */
+    case W_TIMER:
+        break;
+    default:
+        err(c, "unknown message type in packet\n");
+        return -1;
+        break;
     }
     return -1;
 }
@@ -165,7 +182,7 @@ int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
     bytecnt = bitcnt / 8 + (bitcnt % 8 != 0);
     if (fwrite(bin, 1, bytecnt, fp) != bytecnt) {
         if (feof(fp)) {
-	    /* TODO: uhhh */
+            /* TODO: uhhh */
         } else if (ferror(fp)) {
             err(c, "ferror: %s\n", strerror(errno));
             return -1;
