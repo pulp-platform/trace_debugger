@@ -211,17 +211,6 @@ int trdb_get_log_priority(struct trdb_ctx *ctx);
  */
 void trdb_set_log_priority(struct trdb_ctx *ctx, int priority);
 
-
-/**
- * Initialize the trace debugger, call before any other functions. TODO: remove
- */
-void trdb_init();
-
-/**
- * Release resources of the trace debugger, currently a NOP. TODO: remove
- */
-void trdb_close();
-
 /**
  * Compress the given sequence of instruction to a sequence of packets.
  *
@@ -242,23 +231,6 @@ void trdb_close();
 int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct list_head *packet_list,
                              struct tr_instr *instr);
-
-/**
- * Compress the given sequence of instruction to a sequence of packets.
- *
- * The packets should allow trdb_decompress_trace() to reconstruct the original
- * sequence of tr_instr. Since the function allocates new entries for list_head,
- * the caller has to deallocate them by calling trdb_free_packet_list(). Use the
- * functions provided by list.h to handle list_head entries.
- *
- * @param packet_list list to which packets will be appended
- * @param len number of tr_instr
- * @param instrs[len]
- * @return the provided @packet_list
- */
-struct list_head *trdb_compress_trace(struct list_head *packet_list, size_t len,
-                                      struct tr_instr instrs[len]);
-
 
 /**
  * Generate the original instruction sequence from a list of tr_packet, given

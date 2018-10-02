@@ -190,7 +190,6 @@ static int test_trdb_serialize_packet(uint32_t shift)
 {
     int status = TRDB_SUCCESS;
     struct trdb_ctx *c = trdb_new();
-    trdb_init();
     struct tr_packet packet = {0};
 
     /* Testing F_BRANCH_FULL packet with full branch map */
@@ -523,11 +522,17 @@ fail:
 
 static int test_stimuli_to_packet_dump(const char *path)
 {
-    trdb_init(); // TODO: remove, need for trdb_compress_trace
-    struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    int status = 0;
+    int status = TRDB_SUCCESS;
+    struct trdb_ctx *c = trdb_new();
+    if (!c) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    status = 0;
     size_t samplecnt = trdb_stimuli_to_trace(c, path, samples, &status);
     if (status != 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
@@ -537,12 +542,17 @@ static int test_stimuli_to_packet_dump(const char *path)
     status = TRDB_SUCCESS;
 
     LIST_HEAD(head);
-    struct list_head *ret = trdb_compress_trace(&head, samplecnt, *samples);
-    if (!ret) {
-        LOG_ERRT("Compress trace failed\n");
-        status = TRDB_FAIL;
-        goto fail;
+
+    /* step by step compression */
+    for (size_t i = 0; i < samplecnt; i++) {
+        int step = trdb_compress_trace_step(c, &head, &(*samples)[i]);
+        if (step == -1) {
+            LOG_ERRT("Compress trace failed.\n");
+            status = TRDB_FAIL;
+            goto fail;
+        }
     }
+
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &head);
 
@@ -556,7 +566,6 @@ fail:
 
 static int test_disassemble_trace(const char *bin_path, const char *trace_path)
 {
-    trdb_init(); // TODO: remove
     struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
@@ -622,6 +631,8 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
     }
     if (TRDB_VERBOSE_TESTS) {
         trdb_disassemble_trace(samplecnt, *samples, &dunit);
+        trdb_set_disassembly_conf(&dunit, TRDB_LINE_NUMBERS | TRDB_SOURCE_CODE
+                                              | TRDB_FUNCTION_CONTEXT);
         trdb_disassemble_trace_with_bfd(c, samplecnt, *samples, abfd, &dunit);
     }
 
@@ -637,8 +648,6 @@ fail:
 
 int test_compress_trace(const char *trace_path, const char *packets_path)
 {
-    trdb_init();
-
     struct trdb_ctx *ctx = NULL;
 
     FILE *expected_packets = NULL;
@@ -659,17 +668,7 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     status = TRDB_SUCCESS;
 
     LIST_HEAD(packet1_head);
-    LIST_HEAD(packet0_head);
     LIST_HEAD(instr_head);
-
-    /* legacy do-it-all-at-once compression. Here for regression testing */
-    struct list_head *ret =
-        trdb_compress_trace(&packet0_head, samplecnt, *samples);
-    if (!ret) {
-        LOG_ERRT("Compress trace failed\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
 
     ctx = trdb_new();
     if (!ctx) {
@@ -701,7 +700,6 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
         status = TRDB_FAIL;
         goto fail;
     }
-    trdb_dump_packet_list(tmp_fp0, &packet0_head);
     rewind(tmp_fp0);
 
 
@@ -740,31 +738,6 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
         }
     }
 
-    /* rewind(expected_packets); */
-    /* linecnt = 0; */
-    /* /\* test legacy against expected response *\/ */
-    /* while ((nread_expected = getline(&expected, &len, expected_packets)) */
-    /*        != -1) { */
-    /*     linecnt++; */
-    /*     nread_compare = getline(&compare, &len, tmp_fp0); */
-    /*     if (nread_compare == -1) { */
-    /*         LOG_ERRT( */
-    /*             "Hit EOF too early in expected packets file, legacy
-     * compression\n"); */
-    /*         status = TRDB_FAIL; */
-    /*         goto fail; */
-    /*     } */
-    /*     if (nread_expected != nread_compare */
-    /*         || strncmp(compare, expected, nread_expected) != 0) { */
-    /*         LOG_ERRT("Expected packets mismatch on line %zu\n", linecnt); */
-    /*         LOG_ERRT("Expected: %s", expected); */
-    /*         LOG_ERRT("Received: %s", compare); */
-    /*         status = TRDB_FAIL; */
-    /*         goto fail; */
-    /*     } */
-    /* } */
-
-
 fail:
     free(compare);
     free(expected);
@@ -778,117 +751,14 @@ fail:
     remove("tmp2");
     remove("tmp3");
     free(*samples);
-    trdb_free_packet_list(&packet0_head);
     trdb_free_packet_list(&packet1_head);
     trdb_free_instr_list(&instr_head);
-    trdb_close();
-    return status;
-}
-
-
-int test_decompress_trace_legacy(const char *bin_path, const char *trace_path)
-{
-    trdb_init();
-    struct trdb_ctx *ctx = NULL;
-
-    bfd_init();
-    bfd *abfd = bfd_openr(bin_path, NULL);
-
-    if (!(abfd && bfd_check_format(abfd, bfd_object))) {
-        bfd_perror("test_decompress_trace");
-        return TRDB_FAIL;
-    }
-
-    struct tr_instr *tmp;
-    struct tr_instr **samples = &tmp;
-    int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(ctx, trace_path, samples, &status);
-    if (status != 0) {
-        LOG_ERRT("Stimuli to tr_instr failed\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
-    status = TRDB_SUCCESS;
-
-    LIST_HEAD(packet0_head);
-    LIST_HEAD(instr0_head);
-    struct list_head *ret =
-        trdb_compress_trace(&packet0_head, samplecnt, *samples);
-    // trdb_compress_trace_legacy(&packet0_head, samplecnt, *samples);
-    if (!ret) {
-        LOG_ERRT("Compress trace failed\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
-
-    ctx = trdb_new();
-    if (!ctx) {
-        LOG_ERRT("Library context allocation failed.\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
-
-
-    if (TRDB_VERBOSE_TESTS)
-        trdb_dump_packet_list(stdout, &packet0_head);
-
-    trdb_decompress_trace(ctx, abfd, &packet0_head, &instr0_head);
-
-    if (TRDB_VERBOSE_TESTS) {
-        LOG_INFOT("Reconstructed trace disassembly:\n");
-        struct tr_instr *instr;
-        list_for_each_entry_reverse(instr, &instr0_head, list)
-        {
-            LOG_INFOT("%s", instr->str);
-        }
-    }
-
-    /* We compare whether the reconstruction matches the original sequence, only
-     * the pc for now. Legacy compression.
-     */
-    struct tr_instr *instr;
-    int processedcnt = 0;
-    int i = 0;
-    list_for_each_entry_reverse(instr, &instr0_head, list)
-    {
-        /* skip all invalid instructions for the comparison */
-        while (!(*samples)[i].valid || (*samples)[i].exception) {
-            i++;
-        }
-
-        if (instr->iaddr != (*samples)[i].iaddr) {
-            LOG_ERRT("%s", instr->str);
-            LOG_ERRT("original instr: %" PRIx32 " @%" PRIx32 "\n",
-                     (*samples)[i].instr, (*samples)[i].iaddr);
-            LOG_ERRT("reconst. instr: %" PRIx32 " @%" PRIx32 "\n", instr->instr,
-                     instr->iaddr);
-            status = TRDB_FAIL;
-            goto fail;
-        }
-        i++;
-        processedcnt++;
-    }
-    LOG_INFOT("Compared %d instructions\n", processedcnt);
-
-    if (list_empty(&instr0_head)) {
-        LOG_ERRT("Empty instruction list.\n");
-        return 0;
-    }
-
-fail:
-    trdb_free(ctx);
-    free(*samples);
-    trdb_free_packet_list(&packet0_head);
-    trdb_free_instr_list(&instr0_head);
-    bfd_close(abfd);
-
     return status;
 }
 
 
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
-    trdb_init();
     struct trdb_ctx *ctx = trdb_new();
 
     bfd_init();
@@ -990,7 +860,6 @@ fail:
 int test_decompress_trace_differential(const char *bin_path,
                                        const char *trace_path)
 {
-    trdb_init();
     struct trdb_ctx *ctx = NULL;
 
     bfd_init();
