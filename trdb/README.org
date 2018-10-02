@@ -62,7 +62,7 @@
     #+BEGIN_SRC bash
     ./trdb --binary-format pulp --compress -o my_packets data/trdb_stimuli
     #+END_SRC
-    . The generated packets can be inspected with
+    The generated packets can be inspected with
     #+BEGIN_SRC bash
     ./trdb --binary-format pulp --dump my_packets
     #+END_SRC

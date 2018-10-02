@@ -48,7 +48,7 @@ static uint32_t p_branch_map_len(uint32_t branches)
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
                                  struct tr_packet *packet)
 {
-    uint8_t header = NULL;
+    uint8_t header = 0;
     union trdb_pack payload = {0};
     if (!fp) {
         err(c, "fp is null\n");
