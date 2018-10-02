@@ -46,6 +46,18 @@ module trace_debugger
     logic                       flush_stream;
     logic                       flush_confirm;
 
+    // to register all inputs
+    logic                       ivalid_q, ivalid_d;
+    logic                       iexception_q, iexception_d;
+    logic                       interrupt_q, interrupt_d;
+    logic [CAUSELEN-1:0]        cause_q, cause_d;
+    // logic [XLEN-1:0]            tval_d, tval_q;
+    logic [PRIVLEN-1:0]         priv_q, priv_d;
+    logic [XLEN-1:0]            iaddr_q, iaddr_d;
+    logic [ILEN-1:0]            instr_q, instr_d;
+    logic                       compressed_q, compressed_d;
+
+
     // unused variables for a more extensive implementation
     // riscy doesn't have those features
     logic [XLEN-1:0]            lc_tval;
@@ -126,10 +138,19 @@ module trace_debugger
     logic                      sw_valid;
     logic                      sw_grant;
 
+    // to register all inputs
+    assign ivalid_d = ivalid_i;
+    assign iexception_d = iexception_i;
+    assign interrupt_d = interrupt_i;
+    assign cause_d  = cause_i;
+    assign priv_d = priv_i;
+    assign iaddr_d = iaddr_i;
+    assign instr_d = instr_i;
+    assign compressed_d = compressed_i;
 
     // whether we do tracing at all
-    assign trace_valid = ivalid_i && debug_mode && trace_enable;
-    assign debug_mode = priv_i[PRIVLEN-1];
+    assign trace_valid = ivalid_q && debug_mode && trace_enable;
+    assign debug_mode = priv_q[PRIVLEN-1];
     // TODO: make this configurationr register mapped
     assign packet_after_exception                      = '1;
 
@@ -141,16 +162,16 @@ module trace_debugger
 `endif
 
     // buffer variables. Certain variables we need to hold up to three cycles
-    assign interrupt0_d = interrupt_i;
+    assign interrupt0_d = interrupt_q;
     assign interrupt1_d = interrupt0_q;
-    assign cause0_d = cause_i;
+    assign cause0_d = cause_q;
     assign cause1_d = cause0_q;
-    assign priv0_d = priv_i;
-    assign exception0_d = iexception_i && ivalid_i;
+    assign priv0_d = priv_q;
+    assign exception0_d = iexception_q && ivalid_q;
     assign exception1_d = exception0_q;
     assign exception2_d = exception1_q;
-    assign compressed0_d = compressed_i;
-    assign iaddr0_d = iaddr_i;
+    assign compressed0_d = compressed_q;
+    assign iaddr0_d = iaddr_q;
 
     // assign privchange0_d (below)
     // assign u_discontinuity0_d (below)
@@ -158,7 +179,7 @@ module trace_debugger
 
     assign u_discontinuity1_d = u_discontinuity0_q;
     // TODO: add feature to have selective tracing, add enable with regmap
-    assign qualified0_d = trace_enable && ivalid_i;
+    assign qualified0_d = trace_enable && ivalid_q;
     assign qualified1_d = qualified0_q;
 
     // Hook phase related variables up to proper register
@@ -185,31 +206,31 @@ module trace_debugger
 
     // decide whether a privilege change occured
     always_comb begin
-        privchange0_d = (tc_priv != nc_priv) && ivalid_i;
+        privchange0_d = (tc_priv != nc_priv) && ivalid_q;
     end
 
     // decide whether we have a branch instruction
     // beq, bne, blt, bge, bltu, bgeu, p_bneimm, p_beqimm
     always_comb begin: is_branch
         is_branch0_d
-            = ((instr_i & MASK_BEQ)      == MATCH_BEQ) ||
-              ((instr_i & MASK_BNE)      == MATCH_BNE) ||
-              ((instr_i & MASK_BLT)      == MATCH_BLT) ||
-              ((instr_i & MASK_BGE)      == MATCH_BGE) ||
-              ((instr_i & MASK_BLTU)     == MATCH_BLTU) ||
-              ((instr_i & MASK_BGEU)     == MATCH_BGEU) ||
-              ((instr_i & MASK_P_BNEIMM) == MATCH_P_BNEIMM) ||
-              ((instr_i & MASK_P_BEQIMM) == MATCH_P_BEQIMM);
+            = ((instr_q & MASK_BEQ)      == MATCH_BEQ) ||
+              ((instr_q & MASK_BNE)      == MATCH_BNE) ||
+              ((instr_q & MASK_BLT)      == MATCH_BLT) ||
+              ((instr_q & MASK_BGE)      == MATCH_BGE) ||
+              ((instr_q & MASK_BLTU)     == MATCH_BLTU) ||
+              ((instr_q & MASK_BGEU)     == MATCH_BGEU) ||
+              ((instr_q & MASK_P_BNEIMM) == MATCH_P_BNEIMM) ||
+              ((instr_q & MASK_P_BEQIMM) == MATCH_P_BEQIMM);
     end
 
     // decide whether we have a unpredictable discontinuity
     // jalr, mret, sret, uret
     always_comb begin: is_discontinuity
         u_discontinuity0_d
-            = ((instr_i & MASK_JALR) == MATCH_JALR) ||
-              ((instr_i & MASK_MRET) == MATCH_MRET) ||
-              ((instr_i & MASK_SRET) == MATCH_SRET) ||
-              ((instr_i & MASK_URET) == MATCH_URET);
+            = ((instr_q & MASK_JALR) == MATCH_JALR) ||
+              ((instr_q & MASK_MRET) == MATCH_MRET) ||
+              ((instr_q & MASK_SRET) == MATCH_SRET) ||
+              ((instr_q & MASK_URET) == MATCH_URET);
     end
 
     // figure out whether we are dealing with the first qualified instruction
@@ -315,11 +336,20 @@ module trace_debugger
     // TODO: assert that we are not dealing with an unsupported instruction
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
+            ivalid_q           <= '0;
+            iexception_q       <= '0;
+            interrupt_q        <= '0;
+            cause_q            <= '0;
+            priv_q             <= '0;
+            iaddr_q            <= '0;
+            instr_q            <= '0;
+            compressed_q       <= '0;
+
             interrupt0_q       <= '0;
             interrupt1_q       <= '0;
             cause0_q           <= '0;
             cause1_q           <= '0;
-            priv0_q            <=  3'h7; //we always start in M-mode
+            priv0_q            <= 3'h7; //we always start in M-mode
             exception0_q       <= '0;
             exception1_q       <= '0;
             u_discontinuity0_q <= '0;
@@ -330,7 +360,16 @@ module trace_debugger
             qualified0_q       <= '0;
             qualified1_q       <= '0;
         end else begin
-            if(ivalid_i) begin
+            ivalid_q     <= ivalid_d;
+            iexception_q <= iexception_d;
+            interrupt_q  <= interrupt_d;
+            cause_q      <= cause_d;
+            priv_q       <= priv_d;
+            iaddr_q      <= iaddr_d;
+            instr_q      <= instr_d;
+            compressed_q <= compressed_d;
+
+            if(ivalid_q) begin
                 interrupt0_q       <= interrupt0_d;
                 interrupt1_q       <= interrupt1_d;
                 cause0_q           <= cause0_d;
