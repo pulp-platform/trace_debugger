@@ -64,17 +64,16 @@
     #+END_SRC
     . The generated packets can be inspected with
     #+BEGIN_SRC bash
-    ./trdb --binary-format pulp --dump my_packets=.
+    ./trdb --binary-format pulp --dump my_packets
     #+END_SRC
     Now we can try to recover the original instruction sequence by running
     #+BEGIN_SRC bash
-    =./trdb --binary-format pulp --bfd data/interrupt --extract my_packets=
+    =./trdb --binary-format pulp --bfd data/interrupt --extract my_packets
     #+END_SRC
     or even better to see some disassembly
     #+BEGIN_SRC bash
     ./trdb -dSsl --binary-format pulp --bfd data/interrupt --extract my_packets
     #+END_SRC
-    .
 
 
 ** Usage of libtrdb.so
