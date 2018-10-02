@@ -102,6 +102,26 @@ class Driver;
     endfunction
 
 
+    task write_apb(input logic [3:0] waddr, input logic [31:0] wdata);
+        // write request
+        @(posedge this.duv_if.clk_i);
+        this.duv_if.apb_bus.paddr  = waddr;
+        this.duv_if.apb_bus.pwrite = 1'b1;
+        this.duv_if.apb_bus.psel   = 1'b1;
+        this.duv_if.apb_bus.pwdata = wdata;
+
+        @(posedge this.duv_if.clk_i);
+        // we are now the access state of the apb
+        this.duv_if.apb_bus.penable     = 1'b1;
+
+        // wait until request consumed
+        @(posedge this.duv_if.clk_i);
+        wait(this.duv_if.apb_bus.pready == 1);
+        this.duv_if.apb_bus.penable     = 1'b0;
+        this.duv_if.apb_bus.psel   = 1'b0;
+    endtask
+
+
     task run(ref logic tb_eos);
         Stimuli stimuli;
         tb_eos = 1'b0;
@@ -128,21 +148,8 @@ class Driver;
         @(posedge this.duv_if.clk_i);
         apply_zero();
 
-        // enable trace debugger by simulating apb write
-        @(posedge this.duv_if.clk_i);
-        this.duv_if.apb_bus.paddr  = REG_TRDB_CFG;
-        this.duv_if.apb_bus.pwrite = 1'b1;
-        this.duv_if.apb_bus.psel   = 1'b1;
-        this.duv_if.apb_bus.pwdata = 1;
-
-        @(posedge this.duv_if.clk_i);
-        // we are now the access state of the apb
-        this.duv_if.apb_bus.penable     = 1'b1;
-
-        @(posedge this.duv_if.clk_i);
-        wait(this.duv_if.apb_bus.pready == 1);
-        this.duv_if.apb_bus.penable     = 1'b0;
-        this.duv_if.apb_bus.psel   = 1'b0;
+        // enable trace debugger
+        write_apb(REG_TRDB_CFG, 1);
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
@@ -170,22 +177,8 @@ class Driver;
         end
         $display("[DRIVER] @%t: Flushing buffers.", $time);
 
-        // write flush command to register TODO: make task out of this
-        @(posedge this.duv_if.clk_i);
-        this.duv_if.apb_bus.paddr  = REG_TRDB_CTRL;
-        this.duv_if.apb_bus.pwrite = 1'b1;
-        this.duv_if.apb_bus.psel   = 1'b1;
-        this.duv_if.apb_bus.pwdata = 1;
-
-        @(posedge this.duv_if.clk_i);
-        // we are now the access state of the apb
-        this.duv_if.apb_bus.penable     = 1'b1;
-
-        @(posedge this.duv_if.clk_i);
-        wait(this.duv_if.apb_bus.pready == 1);
-        this.duv_if.apb_bus.penable     = 1'b0;
-        this.duv_if.apb_bus.psel   = 1'b0;
-
+        // write flush command to register
+        write_apb(REG_TRDB_CTRL, 1);
 
         $display("[DRIVER] @%t: Driver finished.", $time);
 
