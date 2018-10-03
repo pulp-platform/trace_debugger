@@ -48,6 +48,7 @@ static char args_doc[] = "TRACE-OR-PACKETS";
 #define TRDB_OPT_DEMANGLE 1
 #define TRDB_OPT_NO_ALIASES 2
 #define TRDB_OPT_PREFIX_ADDRESSES 3
+#define TRDB_OPT_INLINES 4
 
 
 static struct argp_option options[] = {
@@ -75,6 +76,7 @@ static struct argp_option options[] = {
     {"function-context", 's', 0, 0,
      "Show when address coincides with function name entrypoint"},
     {"line-numbers", 'l', 0, 0, "Include line numbers and filenames in output"},
+    {"inlines", TRDB_OPT_INLINES, 0, 0, "Print all inlines for source line (with -l)"},
     {"output", 'o', "FILE", 0, "Write to FILE instead of stdout"},
     {0}};
 
@@ -142,6 +144,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
     case 'l':
         arguments->settings_disasm |= TRDB_LINE_NUMBERS;
         break;
+    case TRDB_OPT_INLINES:
+	arguments->settings_disasm |= TRDB_INLINES;
+	break;
     case ARGP_KEY_ARG:
         if (state->arg_num >= TRDB_NUM_ARGS)
             argp_usage(state);

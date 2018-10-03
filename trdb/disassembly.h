@@ -65,6 +65,7 @@ struct disassembler_unit {
 #define TRDB_LINE_NUMBERS 16
 #define TRDB_SOURCE_CODE 32
 #define TRDB_FUNCTION_CONTEXT 64
+#define TRDB_INLINES 128
 
 /**
  * Store disassembly configuration and context.
@@ -102,6 +103,7 @@ struct trdb_disasm_aux {
     bool with_source_code;      /**< show source code mixed with assembly */
     bool with_function_context; /**< show when instruction lands on symbol value
                                    of a function */
+    bool unwind_inlines;        /**< Print all inlines for source line */
 };
 
 /* The number of zeroes we want to see before we start skipping them. The number

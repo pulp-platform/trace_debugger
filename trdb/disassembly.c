@@ -969,6 +969,7 @@ void trdb_set_disassembly_conf(struct disassembler_unit *dunit,
     aux->with_line_numbers = settings & TRDB_LINE_NUMBERS;
     aux->with_source_code = settings & TRDB_SOURCE_CODE;
     aux->with_function_context = settings & TRDB_FUNCTION_CONTEXT;
+    aux->unwind_inlines = settings & TRDB_INLINES;
 }
 
 uint32_t trdb_get_disassembly_conf(struct disassembler_unit *dunit)
@@ -1177,6 +1178,7 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
 
     bool with_line_numbers = aux->with_line_numbers;
     bool with_source_code = aux->with_source_code;
+    bool unwind_inlines = aux->unwind_inlines;
 
     if (!with_line_numbers && !with_source_code)
         return;
@@ -1243,6 +1245,15 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
             else
                 printf("%s:%u\n", filename == NULL ? "???" : filename,
                        linenumber);
+        }
+        if (unwind_inlines) {
+            const char *filename2;
+            const char *functionname2;
+            unsigned line2;
+            while (
+                bfd_find_inliner_info(abfd, &filename2, &functionname2, &line2))
+                printf("inlined by %s:%u (%s)\n", filename2, line2,
+                       functionname2);
         }
     }
 
