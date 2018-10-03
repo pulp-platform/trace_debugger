@@ -1694,7 +1694,11 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
             err(c, "malloc: %s\n", strerror(errno));
             goto fail;
         }
-        bfd_get_section_contents(abfd, section, data, 0, datasize);
+
+        if (!bfd_get_section_contents(abfd, section, data, 0, datasize)) {
+            err(c, "bfd_get_section_contents: %s", bfd_errmsg(bfd_get_error()));
+            goto fail;
+        }
 
         paux->sec = section;
         pinfo->buffer = data;
