@@ -81,8 +81,6 @@ module trdb_reg
 
     assign flush_stream_o = ctrl_q[TRDB_FLUSH_STREAM];
 
-    assign dump_o = dump_q;
-
     // enable all
     // enable privilege tracing
     // enable exception tracing
@@ -135,11 +133,13 @@ module trdb_reg
     assign per_ready_o = 1'b1;
 
     always_comb begin: write_reg
-        cfg_d        = cfg_q;
-        ctrl_d       = ctrl_q;
-        dump_d       = dump_q;
-        dump_valid_d = '0;
-        tu_req_o     = '0;
+        cfg_d         = cfg_q;
+        ctrl_d        = ctrl_q;
+        dump_d        = dump_q;
+        dump_valid_d  = '0;
+        tu_req_o      = '0;
+        lower_addr_d  = lower_addr_q;
+        higher_addr_d = higher_addr_q;
 
         if(per_valid_i & per_we_i) begin
             case (per_addr_i)
