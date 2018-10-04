@@ -29,6 +29,8 @@ module trdb_timer
 
     enum logic [1:0] {IDLE, REQ} cs, ns;
 
+    assign trdb_time_o = trdb_time_q;
+
     // the request logic has a one cycle delay, but when we generated a timer
     // packet by a write to REG_TRDB_DUMP_WITH_TIME, we have to wait for the sw
     // packet anyway
