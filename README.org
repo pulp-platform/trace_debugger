@@ -1,4 +1,4 @@
-* TRDB -- Trace Debugger For RISC-V Core
+* Trace Debugger For RISC-V Core
 ** Overview
 An instruction tracer records the sequence of instructions that the CPU
 executes. Since the required bandwidth to record every instruction directly and
@@ -31,7 +31,7 @@ decompress recorded traces in the packet format.
 ** Packet Format
 The used packet format is described [[https://github.com/riscv/riscv-trace-spec][here]].
 
-** Organization
+** Organization of this repository
 #+BEGIN_EXAMPLE
 .
 |-- doc
@@ -39,7 +39,7 @@ The used packet format is described [[https://github.com/riscv/riscv-trace-spec]
 |-- include
 |-- rtl              RTL model of the trace debugger
 |-- tb               Testbench, uses the C model as golden model
-|-- trdb             Decompression routine and C model
+|-- trdb             Decompression routines and C model
 |-- waves
 |-- LICENSE
 |-- Makefile
@@ -47,22 +47,12 @@ The used packet format is described [[https://github.com/riscv/riscv-trace-spec]
 `-- src_files.yml    Configuration file to use it as an IP in the PULP platform
 #+END_EXAMPLE
 
-** Dependencies for TRDB
-   Requires =libbfd.a=, =libopcodes.a=, =libiberty.a= and =libzlib.a= from
-   binutils built using [[https://github.com/pulp-platform/pulp-riscv-binutils-gdb][binutils]] with the =trace_dbg_dev= branch. Build it by
-   calling
-   #+BEGIN_SRC bash
-     export CFLAGS="-g -O2 -fPIC"
-   ./configure --enable-targets=riscv32, x86_64-pc-linux-gnu --disable-gdb \
-   --disable-ld --disable-gas --disable-gold --disable-intl --disable-gprof \
-   --disable-readline --disable-sim --disable-libdecnumber
-   make clean all
-   #+END_SRC
-
-
-** Building the C model and decompression code
-   Run =make all= in =trdb/= for a release build. Make sure to link the
-   dependencies properly.
+** TRDB, the trace compression/decompression tool
+   Trdb is a command line tool which can produce the same output has the
+   hardware trace debugger given a stimuli file, decompress received packets
+   given the original binary and also show objdump like disassembly of the
+   reconstructed instruction sequence. More information on usage and examples
+   can be found [[https://github.com/pulp-platform/trace_debugger/tree/master/trdb][here]].
 
 ** Building the driver for the PULP platform
    Make sure you have setup the [[https://github.com/pulp-platform/pulp-sdk][PULP SDK]] as described there and have put in in
@@ -71,5 +61,5 @@ The used packet format is described [[https://github.com/riscv/riscv-trace-spec]
 ** Generating tag files
    Run =make TAGS= to generate etag files for emacs.
 
-** Building the documation
-   TODO: improve this
+** Building the documentation
+   There is no documentation for the hardware yet.
