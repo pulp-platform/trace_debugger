@@ -22,7 +22,7 @@ parameter XLEN = 32;
 parameter PRIVLEN = 3;
 parameter CAUSELEN = 5;
 parameter CONTEXTLEN = 32; //TODO: currently not used
-parameter PACKET_LEN = 128; //adjust to about 70
+parameter PACKET_LEN = 80; //TODO: careful double check that
 parameter PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
 parameter PACKET_TOTAL = PACKET_LEN + PACKET_HEADER_LEN;
 
@@ -69,12 +69,14 @@ parameter REG_TRDB_LOWER_ADDR     = 8'h20;//BASEADDR+0x20
 parameter REG_TRDB_HIGHER_ADDR    = 8'h24;//BASEADDR+0x24
 
 
+parameter TRDB_CFG_SIZE = 5;
 parameter TRDB_ENABLE = 0;
 parameter TRDB_TRACE_ACTIVATED = 1;
 parameter TRDB_APPLY_FILTERS = 2;
 parameter TRDB_TRACE_SELECTED_PRIV = 3;
 parameter TRDB_TRACE_RANGE = 4;
 
+parameter TRDB_CTRL_SIZE = 1;
 parameter TRDB_FLUSH_STREAM = 0;
 
 
