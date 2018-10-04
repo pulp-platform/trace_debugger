@@ -49,10 +49,10 @@ module trdb_reg
 );
 
     // hold configuration data TODO: reduce size
-    logic [31:0] cfg_q, cfg_d;
+    logic [TRDB_CFG_SIZE-1:0] cfg_q, cfg_d;
 
     // hold control status TODO: reduce size, careful look below too
-    logic [31:0] ctrl_q, ctrl_d;
+    logic [TRDB_CTRL_SIZE-1:0] ctrl_q, ctrl_d;
 
     // allow the user to write to this register to dump data through the trace
     // debugger
@@ -163,7 +163,9 @@ module trdb_reg
             endcase
         end else begin
             if(flush_confirm_i) begin
-                ctrl_d = {ctrl_q[31:1], 1'b0};
+               // TODO: update this
+               // ctrl_d = {ctrl_q[31:1], 1'b0};
+               ctrl_d = {1'b0};
             end
         end
     end
