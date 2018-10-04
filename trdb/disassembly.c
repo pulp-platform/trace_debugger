@@ -1233,11 +1233,13 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
     if (with_line_numbers) {
         if (functionname != NULL
             && (prev_functionname == NULL
-                || strcmp(functionname, prev_functionname) != 0))
+                || strcmp(functionname, prev_functionname) != 0)) {
             printf("%s():\n", functionname);
+            prev_line = -1;
+        }
         if (linenumber > 0
             && (linenumber != prev_line
-                || (discriminator != prev_discriminator))) {
+                || discriminator != prev_discriminator)) {
             if (discriminator > 0)
                 printf("%s:%u (discriminator %u)\n",
                        filename == NULL ? "???" : filename, linenumber,
