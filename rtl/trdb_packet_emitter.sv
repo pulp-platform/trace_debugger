@@ -46,6 +46,12 @@ module trdb_packet_emitter
      input logic [XLEN-1:0]        sw_word_i,
      output logic                  sw_grant_o,
 
+     // timer packet generation request
+     input logic                   tu_valid_i,
+     input logic [TIMER_WIDTH-1:0] tu_time_i,
+     input logic                   tu_fulltime_i,
+     output logic                  tu_grant_o,
+
      // packet bits which were generated from request
      output logic [PACKET_LEN-1:0] packet_bits_o, //TODO: adjust sizes
      output logic [6:0]            packet_len_o,
@@ -109,6 +115,7 @@ module trdb_packet_emitter
         packet_gen_valid     = '0;
 
         sw_grant_o           = '0;
+        tu_grant_o           = '0;
 
         if(valid_i) begin
             packet_gen_valid   = '1;
@@ -210,7 +217,17 @@ module trdb_packet_emitter
             packet_bits[1:0]     = W_SOFTWARE;
             packet_bits[2+:XLEN] = sw_word_i;
             packet_len           = 2 + XLEN;
+
+        end else if(tu_valid_i) begin
+            packet_gen_valid            = '1;
+            tu_grant_o                  = '1;
+            packet_bits[1:0]            = W_TIME;
+            // TODO: handle fulltime flag
+            packet_bits[2+:TIMER_WIDTH] = tu_time_i;
+            packet_len                  = 2+TIMER_WIDTH;
+
         end
+
     end
 
     //TODO: implement fifo nuking logic

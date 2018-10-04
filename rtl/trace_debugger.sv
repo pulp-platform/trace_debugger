@@ -38,7 +38,10 @@ module trace_debugger
      input logic                stall_i);
 
     // general control of this module
+    // whether this block is enabled at all
     logic                       trace_enable;
+    // if we want to trace
+    logic                       trace_activated;
     logic                       packet_after_exception;
 
     logic                       debug_mode;
@@ -74,7 +77,8 @@ module trace_debugger
     logic                       tc_first_qualified;
     logic                       tc_is_branch;
     logic                       tc_branch_taken;
-    logic                       tc_qualified, lc_qualified;
+    logic                       tc_qualified, lc_qualified, nc_qualified,
+                                nc_unqualified;
     logic                       tc_compressed;
     logic [XLEN-1:0]            tc_iaddr, nc_iaddr;
     logic                       lc_exception_sync;
@@ -138,6 +142,24 @@ module trace_debugger
     logic                      sw_valid;
     logic                      sw_grant;
 
+    // timer unit
+    logic                      timer_rst;
+    logic [TIMER_WIDTH-1:0]    tu_time;
+    logic                      tu_grant;
+    logic                      tu_valid;
+    logic                      tu_req;
+
+    // filter unit
+    logic                      apply_filters;
+    logic                      trace_selected_priv;
+    logic [1:0]                trace_which_priv;
+    logic                      trace_range;
+    logic [XLEN-1:0]           trace_lower_addr;
+    logic [XLEN-1:0]           trace_higher_addr;
+    logic                      filter_qualified_decision;
+
+
+
     // to register all inputs
     assign ivalid_d = ivalid_i;
     assign iexception_d = iexception_i;
@@ -179,7 +201,7 @@ module trace_debugger
 
     assign u_discontinuity1_d = u_discontinuity0_q;
     // TODO: add feature to have selective tracing, add enable with regmap
-    assign qualified0_d = trace_enable; //&& ivalid_q;
+    assign qualified0_d = trace_enable & filter_qualified_decision; //& ivalid_q
     assign qualified1_d = qualified0_q;
 
     // Hook phase related variables up to proper register
@@ -196,6 +218,7 @@ module trace_debugger
     assign lc_exception_sync = exception2_q;
     assign lc_u_discontinuity = u_discontinuity1_q;
     assign tc_is_branch = is_branch0_q;
+    assign nc_qualified = qualified0_d;
     assign tc_qualified = qualified0_q;
     assign lc_qualified = qualified1_q;
     assign tc_compressed = compressed0_q;
@@ -203,6 +226,21 @@ module trace_debugger
     assign tc_iaddr = iaddr0_q;
     // assign tc_first_qualified (below)
     // assign tc_branch_taken (below)
+
+    // determine if we are allowed to emit packets
+
+    trdb_filter i_trdb_filter
+        (.trace_activated_i(trace_activated),
+         .apply_filters_i(apply_filters),
+         .trace_selected_priv_i(trace_selected_priv),
+         .which_priv_i(trace_which_priv),
+         .priv_i(priv_d[1:0]),
+         .trace_range_i(trace_range),
+         .trace_lower_addr_i(trace_lower_addr),
+         .trace_higher_addr_i(trace_higher_addr),
+         .iaddr_i(iaddr_d),
+         .trace_qualified_o(filter_qualified_decision));
+
 
     // decide whether a privilege change occured
     always_comb begin
@@ -238,6 +276,10 @@ module trace_debugger
         tc_first_qualified = !lc_qualified && tc_qualified;
     end
 
+    always_comb begin: becomes_unqualified
+        nc_unqualified = !nc_qualified;
+    end
+
     // is this branch taken?
     // TODO: change to tc_compressed? 2 :4
     always_comb begin: is_branch_taken
@@ -258,6 +300,8 @@ module trace_debugger
          .is_full_o(branch_map_full),
          .is_empty_o(branch_map_empty));
 
+    // decides, by looking at the history of instructions, whether a packet is
+    // necessary or not
     trdb_priority i_trdb_priority
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
@@ -268,6 +312,8 @@ module trace_debugger
          .lc_exception_sync_i(lc_exception_sync && packet_after_exception),
 
          .tc_first_qualified_i(tc_first_qualified),
+         .nc_unqualified_i(nc_unqualified),
+
          //input logic  tc_unhalted,
          .tc_privchange_i(tc_privchange),
          //input logic resync & branch_map_cnt
@@ -291,6 +337,21 @@ module trace_debugger
          .packet_format_o(packet_format),
          .packet_subformat_o(packet_subformat));
 
+
+    // keep track of time for time packets
+    trdb_timer
+        #(.TIMER_WIDTH(TIMER_WIDTH))
+    i_trdb_timer
+        (.clk_i(clk_i),
+         .rst_ni(rst_ni),
+         .manual_rst_i(timer_rst),
+         .tu_req_i(tu_req),
+         .tu_valid_o(tu_valid),
+         .tu_grant_i(tu_grant),
+         .trdb_time_o(tu_time));
+
+
+    // whole packet generation logic
     trdb_packet_emitter i_trdb_packet_emitter
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
@@ -313,6 +374,10 @@ module trace_debugger
          .sw_valid_i(sw_valid),
          .sw_word_i(sw_word),
          .sw_grant_o(sw_grant),
+         .tu_valid_i(tu_valid),
+         .tu_time_i(tu_time),
+         .tu_fulltime_i(tu_fulltime),
+         .tu_grant_o(tu_grant),
          .packet_bits_o(packet_bits),
          .packet_len_o(packet_len),
          .packet_valid_o(packet_gen_valid),
@@ -424,12 +489,20 @@ module trace_debugger
          .per_addr_i(per_addr),
          .per_we_i(per_we),
          .per_valid_i(per_valid),
-         .trace_enable_o(trace_enable),
          .flush_stream_o(flush_stream),
          .flush_confirm_i(flush_confirm),
+         .trace_enable_o(trace_enable),
+         .trace_activated_o(trace_activated),
+         .apply_filters_o(apply_filters),
+         .trace_selected_priv_o(trace_selected_priv),
+         .trace_which_priv_o(trace_which_priv),
+         .trace_range_o(trace_range),
+         .trace_lower_addr_o(trace_lower_addr),
+         .trace_higher_addr_o(trace_higher_addr),
          .sw_word_o(sw_word),
          .sw_valid_o(sw_valid),
-         .sw_grant_i(sw_grant));
+         .sw_grant_i(sw_grant),
+         .tu_req_o(tu_req));
 
 
 endmodule // trace_debugger

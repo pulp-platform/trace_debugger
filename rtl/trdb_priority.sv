@@ -25,6 +25,7 @@ module trdb_priority
      input logic  lc_exception_sync_i,
 
      input logic  tc_first_qualified_i,
+     input logic  nc_unqualified_i,
      //input logic  tc_unhalted,
      input logic  tc_privchange_i,
      //input logic resync & branch_map_cnt
@@ -52,12 +53,10 @@ module trdb_priority
     // TODO: temporarily put here to make it compile
     logic         tc_unhalted_i;
     logic         nc_halt_i;
-    logic         nc_unqualified_i;
     logic         tc_context_change;
 
     assign tc_unhalted_i     = '0;
     assign nc_halt_i         = '0;
-    assign nc_unqualified_i  = '0;
     assign tc_context_change = '0;
 
 

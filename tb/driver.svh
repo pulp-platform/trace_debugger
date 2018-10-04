@@ -123,11 +123,11 @@ class Driver;
 
 
     task test_sw_dump();
-        write_apb(REG_TRDB_DUMP, 32'ha0a0a0a0a);
-        write_apb(REG_TRDB_DUMP, 32'hb0b0b0b0b);
-        write_apb(REG_TRDB_DUMP, 32'hc0c0c0c0c);
-        write_apb(REG_TRDB_DUMP, 32'hd0d0d0d0d);
-        write_apb(REG_TRDB_DUMP, 32'hf0f0f0f0f);
+        write_apb(REG_TRDB_DUMP, 32'ha0a0a0a0);
+        write_apb(REG_TRDB_DUMP, 32'hb0b0b0b0);
+        write_apb(REG_TRDB_DUMP, 32'hc0c0c0c0);
+        write_apb(REG_TRDB_DUMP, 32'hd0d0d0d0);
+        write_apb(REG_TRDB_DUMP, 32'hf0f0f0f0);
     endtask
 
 
@@ -158,7 +158,7 @@ class Driver;
         apply_zero();
 
         // enable trace debugger
-        write_apb(REG_TRDB_CFG, 1);
+        write_apb(REG_TRDB_CFG, 3);
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin

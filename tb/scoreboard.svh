@@ -116,11 +116,11 @@ class Scoreboard;
         len     = 34;
         msgtype = W_SOFTWARE;
 
-        add_packet({32'ha0a0a0a0a, msgtype,len});
-        add_packet({32'hb0b0b0b0b, msgtype,len});
-        add_packet({32'hc0c0c0c0c, msgtype,len});
-        add_packet({32'hd0d0d0d0d, msgtype,len});
-        add_packet({32'hf0f0f0f0f, msgtype,len});
+        add_packet({32'ha0a0a0a0, msgtype,len});
+        add_packet({32'hb0b0b0b0, msgtype,len});
+        add_packet({32'hc0c0c0c0, msgtype,len});
+        add_packet({32'hd0d0d0d0, msgtype,len});
+        add_packet({32'hf0f0f0f0, msgtype,len});
 
     endtask;
 

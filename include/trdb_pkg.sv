@@ -29,6 +29,8 @@ parameter PACKET_TOTAL = PACKET_LEN + PACKET_HEADER_LEN;
 parameter PACKET_BUFFER_STAGES = 4;
 parameter SOFTWARE_BUFFER_STAGES = 2;
 
+parameter TIMER_WIDTH = 40;
+
 // available packet types
 typedef enum logic[1:0]
 {
@@ -51,7 +53,7 @@ typedef enum logic[1:0]
 typedef enum logic [1:0]
 {
  W_EMPTY    = 2'h0,
- W_TIMER    = 2'h1,
+ W_TIME     = 2'h1,
  W_TRACE    = 2'h2,
  W_SOFTWARE = 2'h3
  } trdb_marker_t;
@@ -59,12 +61,20 @@ typedef enum logic [1:0]
 
 // This is information regarding the mapping of configuration registers and the
 // meaning of those bits offset of configuration registers from baseaddress
-parameter REG_TRDB_CFG  = 4'h0; //BASEADDR+0x00
-parameter REG_TRDB_CTRL = 4'h4; //BASEADDR+0x04
-parameter REG_TRDB_DUMP = 4'h8; //BASEADDR+0x08
+parameter REG_TRDB_CFG            = 8'h0; //BASEADDR+0x00
+parameter REG_TRDB_CTRL           = 8'h4; //BASEADDR+0x04
+parameter REG_TRDB_DUMP           = 8'h8; //BASEADDR+0x08
+parameter REG_TRDB_DUMP_WITH_TIME = 8'hc; //BASEADDR+0x0f
+parameter REG_TRDB_LOWER_ADDR     = 8'h20;//BASEADDR+0x20
+parameter REG_TRDB_HIGHER_ADDR    = 8'h24;//BASEADDR+0x24
 
 
 parameter TRDB_ENABLE = 0;
+parameter TRDB_TRACE_ACTIVATED = 1;
+parameter TRDB_APPLY_FILTERS = 2;
+parameter TRDB_TRACE_SELECTED_PRIV = 3;
+parameter TRDB_TRACE_RANGE = 4;
+
 parameter TRDB_FLUSH_STREAM = 0;
 
 
