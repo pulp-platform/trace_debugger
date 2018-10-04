@@ -1,4 +1,4 @@
-* TRDB -- C Model and decompression tools
+* TRDB -- C Model and Decompression Tools
   The C model accepts a stimuli/trace file and produces the sequence of packages
   that the RTL model would. An example of how such a trace file looks like can
   be found in =data/trdb_stimuli=. This is what the RISC-V core sends to the
