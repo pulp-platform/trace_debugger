@@ -229,8 +229,7 @@ module trace_debugger
     // assign tc_first_qualified (below)
     // assign tc_branch_taken (below)
 
-    // determine if we are allowed to emit packets
-
+    // determine if we are allowed to emit packets for nc (next cycle)
     trdb_filter i_trdb_filter
         (.trace_activated_i(trace_activated),
          .apply_filters_i(apply_filters),

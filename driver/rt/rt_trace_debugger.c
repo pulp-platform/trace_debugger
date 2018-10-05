@@ -66,6 +66,12 @@ void rt_trace_debugger_control(rt_trace_dbg_t *handle)
 }
 
 
+/* TODO: this is just for testing, the API should be improved */
+void rt_trace_debugger_cfg(unsigned int addr, unsigned int value){
+    write_reg_l2(addr, value);
+}
+
+
 /* Allocate trace debugger device */
 rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
 				       rt_trace_dbg_conf_t *conf,
@@ -127,13 +133,8 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
 		   (unsigned int)trace_buffs[1], buffer_size, 0,
 		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)1));
 
-    /* This enables the trace debugger side (which lies close the fc) */
-    write_reg_l2(TRDB_REG_CFG, TRDB_FLAG_ENABLE | TRDB_TRACE_ACTIVATED);
-
-    // comment this out to see user data tracing */
-    /* rt_trace_debugger_userdata(0xdeadbeef); */
-    /* rt_trace_debugger_userdata_time(0xdeadbeef); */
-    /* rt_trace_debugger_userdata_time(0xfeebfeeb); */
+    /* This applies some desired intial settings */
+    write_reg_l2(TRDB_REG_CFG, conf->conf_reg);
 
     return tracer;
 
@@ -155,7 +156,7 @@ fail_event:
 void rt_trace_debugger_close(rt_trace_dbg_t *handle, rt_event_t *event)
 {
     rt_trace(RT_TRACE_DEV_CTRL, "[TRDB] closing trace debugger\n");
-    write_reg_l2(TRDB_REG_CFG, TRDB_FLAG_DISABLE);
+    write_reg_l2(TRDB_REG_CFG, TRDB_DISABLE);
     /* TODO: don't know what to do with event */
     if (!handle)
 	rt_free(RT_ALLOC_FC_DATA, handle, sizeof(rt_trace_dbg_t));

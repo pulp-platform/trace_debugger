@@ -1,25 +1,14 @@
 #include <stdio.h>
 #include "pulp.h"
 #include "rt/rt_api.h"
-#include "rt_trace_debugger.h"
+#include "../rt/rt_trace_debugger.h"
 
+
+int trace_me(int a, int b);
+int dont_trace_me(int a, int b, int c);
 
 int main()
 {
-
-#ifdef __RT_USE_IO
-    printf("__RT_USE_IO is set\n");
-#else
-    printf("__RT_USE_IO is NOT set\n");
-#endif
-
-#ifdef __RT_USE_TRACE
-    printf("__RT_USE_TRACE is set\n");
-#else
-    printf("__RT_USE_TRACE is NOT set\n");
-#endif
-    unsigned int test_runs = 5;
-
     /* First configure the SPI device */
     rt_spim_conf_t spi_conf;
     /* Get default configuration */
@@ -43,9 +32,8 @@ int main()
     /* setup trace debugger configuration */
     rt_trace_dbg_conf_t trdb_conf;
     rt_trace_debugger_conf_init(&trdb_conf);
-    trdb_conf.buffer_size = 256;
-    trdb_conf.conf_reg =
-	TRDB_ENABLE | TRDB_TRACE_ACTIVATED; /* enable clock and tracer*/
+    trdb_conf.buffer_size = 16;
+    trdb_conf.conf_reg = TRDB_ENABLE; /* enable clock */
 
     /* and open it */
     rt_trace_dbg_t *trdb =
@@ -54,8 +42,20 @@ int main()
 	rt_error("[TEST] failed to open trace debugger\n");
 	return -1;
     }
-    /* dump some userdata through the traces */
-    rt_trace_debugger_userdata(0xdeadbeef);
+    /* configure range which we want to trace. We looked at the disassembly to
+     * figure out the boundaries of trace_me().
+     */
+    rt_trace_debugger_cfg(TRDB_LOWER_ADDR, 0x1c008ebe);
+    rt_trace_debugger_cfg(TRDB_HIGHER_ADDR, 0x1c008f02);
+
+    /* enable tracing */
+    rt_trace_debugger_cfg(TRDB_REG_CFG, TRDB_ENABLE | TRDB_TRACE_ACTIVATED
+					    | TRDB_APPLY_FILTERS
+					    | TRDB_TRACE_RANGE);
+
+    trace_me(0, 5);
+    dont_trace_me(1, 2, 3);
+    trace_me(10, 2);
 
     /* Let's call some functions to generated some code */
     printf("Hello World!\n");
@@ -64,16 +64,29 @@ int main()
     printf("Memory TRACER RX: %x\n", UDMA_TRACER_RX_ADDR(0));
     printf("Whoami: %d\n", (is_fc()));
 
+    /* Run trdb -dSl --bfd driver_example/driver_example -x tx_spi
+     * to recover trace
+     */
 
-    /* just loop for now */
-    printf("[TEST] looping\n");
-    while (test_runs > 0) {
-	test_runs--;
+    /* TODO: wait for dma to finish, for now we just loop */
+    for (;;) {
 	rt_event_yield(NULL);
     }
-    rt_trace_debugger_close(trdb, NULL);
 
+    rt_trace_debugger_close(trdb, NULL);
     rt_spim_close(spim, NULL);
 
     return 0;
+}
+
+int trace_me(int a, int b)
+{
+    int c = a * b;
+    int d = c * c;
+    return a + b + c;
+}
+
+int dont_trace_me(int a, int b, int c)
+{
+    return -a - b - c;
 }

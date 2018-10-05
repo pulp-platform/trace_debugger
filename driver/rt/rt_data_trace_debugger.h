@@ -20,11 +20,11 @@
 #define __RT_DATA_TRACE_DEBUGGER_H__
 typedef struct {
     unsigned int buffer_size;
-    unsigned int dummy;
+    int dummy;
+    unsigned int conf_reg;
 } rt_trace_dbg_conf_t;
 
 typedef struct {
-    /* TODO: not entirely clear what goes into this one */
     int channel;
     unsigned int buffer_size;
     // uint8_t *trace_buffs[2];
