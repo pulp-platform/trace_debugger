@@ -26,13 +26,21 @@
  * bits
  */
 #define TRDB_REG_CFG 0x1a120000
-#define TRDB_FLAG_ENABLE 1
 #define TRDB_FLAG_DISABLE 0
+#define TRDB_FLAG_ENABLE 1
+#define TRDB_TRACE_ACTIVATED (1 << 1)
+#define TRDB_APPLY_FILTERS (1 << 2)
+#define TRDB_TRACE_SELECTED_PRIV (1 << 3)
+#define TRDB_TRACE_RANGE (1 << 4)
 
 #define TRDB_REG_CTRL 0x1a120004
 #define TRDB_FLAG_FLUSH 1
 
 #define TRDB_REG_DUMP 0x1a120008
+#define TRDB_REG_DUMP_WITH_TIME 0x1a12000c
+
+#define TRDB_LOWER_ADDR  0x1a120020
+#define TRDB_HIGHER_ADDR 0x1a120024
 
 
 void rt_trace_debugger_conf_init(rt_trace_dbg_conf_t *conf);
@@ -45,4 +53,6 @@ void rt_trace_debugger_close(rt_trace_dbg_t *, rt_event_t *);
 void __rt_trace_debugger_eot(void *arg);
 void __rt_spim_eot(void *arg);
 void rt_trace_debugger_userdata(unsigned int value);
+void rt_trace_debugger_userdata_time(unsigned int value);
+
 #endif

@@ -43,7 +43,7 @@ int main()
     /* setup trace debugger configuration */
     rt_trace_dbg_conf_t trdb_conf;
     rt_trace_debugger_conf_init(&trdb_conf);
-    trdb_conf.buffer_size = 512;
+    trdb_conf.buffer_size = 256;
 
     /* and open it */
     rt_trace_dbg_t *trdb =
@@ -61,6 +61,7 @@ int main()
     printf("Memory CAMERA RX: %x\n", UDMA_CAM_RX_ADDR(0));
     printf("Memory TRACER RX: %x\n", UDMA_TRACER_RX_ADDR(0));
     printf("Whoami: %d\n", (is_fc()));
+
 
     /* just loop for now */
     printf("[TEST] looping\n");

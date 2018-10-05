@@ -60,6 +60,12 @@ void rt_trace_debugger_conf_init(rt_trace_dbg_conf_t *conf)
 }
 
 
+void rt_trace_debugger_control(rt_trace_dbg_t *handle)
+{
+    printf("unimplemented\n");
+}
+
+
 /* Allocate trace debugger device */
 rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
 				       rt_trace_dbg_conf_t *conf,
@@ -122,11 +128,12 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
 		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)1));
 
     /* This enables the trace debugger side (which lies close the fc) */
-    write_reg_l2(TRDB_REG_CFG, TRDB_FLAG_ENABLE);
+    write_reg_l2(TRDB_REG_CFG, TRDB_FLAG_ENABLE | TRDB_TRACE_ACTIVATED);
 
-    rt_trace(RT_TRACE_DEV_CTRL,
-	     "[TRDB] succesfully opened trace debugger device (name: %s)\n",
-	     dev_name);
+    // comment this out to see user data tracing */
+    /* rt_trace_debugger_userdata(0xdeadbeef); */
+    /* rt_trace_debugger_userdata_time(0xdeadbeef); */
+    /* rt_trace_debugger_userdata_time(0xfeebfeeb); */
 
     return tracer;
 
@@ -144,12 +151,10 @@ fail_event:
     return NULL;
 }
 
-void rt_trace_debugger_control(rt_trace_dbg_t *handle)
-{
-}
 
 void rt_trace_debugger_close(rt_trace_dbg_t *handle, rt_event_t *event)
 {
+    rt_trace(RT_TRACE_DEV_CTRL, "[TRDB] closing trace debugger\n");
     write_reg_l2(TRDB_REG_CFG, TRDB_FLAG_DISABLE);
     /* TODO: don't know what to do with event */
     if (!handle)
@@ -166,6 +171,7 @@ void rt_trace_debugger_close(rt_trace_dbg_t *handle, rt_event_t *event)
     return;
 }
 
+
 /* ensure continous transfer */
 void __rt_trace_debugger_eot(void *arg)
 {
@@ -173,13 +179,6 @@ void __rt_trace_debugger_eot(void *arg)
 
     rt_trace(RT_TRACE_DEV_CTRL,
 	     "[TRDB] end of transfer, re-enqueue buffer: %d\n", index);
-
-    /* /\* TODO: remove this quick and dirty debugging stuff*\/ */
-    /* for (unsigned int i = 0; i < buffer_size; i++) { */
-    /* 	rt_trace(RT_TRACE_DEV_CTRL, "Mem@%p: 0x%x\n", (trace_buffs[index] + i),
-     */
-    /* 		 *(trace_buffs[index] + i)); */
-    /* } */
 
     rt_spim_send_qspi(trdb_spi, trace_buffs[(int)arg], buffer_size * 8,
 		      RT_SPIM_CS_AUTO,
@@ -200,4 +199,9 @@ void __rt_spim_eot(void *arg)
 void rt_trace_debugger_userdata(unsigned int value)
 {
     write_reg_l2(TRDB_REG_DUMP, value);
+}
+
+void rt_trace_debugger_userdata_time(unsigned int value)
+{
+    write_reg_l2(TRDB_REG_DUMP_WITH_TIME, value);
 }
