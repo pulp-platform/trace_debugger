@@ -1157,10 +1157,12 @@ static void dump_lines(struct print_file_list *p, unsigned int start,
 {
     if (p->map == NULL)
         return;
+    printf("\n");
     while (start <= end) {
         print_line(p, start);
         start++;
     }
+    printf("\n");
 }
 
 
