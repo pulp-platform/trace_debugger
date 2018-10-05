@@ -48,8 +48,8 @@
     For that there are the flags =--disassemble= (disassemble code),
     =--function-context= (clearly delimit when we are entering a function),
     =--line-numbers= (show file names and line numbers) and =--source= (mix
-    dissembly with source code) which can be added to the decompression command.
-    Those flags are similar to the ones in GNU objdump.
+    disassembly with source code) which can be added to the decompression
+    command. Those flags are similar to the ones in GNU objdump.
 
     For more information about the options, run =trdb --help=.
 

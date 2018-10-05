@@ -51,6 +51,12 @@
 #define ILEN 32
 #define CONTEXTLEN 32
 
+/* timer */
+#define TIMELEN 40
+
+/* sw dump */
+#define SWLEN 32
+
 #define INSTR_STR_LEN 128
 
 /* forward declarations */
@@ -103,7 +109,10 @@ struct tr_packet {
     uint32_t length : PACKETLEN; /**< length of packet in bits */
     uint32_t msg_type : 2;       /**< payload type */
     /* custom data written by user, valid when msg_type = W_SOFTWARE*/
-    uint32_t userdata;
+    uint32_t userdata : SWLEN;
+
+    /* timer data */
+    uint64_t time : TIMELEN;
 
     /* actual payload of spec, valid  when msg_type = W_TRACE */
     uint32_t format : 2;    /**< header denoting the packet type */

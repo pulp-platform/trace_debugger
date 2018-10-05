@@ -124,11 +124,13 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
         break;
     /* this is user defined payload, written through the APB */
     case W_SOFTWARE:
-        packet->userdata = payload.bits & MASK_FROM(XLEN);
-        break;
+        packet->userdata = (payload.bits >> MSGTYPELEN) & MASK_FROM(XLEN);
+        return 0;
     /* timer data */
     case W_TIMER:
-        break;
+        /*careful if TIMELEN=64*/
+        packet->time = (payload.bits >> MSGTYPELEN) & MASK_FROM(TIMELEN);
+        return 0;
     default:
         err(c, "unknown message type in packet\n");
         return -1;

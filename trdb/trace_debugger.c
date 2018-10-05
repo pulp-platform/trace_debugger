@@ -1045,6 +1045,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             last_packet = NULL;
         }
 
+	/* we ignore unknown or unused packets (TIMER, SW) */
+	if(packet->msg_type != W_TRACE)
+	    continue;
 
         /* Sometimes we leave the current section (e.g. changing from
          * the .start to the .text section), so let's load the
@@ -2000,6 +2003,7 @@ void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
 
     case W_TIMER:
         dbg(c, "PACKET W_TIMER\n");
+        dbg(c, "    time : %" PRIu64 "\n", packet->time);
         break;
     }
 }
@@ -2063,6 +2067,7 @@ void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
 
     case W_TIMER:
         fprintf(stream, "PACKET W_TIMER\n");
+        fprintf(stream, "    time : %" PRIu64 "\n", packet->time);
         break;
     }
 }
