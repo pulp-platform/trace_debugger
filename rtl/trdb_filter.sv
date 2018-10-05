@@ -39,7 +39,6 @@ module trdb_filter
 
     logic                   ip_in_range;
     logic                   priv_matching;
-    logic                   filter_decision;
 
     always_comb begin: ip_range_check
         if(trace_lower_addr_i <= iaddr_i && iaddr_i < trace_higher_addr_i)

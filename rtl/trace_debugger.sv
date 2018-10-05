@@ -158,7 +158,8 @@ module trace_debugger
     logic [XLEN-1:0]           trace_higher_addr;
     logic                      filter_qualified_decision;
 
-
+    // TODO: send this to reg
+    assign timer_rst = '0;
 
     // to register all inputs
     assign ivalid_d = ivalid_i;
@@ -173,6 +174,7 @@ module trace_debugger
     // whether we do tracing at all
     assign trace_valid = ivalid_q && debug_mode && trace_enable;
     assign debug_mode = priv_q[PRIVLEN-1];
+
     // TODO: make this configurationr register mapped
     assign packet_after_exception                      = '1;
 
@@ -201,7 +203,7 @@ module trace_debugger
 
     assign u_discontinuity1_d = u_discontinuity0_q;
     // TODO: add feature to have selective tracing, add enable with regmap
-    assign qualified0_d = trace_enable & filter_qualified_decision; //& ivalid_q
+    assign qualified0_d = trace_enable && filter_qualified_decision; //& ivalid_q
     assign qualified1_d = qualified0_q;
 
     // Hook phase related variables up to proper register
@@ -292,7 +294,7 @@ module trace_debugger
     trdb_branch_map i_trdb_branch_map
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-         .valid_i(tc_is_branch && trace_valid),
+         .valid_i(tc_is_branch && trace_valid && tc_qualified),
          .branch_taken_i(tc_branch_taken),
          .flush_i(branch_map_flush),
          .map_o(branch_map),
@@ -305,9 +307,10 @@ module trace_debugger
     trdb_priority i_trdb_priority
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
-         .valid_i(trace_valid), // there might be some data stuck in the
-                                // pipeline if valid never goes high again (e.g.
-                                // after wfi), but this shouldnt matter
+         // there might be some data stuck in the
+         // pipeline if valid never goes high again (e.g.
+         // after wfi), but this shouldnt matter
+         .valid_i(trace_valid && tc_qualified),
          .lc_exception_i(lc_exception),
          .lc_exception_sync_i(lc_exception_sync && packet_after_exception),
 
