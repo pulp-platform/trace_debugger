@@ -46,7 +46,7 @@ static uint32_t p_branch_map_len(uint32_t branches)
 }
 
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
-                                 struct tr_packet *packet)
+                                 struct tr_packet *packet, uint32_t *bytes)
 {
     uint8_t header = 0;
     union trdb_pack payload = {0};
@@ -68,7 +68,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     uint8_t len = (header & MASK_FROM(PACKETLEN)) + PACKETLEN;
     payload.bin[0] = header;
     /* compute how many bytes that is */
-    unsigned byte_len = len / 8 + (len % 8 != 0 ? 1 : 0);
+    uint32_t byte_len = len / 8 + (len % 8 != 0 ? 1 : 0);
     /* we have to exclude the header byte */
     if (fread((payload.bin + 1), 1, byte_len - 1, fp) != byte_len - 1) {
         if (feof(fp)) {
@@ -80,6 +80,8 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
         }
         return -1;
     }
+    /* since we succefully read a packet we can now set bytes */
+    *bytes = byte_len;
     /* make sure we start from a good state */
     *packet = (struct tr_packet){0};
 
@@ -148,21 +150,24 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
         err(c, "fopen: %s\n", strerror(errno));
         return -1;
     }
-
+    uint32_t total_bytes_read = 0;
     struct tr_packet *packet = NULL;
     struct tr_packet tmp = {0};
+    uint32_t bytes = 0;
 
     /* read the file and malloc entries into the given linked list head */
-    while (trdb_pulp_read_single_packet(c, fp, &tmp) != -1) {
+    while (trdb_pulp_read_single_packet(c, fp, &tmp, &bytes) != -1) {
         packet = malloc(sizeof(*packet));
         if (!packet) {
             err(c, "malloc: %s\n", strerror(errno));
             return -ENOMEM;
         }
         *packet = tmp;
+        total_bytes_read += bytes;
 
         list_add(&packet->list, packet_list);
     }
+    dbg(c, "total bytes read: %" PRIu32 "\n", total_bytes_read);
     return 0;
 }
 

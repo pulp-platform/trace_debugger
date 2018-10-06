@@ -32,10 +32,11 @@
  * @param c trace debugger context
  * @param fp file to read from
  * @param packet filled out with read packet data
+ * @param bytes the number of bytes of the packet (with header)
  * @return 0 on successful read, -1 on failure
  */
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
-                                 struct tr_packet *packet);
+                                 struct tr_packet *packet, uint32_t *bytes);
 
 /**
  * Repeatedly calls trdb_pulp_read_single_packet until encountering EOF or an
