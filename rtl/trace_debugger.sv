@@ -38,18 +38,25 @@ module trace_debugger
      input logic                stall_i);
 
     // general control of this module
-    // whether this block is enabled at all
+    // clock enabled
     logic                       trace_enable;
-    // if we want to trace
+    // tracing enabled
     logic                       trace_activated;
-    logic                       packet_after_exception;
-
+    // proper privileges for debugging
     logic                       debug_mode;
+    // whether input is good
     logic                       trace_valid;
+    // control the streamer unit
     logic                       flush_stream;
     logic                       flush_confirm;
+    // control the packet fifo
+    logic                       clear_fifo;
+    logic                       fifo_overflow;
+    // special case to jump over vector table entries (which can't be inferred
+    // by inspecting the programs' executable
+    logic                       packet_after_exception;
 
-    // to register all inputs
+    // register all inputs, we don't want to extend riscy's paths
     logic                       ivalid_q, ivalid_d;
     logic                       iexception_q, iexception_d;
     logic                       interrupt_q, interrupt_d;
@@ -153,10 +160,14 @@ module trace_debugger
     logic                      apply_filters;
     logic                      trace_selected_priv;
     logic [1:0]                trace_which_priv;
-    logic                      trace_range;
+    logic                      trace_range_event;
+    logic                      trace_stop_event;
     logic [XLEN-1:0]           trace_lower_addr;
     logic [XLEN-1:0]           trace_higher_addr;
     logic                      filter_qualified_decision;
+    logic                      trace_req_deactivate;
+    logic                      trace_range_match;
+    logic                      trace_priv_match;
 
     // TODO: send this to reg
     assign timer_rst = '0;
@@ -232,14 +243,18 @@ module trace_debugger
     // determine if we are allowed to emit packets for nc (next cycle)
     trdb_filter i_trdb_filter
         (.trace_activated_i(trace_activated),
+         .trace_req_deactivate_o(trace_req_deactivate),
          .apply_filters_i(apply_filters),
          .trace_selected_priv_i(trace_selected_priv),
          .which_priv_i(trace_which_priv),
          .priv_i(priv_d[1:0]),
-         .trace_range_i(trace_range),
+         .trace_range_event_i(trace_range_event),
+         .trace_stop_event_i(trace_stop_event),
          .trace_lower_addr_i(trace_lower_addr),
          .trace_higher_addr_i(trace_higher_addr),
          .iaddr_i(iaddr_d),
+         .trace_range_match_o(trace_range_match),
+         .trace_priv_match_o(trace_priv_match),
          .trace_qualified_o(filter_qualified_decision));
 
 
@@ -373,6 +388,8 @@ module trace_debugger
          .branch_map_full_i(branch_map_full),
          .is_branch_i(tc_is_branch),
          .branch_map_flush_o(branch_map_flush),
+         .clear_fifo_i(clear_fifo),
+         .fifo_overflow_o(fifo_overflow),
          .sw_valid_i(sw_valid),
          .sw_word_i(sw_word),
          .sw_grant_o(sw_grant),
@@ -493,14 +510,22 @@ module trace_debugger
          .per_valid_i(per_valid),
          .flush_stream_o(flush_stream),
          .flush_confirm_i(flush_confirm),
+         .clear_fifo_o(clear_fifo),
          .trace_enable_o(trace_enable),
          .trace_activated_o(trace_activated),
+         .trace_req_deactivate_i(trace_req_deactivate),
          .apply_filters_o(apply_filters),
          .trace_selected_priv_o(trace_selected_priv),
          .trace_which_priv_o(trace_which_priv),
-         .trace_range_o(trace_range),
+         .trace_range_event_o(trace_range_event),
+         .trace_stop_event_o(trace_stop_event),
          .trace_lower_addr_o(trace_lower_addr),
          .trace_higher_addr_o(trace_higher_addr),
+         .trace_qualified_i(qualified0_d),
+         .trace_priv_match_i(trace_priv_match),
+         .trace_range_match_i(trace_range_match),
+         .trace_fifo_overflow_i(fifo_overflow),
+         .external_fifo_overflow_i(stall_i), //external stall is a fifo overflow
          .sw_word_o(sw_word),
          .sw_valid_o(sw_valid),
          .sw_grant_i(sw_grant),

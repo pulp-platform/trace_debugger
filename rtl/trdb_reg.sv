@@ -29,30 +29,47 @@ module trdb_reg
      // packet streamer control
      output                           flush_stream_o,
      input                            flush_confirm_i,
+     output logic                     clear_fifo_o,
 
-     // trace debugger settings
+     // trace debugger settings and control
      output logic                     trace_enable_o,
      output logic                     trace_activated_o,
+     input logic                      trace_req_deactivate_i,
+
+     // signals that control the filtering settings
      output logic                     apply_filters_o,
      output logic                     trace_selected_priv_o,
      output logic [1:0]               trace_which_priv_o,
-     output logic                     trace_range_o,
+     output logic                     trace_range_event_o,
+     output logic                     trace_stop_event_o,
      output logic [XLEN-1:0]          trace_lower_addr_o,
      output logic [XLEN-1:0]          trace_higher_addr_o,
 
+     // trace debugger status signals
+     input logic                      trace_qualified_i,
+     input logic                      trace_priv_match_i,
+     input logic                      trace_range_match_i,
+     input logic                      trace_fifo_overflow_i,
+     input logic                      external_fifo_overflow_i,
 
+     // user data writes which get merged into packet stream
      output logic [31:0]              sw_word_o,
      output logic                     sw_valid_o,
      input logic                      sw_grant_i,
 
+     // timer packet request through user
      output logic                     tu_req_o
 );
 
-    // hold configuration data TODO: reduce size
-    logic [TRDB_CFG_SIZE-1:0] cfg_q, cfg_d;
 
-    // hold control status TODO: reduce size, careful look below too
+    // hold control status
     logic [TRDB_CTRL_SIZE-1:0] ctrl_q, ctrl_d;
+
+    // hold trace debugger status
+    logic [TRDB_STATUS_SIZE-1:0] status_q, status_d;
+
+    // hold trace debugger filter settings
+    logic [TRDB_FILTER_SIZE-1:0] filter_q, filter_d;
 
     // allow the user to write to this register to dump data through the trace
     // debugger
@@ -66,33 +83,34 @@ module trdb_reg
     logic [XLEN-1:0]       lower_addr_q, lower_addr_d;
 
 
+    // control reg outgoing signals
+    assign trace_enable_o = ctrl_q[TRDB_ENABLE];
+    assign trace_activated_o = ctrl_q[TRDB_TRACE_ACTIVATED];
+    assign clear_fifo_o = ctrl_q[TRDB_CLEAR_FIFO];
+    assign flush_stream_o = ctrl_q[TRDB_FLUSH_STREAM];
 
-    assign trace_enable_o = cfg_q[TRDB_ENABLE];
-    assign trace_activated_o = cfg_q[TRDB_TRACE_ACTIVATED];
-    assign apply_filters_o = cfg_q[TRDB_APPLY_FILTERS];
-    assign trace_selected_priv_o = cfg_q[TRDB_TRACE_SELECTED_PRIV];
-    assign trace_range_o = cfg_q[TRDB_TRACE_RANGE];
+    // status reg outgoing signals
+    assign apply_filters_o = filter_q[TRDB_APPLY_FILTERS];
+    assign trace_selected_priv_o = filter_q[TRDB_TRACE_PRIV];
+    assign trace_which_priv_o = filter_q[TRDB_WHICH_PRIV:TRDB_WHICH_PRIV-1];
+    assign trace_range_event_o = filter_q[TRDB_RANGE_EVENT];
+    assign trace_stop_event_o = filter_q[TRDB_STOP_EVENT];
 
-    //TODO: map this
-    assign trace_which_priv_o = '1;
-
+    // for range tracing
     assign trace_lower_addr_o = lower_addr_q;
     assign trace_higher_addr_o = higher_addr_q;
 
-    assign flush_stream_o = ctrl_q[TRDB_FLUSH_STREAM];
 
-    // enable all
-    // enable privilege tracing
-    // enable exception tracing
-    // TODO: read write logic fix
     always_comb begin: read_reg
         per_rdata_o = 32'h0;
         if(per_valid_i & ~per_we_i) begin
             case(per_addr_i)
-            REG_TRDB_CFG:
-                per_rdata_o = cfg_q;
             REG_TRDB_CTRL:
                 per_rdata_o = ctrl_q;
+            REG_TRDB_STATUS:
+                per_rdata_o = status_q;
+            REG_TRDB_FILTER:
+                per_rdata_o = filter_q;
             REG_TRDB_DUMP:
                 per_rdata_o = 32'h0;
             REG_TRDB_DUMP_WITH_TIME:
@@ -132,9 +150,18 @@ module trdb_reg
     // next cycle this is allowed
     assign per_ready_o = 1'b1;
 
+
+    // status from trace debugger
+    assign status_d[TRDB_QUALIFIED] = trace_qualified_i;
+    assign status_d[TRDB_PRIV_MATCH] = trace_priv_match_i;
+    assign status_d[TRDB_RANGE_MATCH] = trace_range_match_i;
+    assign status_d[TRDB_FIFO_OVERFLOW] = trace_fifo_overflow_i;
+    assign status_d[TRDB_EXTERNAL_FIFO_OVERFLOW] = external_fifo_overflow_i;
+
+    // register write logic
     always_comb begin: write_reg
-        cfg_d         = cfg_q;
         ctrl_d        = ctrl_q;
+        filter_d      = filter_q;
         dump_d        = dump_q;
         dump_valid_d  = '0;
         tu_req_o      = '0;
@@ -143,10 +170,12 @@ module trdb_reg
 
         if(per_valid_i & per_we_i) begin
             case (per_addr_i)
-            REG_TRDB_CFG:
-                cfg_d = per_wdata_i;
             REG_TRDB_CTRL:
                 ctrl_d = per_wdata_i;
+            REG_TRDB_STATUS: begin
+            end
+            REG_TRDB_FILTER:
+                filter_d = {per_wdata_i[6], 1'b0, per_wdata_i[4:0]};
             REG_TRDB_DUMP: begin
                 dump_d       = per_wdata_i;
                 dump_valid_d = '1;
@@ -161,27 +190,33 @@ module trdb_reg
             REG_TRDB_HIGHER_ADDR:
                 higher_addr_d = per_wdata_i;
             endcase
-        end else begin
-            if(flush_confirm_i) begin
-               // TODO: update this
-               // ctrl_d = {ctrl_q[31:1], 1'b0};
-               ctrl_d = {1'b0};
-            end
+        end
+
+        if(flush_confirm_i) begin
+            ctrl_d                    = ctrl_q;
+            ctrl_d[TRDB_FLUSH_STREAM] = 1'b0;
+        end
+
+        if(trace_req_deactivate_i) begin
+            ctrl_d                       = ctrl_q;
+            ctrl_d[TRDB_TRACE_ACTIVATED] = 1'b0;
         end
     end
 
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
-            cfg_q         <= 'h0;
             ctrl_q        <= 'h0;
+            status_q      <= 'h0;
+            filter_q      <= 'h0;
             dump_q        <= 'h0;
             dump_valid_q  <= 'h0;
             higher_addr_q <= 'h0;
             lower_addr_q  <= 'h0;
 
         end else begin
-            cfg_q         <= cfg_d;
             ctrl_q        <= ctrl_d;
+            status_q      <= status_d;
+            filter_q      <= filter_d;
             dump_q        <= dump_d;
             dump_valid_q  <= dump_valid_d;
             higher_addr_q <= higher_addr_d;

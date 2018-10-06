@@ -158,7 +158,7 @@ class Driver;
         apply_zero();
 
         // enable trace debugger
-        write_apb(REG_TRDB_CFG, 3);
+        write_apb(REG_TRDB_CTRL, 3);
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
@@ -190,7 +190,7 @@ class Driver;
 
         $display("[DRIVER] @%t: Flushing buffers.", $time);
         // write flush command to register
-        write_apb(REG_TRDB_CTRL, 1);
+        write_apb(REG_TRDB_CTRL, (1 << TRDB_FLUSH_STREAM | 3));
 
 
         $display("[DRIVER] @%t: Driver finished.", $time);

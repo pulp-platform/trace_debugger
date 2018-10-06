@@ -21,6 +21,7 @@ module trdb_filter
      (
      // this is manually controllable by the user
      input logic            trace_activated_i,
+     output logic           trace_req_deactivate_o,
 
      // whether to consider filters at all
      input logic            apply_filters_i,
@@ -31,15 +32,20 @@ module trdb_filter
      input logic [1:0]      priv_i,
 
      // trace specific address ranges
-     input logic            trace_range_i,
+     input logic            trace_range_event_i,
+     input logic            trace_stop_event_i,
      input logic [XLEN-1:0] trace_lower_addr_i,
      input logic [XLEN-1:0] trace_higher_addr_i,
      input logic [XLEN-1:0] iaddr_i,
+
+     output logic           trace_range_match_o,
+     output logic           trace_priv_match_o,
      output logic           trace_qualified_o);
 
     logic                   ip_in_range;
     logic                   priv_matching;
 
+    // ip in specified range
     always_comb begin: ip_range_check
         if(trace_lower_addr_i <= iaddr_i && iaddr_i < trace_higher_addr_i)
             ip_in_range = '1;
@@ -47,6 +53,13 @@ module trdb_filter
             ip_in_range = '0;
     end
 
+    // deactivate when ip lands in specified range
+    always_comb begin: stop_check
+        trace_req_deactivate_o = apply_filters_i && ip_in_range &&
+                                 trace_stop_event_i;
+    end
+
+    // privilege matching
     always_comb begin: priv_check
         // priv_matching = '0;
         // if(trace_priv_i == which_priv_i)
@@ -58,6 +71,8 @@ module trdb_filter
         priv_matching = '1;
     end
 
+    assign trace_range_match_o = ip_in_range;
+    assign trace_priv_match_o = priv_matching;
 
     always_comb begin
         trace_qualified_o = '0;
@@ -67,7 +82,7 @@ module trdb_filter
             trace_qualified_o = trace_activated_i;
         else
             trace_qualified_o = trace_activated_i &&
-                                (trace_range_i && ip_in_range) &&
+                                (trace_range_event_i && ip_in_range) &&
                                 priv_matching;
     end
 

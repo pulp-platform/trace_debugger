@@ -81,6 +81,8 @@ module trdb_stream_align8
         residual_d      = residual_q;
         offset_d        = offset_q;
 
+        high_ptr        = '0;
+
         flush_confirm_o = '0;
 
         if(valid_i) begin

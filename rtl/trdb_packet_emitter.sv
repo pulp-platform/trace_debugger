@@ -41,6 +41,10 @@ module trdb_packet_emitter
 
      output logic                  branch_map_flush_o,
 
+     // packet fifo control and status
+     input logic                   clear_fifo_i,
+     output logic                  fifo_overflow_o,
+
      // software packet generation request (dumping a write to stream)
      input logic                   sw_valid_i,
      input logic [XLEN-1:0]        sw_word_i,
@@ -234,7 +238,7 @@ module trdb_packet_emitter
     //TODO: request resync logic on nuked fifo
 
     assign clear_fifo = 1'b0;
-
+    assign fifo_overflow = ~packet_fifo_not_full;
 
     // this buffers our generated packet, since packets can be generated every
     // cycle, but we only read atmost 32 bit per cycle
