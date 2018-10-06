@@ -21,7 +21,7 @@
 typedef struct {
     unsigned int buffer_size;
     int dummy;
-    unsigned int conf_reg;
+    unsigned int ctrl_reg;
 } rt_trace_dbg_conf_t;
 
 typedef struct {

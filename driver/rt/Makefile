@@ -1,7 +1,7 @@
 PULP_APP = driver_example
 PULP_APP_FC_SRCS = driver_example.c rt_trace_debugger.c
 PULP_APP_HOST_SRCS = driver_example.c
-PULP_CFLAGS = -O1 -g -mnohwloop
+PULP_CFLAGS = -O3 -g -mnohwloop
 
 PULP_USER_CONFIG = $(CURDIR)/config.json
 override CONFIG_OPT += runner/peripherals=true

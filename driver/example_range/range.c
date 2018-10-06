@@ -32,8 +32,8 @@ int main()
     /* setup trace debugger configuration */
     rt_trace_dbg_conf_t trdb_conf;
     rt_trace_debugger_conf_init(&trdb_conf);
-    trdb_conf.buffer_size = 16;
-    trdb_conf.conf_reg = TRDB_ENABLE; /* enable clock */
+    trdb_conf.buffer_size = 28;
+    trdb_conf.ctrl_reg = TRDB_ENABLE; /* enable clock */
 
     /* and open it */
     rt_trace_dbg_t *trdb =
@@ -45,13 +45,15 @@ int main()
     /* configure range which we want to trace. We looked at the disassembly to
      * figure out the boundaries of trace_me().
      */
-    rt_trace_debugger_cfg(TRDB_LOWER_ADDR, 0x1c008ebe);
-    rt_trace_debugger_cfg(TRDB_HIGHER_ADDR, 0x1c008f02);
+    rt_trace_debugger_ctrl(TRDB_LOWER_ADDR, 0x1c008eca);
+    rt_trace_debugger_ctrl(TRDB_HIGHER_ADDR, 0x1c008f0c);
+
+    /* want to trace range */
+    rt_trace_debugger_ctrl(TRDB_REG_FILTER,
+			   TRDB_APPLY_FILTERS | TRDB_TRACE_RANGE_EVENT);
 
     /* enable tracing */
-    rt_trace_debugger_cfg(TRDB_REG_CFG, TRDB_ENABLE | TRDB_TRACE_ACTIVATED
-					    | TRDB_APPLY_FILTERS
-					    | TRDB_TRACE_RANGE);
+    rt_trace_debugger_ctrl(TRDB_REG_CTRL, TRDB_ENABLE | TRDB_TRACE_ACTIVATED);
 
     trace_me(0, 5);
     dont_trace_me(1, 2, 3);

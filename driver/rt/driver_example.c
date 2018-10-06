@@ -27,7 +27,7 @@ int main()
     /* Set maximum baudrate. Can actually be lower than
      * that depending on the best divider found
      */
-    spi_conf.max_baudrate = 1000000;
+    spi_conf.max_baudrate = 1000000000;
     /* SPI interface identifier as the Pulp chip can have
      * several interfaces
      */
@@ -43,8 +43,9 @@ int main()
     /* setup trace debugger configuration */
     rt_trace_dbg_conf_t trdb_conf;
     rt_trace_debugger_conf_init(&trdb_conf);
-    trdb_conf.buffer_size = 256;
-    trdb_conf.conf_reg =
+    /* trdb_conf.buffer_size = 4 * 32; */
+    trdb_conf.buffer_size = 4 * 32;
+    trdb_conf.ctrl_reg =
 	TRDB_ENABLE | TRDB_TRACE_ACTIVATED; /* enable clock and tracer*/
 
     /* and open it */
@@ -55,7 +56,7 @@ int main()
 	return -1;
     }
     /* dump some userdata through the traces */
-    rt_trace_debugger_userdata(0xdeadbeef);
+    /* rt_trace_debugger_userdata(0xdeadbeef); */
 
     /* Let's call some functions to generated some code */
     printf("Hello World!\n");
@@ -64,11 +65,9 @@ int main()
     printf("Memory TRACER RX: %x\n", UDMA_TRACER_RX_ADDR(0));
     printf("Whoami: %d\n", (is_fc()));
 
-
+    rt_trace_debugger_ctrl(TRDB_REG_CTRL, trdb_conf.ctrl_reg | TRDB_FLUSH);
     /* just loop for now */
-    printf("[TEST] looping\n");
-    while (test_runs > 0) {
-	test_runs--;
+    for (;;) {
 	rt_event_yield(NULL);
     }
     rt_trace_debugger_close(trdb, NULL);

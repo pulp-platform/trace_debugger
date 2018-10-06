@@ -67,7 +67,8 @@ void rt_trace_debugger_control(rt_trace_dbg_t *handle)
 
 
 /* TODO: this is just for testing, the API should be improved */
-void rt_trace_debugger_cfg(unsigned int addr, unsigned int value){
+void rt_trace_debugger_ctrl(unsigned int addr, unsigned int value)
+{
     write_reg_l2(addr, value);
 }
 
@@ -99,7 +100,8 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
     /* TODO: is it ok to hold onto this pointer?*/
     sched_i = sched;
 
-    if (rt_event_alloc(sched, 2))
+    /* TODO: really alloc enough events */
+    if (rt_event_alloc(sched_i, 10))
 	goto fail_event;
 
     rt_trace_dbg_t *tracer = rt_alloc(RT_ALLOC_FC_DATA, sizeof(rt_trace_dbg_t));
@@ -111,8 +113,9 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
     tracer->channel = 2 * ARCHI_UDMA_TRACER_ID(0);
     tracer->buffer_size = conf->buffer_size;
 
-    trace_buffs[0] = rt_alloc(RT_ALLOC_PERIPH, buffer_size);
-    trace_buffs[1] = rt_alloc(RT_ALLOC_PERIPH, buffer_size);
+    /* spi needs 4 byte alignment */
+    trace_buffs[0] = rt_alloc_align(RT_ALLOC_PERIPH, buffer_size, 4);
+    trace_buffs[1] = rt_alloc_align(RT_ALLOC_PERIPH, buffer_size, 4);
     if (!trace_buffs[0] || !trace_buffs[1]) {
 	rt_error("[TRDB] failed to allocate memory for double buffers\n");
 	goto fail_alloc_periph;
@@ -129,13 +132,15 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
     rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0),
 		   (unsigned int)trace_buffs[0], buffer_size, 0,
 		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)0));
-    rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0),
-		   (unsigned int)trace_buffs[1], buffer_size, 0,
-		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)1));
+    /* rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0), */
+    /* 		   (unsigned int)trace_buffs[1], buffer_size, 0, */
+    /* 		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)1));
+     */
 
     /* This applies some desired intial settings */
-    write_reg_l2(TRDB_REG_CFG, conf->conf_reg);
+    write_reg_l2(TRDB_REG_CTRL, conf->ctrl_reg);
 
+    rt_irq_restore(irq);
     return tracer;
 
 fail_alloc_periph:
@@ -156,7 +161,7 @@ fail_event:
 void rt_trace_debugger_close(rt_trace_dbg_t *handle, rt_event_t *event)
 {
     rt_trace(RT_TRACE_DEV_CTRL, "[TRDB] closing trace debugger\n");
-    write_reg_l2(TRDB_REG_CFG, TRDB_DISABLE);
+    write_reg_l2(TRDB_REG_CTRL, TRDB_DISABLE);
     /* TODO: don't know what to do with event */
     if (!handle)
 	rt_free(RT_ALLOC_FC_DATA, handle, sizeof(rt_trace_dbg_t));
@@ -172,28 +177,28 @@ void rt_trace_debugger_close(rt_trace_dbg_t *handle, rt_event_t *event)
     return;
 }
 
-
+int buffer_full[2] = {0};
 /* ensure continous transfer */
 void __rt_trace_debugger_eot(void *arg)
 {
     int index = (int)arg;
 
-    rt_trace(RT_TRACE_DEV_CTRL,
-	     "[TRDB] end of transfer, re-enqueue buffer: %d\n", index);
-
-    rt_spim_send_qspi(trdb_spi, trace_buffs[(int)arg], buffer_size * 8,
+    buffer_full[index] = 1;
+    rt_spim_send_qspi(trdb_spi, trace_buffs[index], buffer_size * 8,
 		      RT_SPIM_CS_AUTO,
 		      rt_event_get(sched_i, __rt_spim_eot, (void *)index));
-    /* rt_periph_copy( */
-    /* 	NULL, 2 * ARCHI_UDMA_TRACER_ID(0), (unsigned int)trace_buffs[index], */
-    /* 	buffer_size, 0, */
-    /* 	rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)index)); */
+    printf("trdb: buffer %d is %d\n", index, buffer_full[index]);
+    /* queue for other buffer*/
+    rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0),
+		   (unsigned int)trace_buffs[(index + 1) % 2], buffer_size, 0,
+		   rt_event_get(sched_i, __rt_trace_debugger_eot,
+				(void *)((index + 1) % 2)));
 }
 
 void __rt_spim_eot(void *arg)
 {
-    rt_trace(RT_TRACE_DEV_CTRl, "[TRDB] spi end of transfer of buffer: %d\n",
-	     (int)arg);
+    buffer_full[(int)arg] = 0;
+    printf("spim: buffer %d is %d\n", (int)arg, buffer_full[(int)arg]);
 }
 
 /* TODO: make this inline or a macro */
