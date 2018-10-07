@@ -52,6 +52,10 @@ MORE_TAG_PATHS  = $(PULP_BINUTILS_PATH)/bfd
 LDFLAGS		= $(addprefix -L, $(LIB_PATHS))
 LDLIBS		= -l:libbfd.a -l:libopcodes.a -l:libiberty.a -l:libz.a -ldl
 
+HEADERS 	= $(wildcard *.h)
+HEADERS 	+= $(wildcard lib/bfd/*.h)
+HEADERS 	+= $(wildcard lib/include/*.h)
+
 MAIN_SRCS	= $(wildcard main/*.c)
 MAIN_OBJS	= $(MAIN_SRCS:.c=.o)
 
@@ -69,6 +73,7 @@ BIN		= trdb
 TEST_BIN	= tests
 # golden model lib for simulator
 GMLIB		= libtrdb
+STATIC_LIB  = libtrdb.a
 
 
 CTAGS		= ctags
@@ -85,6 +90,17 @@ debug: all
 
 lib: CFLAGS += -fPIC
 lib: $(GMLIB).so
+
+static_lib: CFLAGS += -fPIC
+static_lib: $(STATIC_LIB)
+
+static_lib_install:
+	install -D lib/bfd/libbfd.a $(INSTALL_DIR)/lib
+	install -D lib/libiberty/libiberty.a $(INSTALL_DIR)/lib
+	install -D lib/zlib/libz.a $(INSTALL_DIR)/lib
+	install -D lib/opcodes/libopcodes.a $(INSTALL_DIR)/lib
+	install -D $(STATIC_LIB) $(INSTALL_DIR)/lib
+	install -D $(HEADERS) $(INSTALL_DIR)/include
 
 .PHONY: install
 install: all
@@ -104,6 +120,9 @@ $(BIN): $(OBJS) $(MAIN_OBJS)
 
 $(TEST_BIN): $(OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)
+
+$(STATIC_LIB): $(OBJS)
+	$(AR) -r $@ $(OBJS)
 
 $(GMLIB).so: $(OBJS) $(DPI_OBJS)
 #	gcc -o $(GMLIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)

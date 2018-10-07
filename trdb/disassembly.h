@@ -325,7 +325,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf);
  * @param data raw data block to disassemble
  * @param dunit disassembly context
  */
-void disassemble_block(size_t len, bfd_byte data[len],
+void disassemble_block(size_t len, bfd_byte *data,
                        struct disassembler_unit *dunit);
 
 /**
