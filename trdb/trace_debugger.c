@@ -1045,9 +1045,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             last_packet = NULL;
         }
 
-	/* we ignore unknown or unused packets (TIMER, SW) */
-	if(packet->msg_type != W_TRACE)
-	    continue;
+        /* we ignore unknown or unused packets (TIMER, SW) */
+        if (packet->msg_type != W_TRACE)
+            continue;
 
         /* Sometimes we leave the current section (e.g. changing from
          * the .start to the .text section), so let's load the
@@ -1540,7 +1540,8 @@ union pack {
                        */
 };
 
-/* bin must be an all zeros array */
+
+/* pulp specific packet serialization TODO: rename to pulp*/
 int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                           size_t *bitcnt, uint8_t align, uint8_t bin[])
 {
@@ -1554,24 +1555,34 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     }
 
     union pack data = {0};
+    /* We put the number of bytes (without header) as the packet length.
+     * The PULPPKTLEN, and both FORMATLEN are considered the header
+     */
+    uint32_t bits_without_header = packet->length - 2 * FORMATLEN;
+    uint32_t byte_len =
+        bits_without_header / 8 + (bits_without_header % 8 != 0);
+    if (byte_len >= 16) { // TODO: replace with pow or mask
+        err(c, "bad packet length\n");
+        return -1;
+    }
 
     switch (packet->format) {
     case F_BRANCH_FULL: {
         uint32_t len = branch_map_len(packet->branches);
 
         /* we need enough space to do the packing it in uint128 */
-        assert(128 > PACKETLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
+        assert(128 > PULPPKTLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
         /* TODO: assert branch map to overfull */
         /* TODO: branch map full logic handling */
         /* TODO: for now we put the address always */
         data.bits =
-            (packet->length) | (packet->msg_type << PACKETLEN)
-            | (packet->format << (PACKETLEN + MSGTYPELEN))
-            | (packet->branches << (PACKETLEN + MSGTYPELEN + FORMATLEN));
+            byte_len | (packet->msg_type << PULPPKTLEN)
+            | (packet->format << (PULPPKTLEN + MSGTYPELEN))
+            | (packet->branches << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
         data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len))
-                     << (PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN);
+                     << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN);
 
-        *bitcnt = PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len;
+        *bitcnt = PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len;
 
         /* if we have a full branch we don't necessarily need to emit address */
         if ((packet->branches == 31
@@ -1579,7 +1590,7 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
             || packet->branches < 31) {
             data.bits |=
                 ((__uint128_t)packet->address
-                 << (PACKETLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
+                 << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
             *bitcnt += XLEN;
         }
         data.bits <<= align;
@@ -1595,13 +1606,13 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         return -1;
 
     case F_ADDR_ONLY:
-        assert(128 > PACKETLEN + MSGTYPELEN + FORMATLEN + XLEN);
-        data.bits = (packet->length) | (packet->msg_type << PACKETLEN)
-                    | (packet->format << (PACKETLEN + MSGTYPELEN))
+        assert(128 > PULPPKTLEN + MSGTYPELEN + FORMATLEN + XLEN);
+        data.bits = byte_len | (packet->msg_type << PULPPKTLEN)
+                    | (packet->format << (PULPPKTLEN + MSGTYPELEN))
                     | ((__uint128_t)packet->address
-                       << (PACKETLEN + MSGTYPELEN + FORMATLEN));
+                       << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
 
-        *bitcnt = PACKETLEN + MSGTYPELEN + FORMATLEN + XLEN;
+        *bitcnt = PULPPKTLEN + MSGTYPELEN + FORMATLEN + XLEN;
 
         data.bits <<= align;
         memcpy(bin, data.bin,
@@ -1611,21 +1622,21 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     case F_SYNC:
         assert(PRIVLEN == 3);
         /* check for enough space to the packing */
-        assert(128 > PACKETLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1);
+        assert(128 > PULPPKTLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1);
         /* TODO: for now we ignore the context field since we have
          * only one hart
          */
 
         /* common part to all sub formats */
         data.bits =
-            (packet->length) | (packet->msg_type << PACKETLEN)
-            | (packet->format << (PACKETLEN + MSGTYPELEN))
-            | (packet->subformat << (PACKETLEN + MSGTYPELEN + FORMATLEN))
-            | (packet->privilege << (PACKETLEN + MSGTYPELEN + 2 * FORMATLEN));
-        *bitcnt = PACKETLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
+            byte_len | (packet->msg_type << PULPPKTLEN)
+            | (packet->format << (PULPPKTLEN + MSGTYPELEN))
+            | (packet->subformat << (PULPPKTLEN + MSGTYPELEN + FORMATLEN))
+            | (packet->privilege << (PULPPKTLEN + MSGTYPELEN + 2 * FORMATLEN));
+        *bitcnt = PULPPKTLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
 
         /* to reduce repetition */
-        uint32_t suboffset = PACKETLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
+        uint32_t suboffset = PULPPKTLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
         switch (packet->subformat) {
         case SF_START:
             data.bits |= ((__uint128_t)packet->branch << suboffset)
@@ -1642,7 +1653,7 @@ int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                    << (suboffset + 1 + XLEN + CAUSELEN));
             // going to be zero anyway in our case
             //  | ((__uint128_t)packet->tval
-            //   << (PACKETLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1));
+            //   << (PULPPKTLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1));
             *bitcnt += (1 + XLEN + CAUSELEN + 1);
             break;
 

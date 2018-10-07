@@ -111,9 +111,9 @@ class Scoreboard;
 
     // generated the response for the sw dump writes TODO: a bit hacky
     task generate_sw_dump();
-        logic [6:0] len;
+        logic [3:0] len;
         logic [1:0] msgtype;
-        len     = 34;
+        len     = 4; // payload bytes after first byte
         msgtype = W_SOFTWARE;
 
         add_packet({32'ha0a0a0a0, msgtype,len});

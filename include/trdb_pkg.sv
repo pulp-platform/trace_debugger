@@ -24,7 +24,8 @@ parameter CAUSELEN = 5;
 parameter CONTEXTLEN = 32; //TODO: currently not used
 parameter PACKET_LEN = 80; //TODO: careful double check that
 parameter PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
-parameter PACKET_TOTAL = PACKET_LEN + PACKET_HEADER_LEN;
+parameter PACKET_BYTE_HEADER_LEN = 4;
+parameter PACKET_TOTAL = PACKET_LEN + PACKET_BYTE_HEADER_LEN;
 
 parameter PACKET_BUFFER_STAGES = 4;
 parameter SOFTWARE_BUFFER_STAGES = 2;

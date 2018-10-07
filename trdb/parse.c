@@ -65,7 +65,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     }
 
     /* read packet length it bits (including header) */
-    uint8_t len = (header & MASK_FROM(PACKETLEN)) + PACKETLEN;
+    uint8_t len = (header & MASK_FROM(PULPPKTLEN))*8 + 8;
     payload.bin[0] = header;
     /* compute how many bytes that is */
     uint32_t byte_len = len / 8 + (len % 8 != 0 ? 1 : 0);
@@ -85,8 +85,9 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     /* make sure we start from a good state */
     *packet = (struct tr_packet){0};
 
-    packet->length = payload.bits & MASK_FROM(PACKETLEN);
-    packet->msg_type = (payload.bits >>= PACKETLEN) & MASK_FROM(MSGTYPELEN);
+    /* approxmation in multiple of 8*/
+    packet->length = header & MASK_FROM(PULPPKTLEN) * 8;
+    packet->msg_type = (payload.bits >>= PULPPKTLEN) & MASK_FROM(MSGTYPELEN);
 
     switch (packet->msg_type) {
     /* we are dealing with a regular trace packet */

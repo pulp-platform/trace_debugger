@@ -40,6 +40,7 @@
 
 /* custom header */
 #define PACKETLEN 7
+#define PULPPKTLEN 4
 #define MSGTYPELEN 2
 
 /* given header */
