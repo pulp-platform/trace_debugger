@@ -381,12 +381,61 @@ static bool is_unsupported(uint32_t instr)
 }
 
 
+static uint32_t sign_extendable_bits(uint32_t addr)
+{
+    int clz = __builtin_clz(addr);
+    int clo = __builtin_clz(~addr);
+    return clz > clo ? clz : clo;
+}
 /* Sometimes we have to decide whether to put in the absolute or differential
  * address into the packet. We choose the one which has the least amount of
  * meaningfull bits, i.e. the bits that can't be inferred by sign-extension.
  */
 static bool differential_addr(int *lead, uint32_t absolute,
                               uint32_t differential)
+{
+    int abs = sign_extendable_bits(absolute);
+    int diff = sign_extendable_bits(differential);
+
+    /* /\* on tie we probe which one would be better *\/ */
+    /* if ((abs == 32) && (diff == 32)) { */
+    /*     if ((abs & 1) == last) { */
+    /*         *lead = 0; */
+    /*         return prefer_abs; */
+    /*     } else if ((diff & 1) == last) { */
+    /*         *lead = 0; */
+    /*         return prefer_diff; */
+    /*     } else { */
+    /*         *lead = 1; */
+    /*         return prefer_abs; */
+    /*     } */
+    /* } */
+
+    /* /\* check if we can sign extend from the previous byte *\/ */
+    /* if (abs == 32) { */
+    /*     if ((abs & 1) == last_bit) */
+    /*         *lead = 0; */
+    /*     else */
+    /*         *lead = 1; */
+    /*     return prefer_abs; */
+    /* } */
+
+    /* if (diff == 32) { */
+    /*     if ((diff & 1) == last_bit) */
+    /*         *lead = 0; */
+    /*     else */
+    /*         *lead = 1; */
+    /*     return prefer_diff; */
+    /* } */
+
+    /* general case */
+    *lead = diff > abs ? diff : abs;
+    return diff > abs; /* on tie we prefer absolute */
+}
+
+/* */
+static bool pulp_differential_addr(uint8_t *lead, uint32_t absolute,
+                                   uint32_t differential, uint8_t last_bit)
 {
     int aclz = __builtin_clz(absolute);
     int aclo = __builtin_clz(~absolute);
@@ -395,8 +444,49 @@ static bool differential_addr(int *lead, uint32_t absolute,
 
     int abs = aclz > aclo ? aclz : aclo;
     int diff = dclz > dclo ? dclz : dclo;
-    *lead = diff > abs ? diff : abs;
-    return diff > abs;
+
+    bool prefer_diff = true;
+    bool prefer_abs = false;
+
+    /* we are only interested in sign extension for byte boundaries */
+    abs = (abs / 8) * 8;
+    diff = (diff / 8) * 8;
+
+
+    /* on tie we probe which one would be better */
+    if ((abs == 32) && (diff == 32)) {
+        if ((abs & 1) == last_bit) {
+            *lead = 0;
+            return prefer_abs;
+        } else if ((diff & 1) == last_bit) {
+            *lead = 0;
+            return prefer_diff;
+        } else {
+            *lead = 8;
+            return prefer_abs;
+        }
+    }
+
+    /* check if we can sign extend from the previous byte */
+    if (abs == 32) {
+        if ((abs & 1) == last_bit)
+            *lead = 0;
+        else
+            *lead = 8;
+        return prefer_abs;
+    }
+
+    if (diff == 32) {
+        if ((diff & 1) == last_bit)
+            *lead = 0;
+        else
+            *lead = 8;
+        return prefer_diff;
+    }
+
+    /* general case */
+    *lead = diff > abs ? 32 - diff : 32 - abs;
+    return diff > abs; /* on tie we prefer absolute */
 }
 
 
@@ -449,6 +539,21 @@ static void emit_start_packet(struct tr_packet *tr, struct tr_instr *tc_instr,
 }
 
 
+static uint32_t sext32(uint32_t val, uint32_t bit)
+{
+    if (bit == 0)
+        return 0;
+
+    if (bit == 32)
+        return val;
+
+    int m = 1U << (bit - 1);
+
+    val = val & ((1U << bit) - 1);
+    return (val ^ m) - m;
+}
+
+
 static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                                         struct tr_packet *tr,
                                         struct branch_map_state *branch_map,
@@ -460,12 +565,15 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
         tr->format = F_ADDR_ONLY;
         if (full_address) {
             tr->address = tc_instr->iaddr;
+            tr->length = MSGTYPELEN + FORMATLEN + XLEN;
         } else {
             /* always differential in F_ADDR_ONLY*/
-            tr->address = last_iaddr - tc_instr->iaddr;
+            uint32_t diff = last_iaddr - tc_instr->iaddr;
+            uint32_t lead = sign_extendable_bits(diff);
+            uint32_t keep = XLEN - lead + 1;
+            tr->address = MASK_FROM(keep) & diff;
+            tr->length = MSGTYPELEN + FORMATLEN + keep;
         }
-        /* TODO: compress length with differential */
-        tr->length = MSGTYPELEN + FORMATLEN + XLEN;
         assert(branch_map->bits == 0);
     } else {
         if (branch_map->full && is_u_discontinuity)
@@ -491,28 +599,31 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
              */
             uint32_t diff = last_iaddr - tc_instr->iaddr;
             uint32_t full = tc_instr->iaddr;
+            uint32_t keep = 0;
             int lead = 0;
+
             if (differential_addr(&lead, full, diff)) {
+                keep = XLEN - lead + 1;
                 tr->format = F_BRANCH_DIFF;
-                tr->address = diff;
+                tr->address = MASK_FROM(keep) & diff;
             } else {
+                keep = XLEN - lead + 1;
                 tr->format = F_BRANCH_FULL;
-                tr->address = full;
+                tr->address = MASK_FROM(keep) & full;
             }
             tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
                          + branch_map_len(branch_map->cnt);
             if (branch_map->full) {
                 if (is_u_discontinuity)
-                    tr->length += XLEN;
+                    tr->length += keep;
                 else
                     tr->length += 0;
             } else {
-                tr->length += XLEN;
+                tr->length += keep;
             }
         }
         tr->branches = branch_map->cnt;
         tr->branch_map = branch_map->bits;
-        /* TODO: compress length with differential */
         *branch_map = (struct branch_map_state){0};
     }
 
@@ -785,7 +896,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     ctx->stats.instrs++;
     if (generated_packet) {
         *branch_map = (struct branch_map_state){0};
-        ctx->stats.packetbits += tr->length;
+        ctx->stats.packetbits += (tr->length - MSGTYPELEN);
         ctx->stats.packets++;
     }
 
@@ -1090,11 +1201,6 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         }
 
         if (packet->format == F_BRANCH_FULL) {
-            /* We have to find the instruction where we can apply the address
-             * information to. This might either be a discontinuity infromation
-             * or a sync up address. The search_discontinuity
-             * variable tells us which one is it
-             */
             bool hit_address = false; /* TODO: for now we don't allow
                                        * resync packets, see todo.org
                                        */
@@ -1109,12 +1215,23 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * address field
              * TODO: edgecase where we sign extend from msb of branchmap
              */
-            if ((dec_ctx.branch_map.full
-                 && (packet->length
-                     > MSGTYPELEN + FORMATLEN + BRANCHLEN
-                           + branch_map_len(dec_ctx.branch_map.cnt)))
+            uint32_t lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN
+                                      + branch_map_len(dec_ctx.branch_map.cnt);
+            /* TODO: test with sext bit  = 0 etc */
+            /* TODO: does this initialization make sense? */
+            uint32_t sext_addr = packet->address;
+            if (c->config.full_address) {
+                sext_addr = packet->address;
+            } else {
+                sext_addr =
+                    sext32(packet->address, packet->length - lower_boundary);
+            }
+
+            uint32_t absolute_addr = sext_addr;
+
+            if ((dec_ctx.branch_map.full && (packet->length > lower_boundary))
                 || !dec_ctx.branch_map.full) {
-                dec_ctx.last_packet_addr = packet->address;
+                dec_ctx.last_packet_addr = absolute_addr;
             }
 
 
@@ -1127,7 +1244,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 if (status != 0)
                     goto fail;
 
-                if (dec_ctx.branch_map.cnt == 0 && pc == packet->address)
+                /* TODO: test if packet addr valid first */
+                if (dec_ctx.branch_map.cnt == 0 && pc == absolute_addr)
                     hit_address = true;
 
                 dis_instr.priv = dec_ctx.privilege;
@@ -1167,12 +1285,12 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                                 "(branch following discontinuity is included in this "
                                 "packet)\n");
                             /* TODO: should I poison addr? */
-                            pc = packet->address;
+                            pc = absolute_addr;
                         } else {
                             info(
                                 c,
                                 "We hit the full branch_map + address edge case\n");
-                            pc = packet->address;
+                            pc = absolute_addr;
                         }
                         hit_discontinuity = true;
                     } else if (dec_ctx.branch_map.cnt > 0
@@ -1185,7 +1303,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         /* we finally hit a jump with unknown  destination,
                          * thus the information in this packet  is used up
                          */
-                        pc = packet->address;
+                        pc = absolute_addr;
                         hit_discontinuity = true;
                         info(c, "Found the discontinuity\n");
                     }
@@ -1235,7 +1353,17 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              */
             bool hit_discontinuity = dec_ctx.branch_map.full;
 
-            uint32_t absolute_addr = dec_ctx.last_packet_addr - packet->address;
+            /* bits until address field */
+            uint32_t lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN
+                                      + branch_map_len(dec_ctx.branch_map.cnt);
+
+            uint32_t sext_addr =
+                sext32(packet->address, packet->length - lower_boundary);
+
+
+            /* uint32_t absolute_addr = dec_ctx.last_packet_addr -
+             * packet->address; */
+            uint32_t absolute_addr = dec_ctx.last_packet_addr - sext_addr;
 
             dbg(c,
                 "F_BRANCH_DIFF resolved address:%" PRIx32 " from %" PRIx32
@@ -1247,10 +1375,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * address field
              * TODO: edgecase where we sign extend from msb of branchmap
              */
-            if ((dec_ctx.branch_map.full
-                 && (packet->length
-                     > MSGTYPELEN + FORMATLEN + BRANCHLEN
-                           + branch_map_len(dec_ctx.branch_map.cnt)))
+            if ((dec_ctx.branch_map.full && (packet->length > lower_boundary))
                 || !dec_ctx.branch_map.full)
                 dec_ctx.last_packet_addr = absolute_addr;
 
@@ -1450,10 +1575,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             bool hit_discontinuity = false;
 
             uint32_t absolute_addr;
-            if (c->config.full_address)
+            if (c->config.full_address) {
                 absolute_addr = packet->address;
-            else
-                absolute_addr = dec_ctx.last_packet_addr - packet->address;
+            } else {
+                uint32_t sext_addr = sext32(
+                    packet->address, packet->length - MSGTYPELEN - FORMATLEN);
+                absolute_addr = dec_ctx.last_packet_addr - sext_addr;
+            }
 
             dbg(c,
                 "F_ADDR_ONLY resolved address:%" PRIx32 " from %" PRIx32
