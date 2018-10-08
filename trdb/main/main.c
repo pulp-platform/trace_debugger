@@ -35,7 +35,7 @@
 #include "../list.h"
 #include "../trace_debugger.h"
 #include "../disassembly.h"
-#include "../parse.h"
+#include "../serialize.h"
 
 #define TRDB_NUM_ARGS 1
 

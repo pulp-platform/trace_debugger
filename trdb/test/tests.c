@@ -35,8 +35,8 @@
 #include "../disassembly.c"
 #include "../utils.h"
 #include "../utils.c"
-#include "../parse.h"
-#include "../parse.c"
+#include "../serialize.h"
+#include "../serialize.c"
 
 #define TRDB_SUCCESS 0
 #define TRDB_FAIL -1
@@ -214,7 +214,7 @@ static int test_trdb_serialize_packet(uint32_t shift)
     }
 
     size_t bitcnt = 0;
-    if (trdb_serialize_packet(c, &packet, &bitcnt, shift, bin)) {
+    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, shift, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -241,7 +241,7 @@ static int test_trdb_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -263,7 +263,7 @@ static int test_trdb_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -290,7 +290,7 @@ static int test_trdb_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }
@@ -321,7 +321,7 @@ static int test_trdb_serialize_packet(uint32_t shift)
     memset(bin, 0, sizeof(struct tr_packet));
     bitcnt = 0;
 
-    if (trdb_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
+    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
         LOG_ERRT("Packet conversion failed\n");
         status = TRDB_FAIL;
     }

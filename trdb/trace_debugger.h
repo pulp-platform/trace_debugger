@@ -134,12 +134,22 @@ struct tr_packet {
     struct list_head list; /**< used to make a linked list of tr_packet */
 };
 
-
-/* for type punning */
+/* For type punning.
+ * It's pretty annoying to pack our packets tightly, since our packet members
+ * are not 8 bit aligned. We assure that each packet is smaller that 128 bits,
+ * pack all packet members into a 128 bit integer and read it out to bytes
+ * through the union. Since uint8_t doesn't count as a char the compiler assumes
+ * a uint8_t pointer can't alias a __uint128_t, thus the union. Or we could use
+ * -fno-strict-aliasing.
+ */
 union trdb_pack {
-    __uint128_t bits;
-    uint8_t bin[16];
+    __uint128_t bits; /* non-portable gcc stuff. TODO: fix */
+    uint8_t bin[16];  /* since uint8_t =/= char strict aliasing might
+                       * mess your shit up. Careful this is also
+                       * endian dependent
+                       */
 };
+
 
 /**
  * Library/trace debugger context, needs to be hold by program and passed to
@@ -347,38 +357,6 @@ void trdb_free_packet_list(struct list_head *packet_list);
  * @param instr_list list to free
  */
 void trdb_free_instr_list(struct list_head *instr_list);
-
-
-/**
- * Packs the @p packet into an array @p bin, aligned by @p align and writes the
- * packet length in bits into @p bitcnt. This function is specific to the PULP
- * platform since it omits certain fields such as "context", which are always
- * set to zero.
- *
- * @param c a trace debugger context
- * @param packet the data to serialize
- * @param bitcnt written with the number of bits in @p packet
- * @param align alignment of packet bits in @p bin, larger or equal to zero and
- * smaller than eight.
- * @param bin the array where the packet bits will be written into
- * @return 0 on success, -1 on failure
- */
-int trdb_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
-                          size_t *bitcnt, uint8_t align, uint8_t bin[]);
-
-/**
- * Write a list of tr_packets to a file located at @p path.
- *
- * This function calls trdb_serialize_packet() to tightly align the packets,
- * which can have a non-power-of-two size.
- *
- * @param c the context/state of the trace debugger
- * @param path where the file is located at
- * @param packet_list list of packets to write
- * @return -1 on failure and 0 on success
- */
-int trdb_write_packets(struct trdb_ctx *c, const char *path,
-                       struct list_head *packet_list);
 
 /**
  * Read a stimuli file at @p path into a list of tr_instr. This function

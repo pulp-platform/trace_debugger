@@ -18,13 +18,32 @@
  */
 
 /**
- * @file parse.h
+ * @file serialize.h
  * @author Robert Balas (balasr@student.ethz.ch)
  * @date 25 Sep 2018
  * @brief Read binary data into packets
  */
 
 #include "trace_debugger.h"
+
+
+/**
+ * Packs the @p packet into an array @p bin, aligned by @p align and writes the
+ * packet length in bits into @p bitcnt. This function is specific to the PULP
+ * platform since it omits certain fields such as "context", which are always
+ * set to zero.
+ *
+ * @param c a trace debugger context
+ * @param packet the data to serialize
+ * @param bitcnt written with the number of bits in @p packet
+ * @param align alignment of packet bits in @p bin, larger or equal to zero and
+ * smaller than eight.
+ * @param bin the array where the packet bits will be written into
+ * @return 0 on success, -1 on failure
+ */
+int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
+                               size_t *bitcnt, uint8_t align, uint8_t bin[]);
+
 
 /**
  * Read a packet from @p fp stored in the PULP binary format.
@@ -60,3 +79,17 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
  */
 int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                   FILE *fp);
+
+/**
+ * Write a list of tr_packets to a file located at @p path.
+ *
+ * This function calls trdb_serialize_packet() to tightly align the packets,
+ * which can have a non-power-of-two size.
+ *
+ * @param c the context/state of the trace debugger
+ * @param path where the file is located at
+ * @param packet_list list of packets to write
+ * @return -1 on failure and 0 on success
+ */
+int trdb_write_packets(struct trdb_ctx *c, const char *path,
+                       struct list_head *packet_list);

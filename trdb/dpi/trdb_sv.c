@@ -32,6 +32,7 @@
 #include "trdb_sv.h"
 #include "../utils.h"
 #include "../trace_debugger.h"
+#include "../serialize.h"
 
 LIST_HEAD(packets);
 
@@ -113,7 +114,7 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
     if (p == -1)
         err(ctx, "compression step failed\n");
     if (p == 1) {
-        if (trdb_serialize_packet(ctx, latest_packet, &bitcnt, 0, buff)) {
+        if (trdb_pulp_serialize_packet(ctx, latest_packet, &bitcnt, 0, buff)) {
             err(ctx, "failed to serialize packet, continuing...\n");
         }
         packetcnt++;
