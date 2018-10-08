@@ -55,6 +55,10 @@ struct trdb_config {
      * decompression and compression
      */
     bool full_address;
+    /* do the sign extension of addresses like PULP. Only relevant if
+     * full_address = false
+     */
+    bool use_pulp_sext;
 
     /* TODO: move this */
     /* set to true to always diassemble to most general representation */
@@ -156,6 +160,7 @@ struct trdb_stats {
     size_t instrbits;
     size_t instrs;
     size_t packets;
+    uint32_t sext_bits[32];
 };
 
 
@@ -433,59 +438,50 @@ static bool differential_addr(int *lead, uint32_t absolute,
     return diff > abs; /* on tie we prefer absolute */
 }
 
-/* */
-static bool pulp_differential_addr(uint8_t *lead, uint32_t absolute,
-                                   uint32_t differential, uint8_t last_bit)
+
+/* Does the same as differential_addr() but only considers byte boundaries */
+static bool pulp_differential_addr(int *lead, uint32_t absolute,
+                                   uint32_t differential)
 {
-    int aclz = __builtin_clz(absolute);
-    int aclo = __builtin_clz(~absolute);
-    int dclz = __builtin_clz(differential);
-    int dclo = __builtin_clz(~differential);
+    int abs = sign_extendable_bits(absolute);
+    int diff = sign_extendable_bits(differential);
 
-    int abs = aclz > aclo ? aclz : aclo;
-    int diff = dclz > dclo ? dclz : dclo;
+    /* /\* on tie we probe which one would be better *\/ */
+    /* if ((abs == 32) && (diff == 32)) { */
+    /*     if ((abs & 1) == last) { */
+    /*         *lead = 0; */
+    /*         return prefer_abs; */
+    /*     } else if ((diff & 1) == last) { */
+    /*         *lead = 0; */
+    /*         return prefer_diff; */
+    /*     } else { */
+    /*         *lead = 1; */
+    /*         return prefer_abs; */
+    /*     } */
+    /* } */
 
-    bool prefer_diff = true;
-    bool prefer_abs = false;
+    /* /\* check if we can sign extend from the previous byte *\/ */
+    /* if (abs == 32) { */
+    /*     if ((abs & 1) == last_bit) */
+    /*         *lead = 0; */
+    /*     else */
+    /*         *lead = 1; */
+    /*     return prefer_abs; */
+    /* } */
 
+    /* if (diff == 32) { */
+    /*     if ((diff & 1) == last_bit) */
+    /*         *lead = 0; */
+    /*     else */
+    /*         *lead = 1; */
+    /*     return prefer_diff; */
+    /* } */
     /* we are only interested in sign extension for byte boundaries */
     abs = (abs / 8) * 8;
     diff = (diff / 8) * 8;
 
-
-    /* on tie we probe which one would be better */
-    if ((abs == 32) && (diff == 32)) {
-        if ((abs & 1) == last_bit) {
-            *lead = 0;
-            return prefer_abs;
-        } else if ((diff & 1) == last_bit) {
-            *lead = 0;
-            return prefer_diff;
-        } else {
-            *lead = 8;
-            return prefer_abs;
-        }
-    }
-
-    /* check if we can sign extend from the previous byte */
-    if (abs == 32) {
-        if ((abs & 1) == last_bit)
-            *lead = 0;
-        else
-            *lead = 8;
-        return prefer_abs;
-    }
-
-    if (diff == 32) {
-        if ((diff & 1) == last_bit)
-            *lead = 0;
-        else
-            *lead = 8;
-        return prefer_diff;
-    }
-
     /* general case */
-    *lead = diff > abs ? 32 - diff : 32 - abs;
+    *lead = diff > abs ? diff : abs;
     return diff > abs; /* on tie we prefer absolute */
 }
 
@@ -569,10 +565,15 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
         } else {
             /* always differential in F_ADDR_ONLY*/
             uint32_t diff = last_iaddr - tc_instr->iaddr;
-            uint32_t lead = sign_extendable_bits(diff);
+            uint32_t lead = ctx->config.use_pulp_sext
+                                ? (sign_extendable_bits(diff) / 8) * 8
+                                : sign_extendable_bits(diff);
+
             uint32_t keep = XLEN - lead + 1;
             tr->address = MASK_FROM(keep) & diff;
             tr->length = MSGTYPELEN + FORMATLEN + keep;
+            /* record distribution */
+            ctx->stats.sext_bits[keep - 1]++;
         }
         assert(branch_map->bits == 0);
     } else {
@@ -601,15 +602,21 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             uint32_t full = tc_instr->iaddr;
             uint32_t keep = 0;
             int lead = 0;
+            bool use_differential =
+                ctx->config.use_pulp_sext
+                    ? pulp_differential_addr(&lead, full, diff)
+                    : differential_addr(&lead, full, diff);
 
-            if (differential_addr(&lead, full, diff)) {
+            if (use_differential) {
                 keep = XLEN - lead + 1;
                 tr->format = F_BRANCH_DIFF;
                 tr->address = MASK_FROM(keep) & diff;
+                ctx->stats.sext_bits[keep - 1]++;
             } else {
                 keep = XLEN - lead + 1;
                 tr->format = F_BRANCH_FULL;
                 tr->address = MASK_FROM(keep) & full;
+                ctx->stats.sext_bits[keep - 1]++;
             }
             tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
                          + branch_map_len(branch_map->cnt);
@@ -910,7 +917,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         if (trdb_get_log_priority(ctx) == LOG_DEBUG)
             trdb_disassemble_instr(instr, ctx->dunit);
     } else {
-        dbg(ctx, "0x%016jx  0x%08jx\n", (uintmax_t)instr->iaddr,
+        dbg(ctx, "0x%08jx  0x%08jx\n", (uintmax_t)instr->iaddr,
             (uintmax_t)instr->instr);
     }
 

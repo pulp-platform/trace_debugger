@@ -799,8 +799,10 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         }
     }
     printf("%s\n", bin_path);
-    printf("(Compression) Bits per instruction:%lf\n",
+    printf("(Compression) Bits per instruction: %lf\n",
            ctx->stats.packetbits / (double)ctx->stats.instrs);
+    printf("(Compression) Compression ratio: %lf\n",
+           ctx->stats.packetbits / (double)ctx->stats.instrbits);
 
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
@@ -886,6 +888,7 @@ int test_decompress_trace_differential(const char *bin_path,
 
     ctx = trdb_new();
     ctx->config.full_address = false;
+    ctx->config.use_pulp_sext = true;
     if (!ctx) {
         LOG_ERRT("Library context allocation failed.\n");
         status = TRDB_FAIL;
@@ -902,8 +905,20 @@ int test_decompress_trace_differential(const char *bin_path,
         }
     }
     printf("%s\n", bin_path);
-    printf("(Compression) Bits per instruction:%lf\n",
+    printf("(Compression) Bits per instruction: %lf\n",
            ctx->stats.packetbits / (double)ctx->stats.instrs);
+    printf("(Compression) Compression ratio: %lf\n",
+           ctx->stats.packetbits / (double)ctx->stats.instrbits);
+    printf("(Compression) Sign extension distribution:\n");
+    unsigned sum = 0;
+    for (unsigned i = 0; i < 32; i++) {
+        sum += ctx->stats.sext_bits[i];
+    }
+    for (unsigned i = 0; i < 32; i++) {
+        printf("(Compression) Bit %2u: %10.5lf%%\n", (i + 1),
+               (ctx->stats.sext_bits[i] * 100 / (double)sum));
+    }
+
 
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);

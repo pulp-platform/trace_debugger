@@ -113,7 +113,7 @@ struct tr_packet {
     uint32_t userdata : SWLEN;
 
     /* timer data */
-    uint64_t time : TIMELEN;
+    uint64_t time;
 
     /* actual payload of spec, valid  when msg_type = W_TRACE */
     uint32_t format : 2;    /**< header denoting the packet type */
