@@ -93,7 +93,6 @@ module trace_debugger
 
     // pass delayed data
     logic [CAUSELEN-1:0]        lc_cause;
-    logic                       lc_interupt;
 
     // registers to hold onto the input data for a few phases, mostly one
     logic                       interrupt0_q, interrupt0_d;

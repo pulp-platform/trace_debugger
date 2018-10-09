@@ -238,7 +238,7 @@ module trdb_packet_emitter
     //TODO: request resync logic on nuked fifo
 
     assign clear_fifo = 1'b0;
-    assign fifo_overflow = ~packet_fifo_not_full;
+    assign fifo_overflow_o = ~packet_fifo_not_full;
 
     // this buffers our generated packet, since packets can be generated every
     // cycle, but we only read atmost 32 bit per cycle
