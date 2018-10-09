@@ -17,4 +17,5 @@ trace_debugger:
     rtl/trdb_stream_align8.sv,
     rtl/trdb_timer.sv,
     rtl/trdb_filter.sv,
+    rtl/trdb_lzc.sv,
   ]

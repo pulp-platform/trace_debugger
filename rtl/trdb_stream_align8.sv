@@ -112,7 +112,7 @@ module trdb_stream_align8
                 grant_o   = '1;
 
             end else if((high_ptr >> 3) > packet_bytes_len) begin
-                offset_d = (packet_bytes_len % 4 + offset_q);
+                offset_d = ((packet_bytes_len % 4) + offset_q);
 
                 // figure out if we can still produce a whole word or we should
                 // wait for more data by saving it into residual_d
@@ -120,18 +120,32 @@ module trdb_stream_align8
                     residual_d = '0;
                     valid_d = '1;
                 end else if(offset_d > 4) begin
-                    // residual_d = residual_d;
-                    valid_d = '1;
+                    if((offset_d % 4) == 1) begin
+                        residual_d = residual_d & 32'hff;
+                    end else if ((offset_d % 4) == 2) begin
+                        residual_d = residual_d & 32'hffff;
+                    end else if ((offset_d % 4) == 3) begin
+                        residual_d = residual_d & 32'hffffff;
+                    end else
+                        residual_d = residual_d;
+                    valid_d        = '1;
                 end else begin
-                    residual_d = data_d;
-                    valid_d    = '0;
+                    if(offset_d == 1)
+                        residual_d = data_d & 32'hff;
+                    else if (offset_d == 2)
+                        residual_d = data_d & 32'hffff;
+                    else if (offset_d == 3)
+                        residual_d = data_d & 32'hffffff;
+                    else
+                        residual_d     = data_d; //TODO: need to mask this
+                    valid_d        = '0;
                 end
 
                 offset_d   = offset_d % 4;
                 //we are done with the current packet
                 low_ptr_d  = '0;
                 // request the next packet
-                grant_o    = '1; //TODO: doesn't cause comb loop with fifo?
+                grant_o    = '1;
             end
 
         end else if(flush_stream_i) begin

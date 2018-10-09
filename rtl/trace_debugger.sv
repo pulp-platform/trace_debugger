@@ -56,6 +56,8 @@ module trace_debugger
     // by inspecting the programs' executable
     logic                       packet_after_exception;
 
+    logic                       trace_full_addr;
+
     // register all inputs, we don't want to extend riscy's paths
     logic                       ivalid_q, ivalid_d;
     logic                       iexception_q, iexception_d;
@@ -123,6 +125,10 @@ module trace_debugger
     logic                       packet_valid;
     trdb_format_t               packet_format;
     trdb_subformat_t            packet_subformat;
+
+    // variables for address compression
+    logic [$clog2(XLEN)-1+1:0]  keep_addr_bits;
+    logic [XLEN-1:0]            diff_addr;
 
     // generated packet
     logic [PACKET_LEN-1:0]     packet_bits;
@@ -324,6 +330,8 @@ module trace_debugger
          // pipeline if valid never goes high again (e.g.
          // after wfi), but this shouldnt matter
          .valid_i(trace_valid && tc_qualified),
+         .full_addr_i(tc_iaddr),
+         .diff_addr_i(diff_addr),
          .lc_exception_i(lc_exception),
          .lc_exception_sync_i(lc_exception_sync && packet_after_exception),
 
@@ -347,8 +355,9 @@ module trace_debugger
          .branch_map_full_i(branch_map_full),
 
          //input logic  tc_context_change,
-
          .branch_map_empty_i(branch_map_empty),
+         .use_full_addr_i(trace_full_addr),
+         .keep_bits_o(keep_addr_bits),
          .valid_o(packet_valid),
          .packet_format_o(packet_format),
          .packet_subformat_o(packet_subformat));
@@ -373,7 +382,9 @@ module trace_debugger
          .rst_ni(rst_ni),
          .packet_format_i(packet_format),
          .packet_subformat_i(packet_subformat),
+         .keep_bits_i(keep_addr_bits),
          .valid_i(packet_valid),
+         .use_full_addr_i(trace_full_addr),
          .interrupt_i(lc_interrupt), // get the value of the trapped instr
          .cause_i(lc_cause),
          .tval_i(lc_tval),
@@ -387,6 +398,7 @@ module trace_debugger
          .branch_map_full_i(branch_map_full),
          .is_branch_i(tc_is_branch),
          .branch_map_flush_o(branch_map_flush),
+         .diff_addr_o(diff_addr),
          .clear_fifo_i(clear_fifo),
          .fifo_overflow_o(fifo_overflow),
          .sw_valid_i(sw_valid),
@@ -512,6 +524,7 @@ module trace_debugger
          .clear_fifo_o(clear_fifo),
          .trace_enable_o(trace_enable),
          .trace_activated_o(trace_activated),
+         .trace_full_addr_o(trace_full_addr),
          .trace_req_deactivate_i(trace_req_deactivate),
          .apply_filters_o(apply_filters),
          .trace_selected_priv_o(trace_selected_priv),

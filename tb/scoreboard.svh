@@ -67,6 +67,9 @@ class Scoreboard;
         // reserve memory for golden model
         trdb_sv_alloc();
 
+        // configure golden model
+        trdb_sv_set_full_address(FULL_ADDRESS);
+
         // acquire stimuli
         inbox.get(stimuli);
 
@@ -126,6 +129,7 @@ class Scoreboard;
 
     task run(ref logic tb_eos);
         automatic int packetcnt;
+        automatic int packet_bytes;
         Statistics stats;
         Response gm_response;
         Response duv_response;
@@ -162,8 +166,11 @@ class Scoreboard;
                 stats.packet_bad++;
             end else begin
                 msgtype = trdb_marker_t'{duv_packet.bits[5:4]};
-                $display("[SCORE]  @%t: Packet with msgtype %s, number %0d ok",
-                         $time, msgtype.name, packetcnt);
+                packet_bytes = duv_packet.bits[3:0] + 1;
+                $display("[SCORE]  @%t: Packet with msgtype %s, length %0d,",
+                         $time, msgtype.name, packet_bytes,
+                         "payload %h and number %0d ok",
+                          duv_packet.bits, packetcnt);
             end
         end
 

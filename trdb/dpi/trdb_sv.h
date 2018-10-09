@@ -37,6 +37,12 @@
 void trdb_sv_alloc();
 
 /**
+ * Configure address compression behaviour of trdb. Setting full_address to a
+ * non-zero value disables address compression.
+ */
+void trdb_sv_set_full_address(int full_address);
+
+/**
  * Run the trace compression algorithm step by step. Each call is equivalent to
  * advancing one cycle in the RTL model. Normally we should pass a struct but
  * here we just flattened it, which makes the parameter list a bit unwieldy.

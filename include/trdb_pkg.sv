@@ -71,11 +71,12 @@ parameter REG_TRDB_LOWER_ADDR     = 8'h20;//BASEADDR+0x20
 parameter REG_TRDB_HIGHER_ADDR    = 8'h24;//BASEADDR+0x24
 
 
-parameter TRDB_CTRL_SIZE = 4;
+parameter TRDB_CTRL_SIZE = 5;
 parameter TRDB_ENABLE = 0;
 parameter TRDB_TRACE_ACTIVATED = 1;
 parameter TRDB_CLEAR_FIFO = 2;
 parameter TRDB_FLUSH_STREAM = 3;
+parameter TRDB_FULL_ADDR = 4;
 
 parameter TRDB_STATUS_SIZE = 5;
 parameter TRDB_QUALIFIED = 0;

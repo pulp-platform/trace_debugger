@@ -158,7 +158,9 @@ class Driver;
         apply_zero();
 
         // enable trace debugger
-        write_apb(REG_TRDB_CTRL, 3);
+        write_apb(REG_TRDB_CTRL, (1 << TRDB_ENABLE)
+                  | (1 << TRDB_TRACE_ACTIVATED)
+                  | (FULL_ADDRESS << TRDB_FULL_ADDR));
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin

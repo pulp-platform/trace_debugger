@@ -133,7 +133,6 @@ class Monitor;
                         effective_bits = packet_byte[PACKET_BYTE_HEADER_LEN-1:0]
                                          * 8
                                          + 8; //for the header
-                        $display("effective bits %d:", effective_bits);
 
                         // a zero length packet can't be good
                         if(!(effective_bits > PACKET_BYTE_HEADER_LEN))
@@ -142,7 +141,6 @@ class Monitor;
                         packet_byte_len
                             = effective_bits / 8
                               + ((effective_bits % 8) != 0 ? 1 : 0);
-                        $display("packet_byte_len %d:", packet_byte_len);
 
                         packet.bits[packet_byte_off*8+:8] = packet_byte;
                         packet_byte_off++;

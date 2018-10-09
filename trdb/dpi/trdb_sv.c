@@ -71,6 +71,12 @@ void trdb_sv_free()
 }
 
 
+void trdb_sv_set_full_address(int full_address)
+{
+    trdb_set_full_address(ctx, full_address);
+}
+
+
 void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
                         const svLogicVecVal *cause, const svLogicVecVal *tval,
                         const svLogicVecVal *priv, const svLogicVecVal *iaddr,
