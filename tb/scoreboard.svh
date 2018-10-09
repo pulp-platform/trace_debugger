@@ -161,7 +161,7 @@ class Scoreboard;
                 $display("[SCORE]  @%t: Received: %h", $time, duv_packet.bits);
                 stats.packet_bad++;
             end else begin
-                msgtype = trdb_marker_t'{duv_packet.bits[8:7]};
+                msgtype = trdb_marker_t'{duv_packet.bits[5:4]};
                 $display("[SCORE]  @%t: Packet with msgtype %s, number %0d ok",
                          $time, msgtype.name, packetcnt);
             end
@@ -176,7 +176,7 @@ class Scoreboard;
             while(duv_box.num > 0) begin
                 duv_box.get(duv_response);
                 duv_packet = duv_response.packet;
-                msgtype    = trdb_marker_t'{duv_packet.bits[8:7]};
+                msgtype    = trdb_marker_t'{duv_packet.bits[5:4]};
                 $display("[SCORE]  @%t: Remaning: %h", $time, duv_packet.bits);
                 $display("[SCORE]  @%t: length: %0d msgtype: %s",
                          $time, duv_packet.bits[6:0], msgtype.name);
