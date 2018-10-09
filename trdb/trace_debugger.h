@@ -150,6 +150,7 @@ union trdb_pack {
                        */
 };
 
+struct trdb_config;
 
 /**
  * Library/trace debugger context, needs to be hold by program and passed to
@@ -217,6 +218,11 @@ int trdb_get_log_priority(struct trdb_ctx *ctx);
  * @param priority the new loggint priority
  */
 void trdb_set_log_priority(struct trdb_ctx *ctx, int priority);
+
+
+bool trdb_is_full_address(struct trdb_ctx *ctx);
+
+void trdb_set_full_address(struct trdb_ctx *ctx, bool v);
 
 /**
  * Compress the given sequence of instruction to a sequence of packets.

@@ -318,6 +318,18 @@ void trdb_set_log_priority(struct trdb_ctx *ctx, int priority)
 }
 
 
+bool trdb_is_full_address(struct trdb_ctx *ctx)
+{
+    return ctx->config.full_address;
+}
+
+
+void trdb_set_full_address(struct trdb_ctx *ctx, bool v)
+{
+    ctx->config.full_address = v;
+}
+
+
 static bool is_branch(uint32_t instr)
 {
     /* static bool is_##code##_instr(long insn) */
@@ -349,7 +361,9 @@ static bool branch_taken(bool before_compressed, uint32_t addr_before,
 
 static uint32_t branch_map_len(uint32_t branches)
 {
-    if (branches <= 1) {
+    if (branches == 0) {
+        return 31;
+    } else if (branches <= 1) {
         return 1;
     } else if (branches <= 9) {
         return 9;
@@ -439,6 +453,19 @@ static bool differential_addr(int *lead, uint32_t absolute,
 }
 
 
+static int quantize_clz(int x)
+{
+
+    if (x < 9)
+        return 0;
+    else if (x < 17)
+        return 9;
+    else if (x < 25)
+        return 17;
+    else
+        return 25;
+}
+
 /* Does the same as differential_addr() but only considers byte boundaries */
 static bool pulp_differential_addr(int *lead, uint32_t absolute,
                                    uint32_t differential)
@@ -477,8 +504,9 @@ static bool pulp_differential_addr(int *lead, uint32_t absolute,
     /*     return prefer_diff; */
     /* } */
     /* we are only interested in sign extension for byte boundaries */
-    abs = (abs / 8) * 8;
-    diff = (diff / 8) * 8;
+    abs = quantize_clz(abs);
+    diff = quantize_clz(diff);
+    assert(abs != 32); /* there is always a one or zero leading */
 
     /* general case */
     *lead = diff > abs ? diff : abs;
@@ -559,6 +587,8 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 {
     if (branch_map->cnt == 0) {
         tr->format = F_ADDR_ONLY;
+        tr->branches = branch_map->cnt;
+
         if (full_address) {
             tr->address = tc_instr->iaddr;
             tr->length = MSGTYPELEN + FORMATLEN + XLEN;
@@ -566,11 +596,13 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             /* always differential in F_ADDR_ONLY*/
             uint32_t diff = last_iaddr - tc_instr->iaddr;
             uint32_t lead = ctx->config.use_pulp_sext
-                                ? (sign_extendable_bits(diff) / 8) * 8
+                                ? quantize_clz(sign_extendable_bits(diff))
                                 : sign_extendable_bits(diff);
 
             uint32_t keep = XLEN - lead + 1;
-            tr->address = MASK_FROM(keep) & diff;
+            /* should only be relevant for serialization */
+            /* tr->address = MASK_FROM(keep) & diff; */
+            tr->address = diff;
             tr->length = MSGTYPELEN + FORMATLEN + keep;
             /* record distribution */
             ctx->stats.sext_bits[keep - 1]++;
@@ -580,16 +612,23 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
         if (branch_map->full && is_u_discontinuity)
             dbg(ctx, "full branch map and discontinuity edge case\n");
 
+        tr->branches = branch_map->cnt;
+
         if (full_address) {
             tr->format = F_BRANCH_FULL;
             tr->address = tc_instr->iaddr;
             tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
                          + branch_map_len(branch_map->cnt);
             if (branch_map->full) {
-                if (is_u_discontinuity)
+                if (is_u_discontinuity) {
                     tr->length += XLEN;
-                else
+                } else {
+                    /* we don't need to record the address, indicate by settings
+                     * branchcnt to 0
+                     */
                     tr->length += 0;
+                    tr->branches = 0;
+                }
             } else {
                 tr->length += XLEN;
             }
@@ -610,26 +649,34 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (use_differential) {
                 keep = XLEN - lead + 1;
                 tr->format = F_BRANCH_DIFF;
-                tr->address = MASK_FROM(keep) & diff;
+                /* this should only be relevant for serialization */
+                /* tr->address = MASK_FROM(keep) & diff; */
+                tr->address = diff;
                 ctx->stats.sext_bits[keep - 1]++;
             } else {
                 keep = XLEN - lead + 1;
                 tr->format = F_BRANCH_FULL;
-                tr->address = MASK_FROM(keep) & full;
+                /* this should only be relevant for serialization */
+                /* tr->address = MASK_FROM(keep) & full; */
+                tr->address = full;
                 ctx->stats.sext_bits[keep - 1]++;
             }
             tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
                          + branch_map_len(branch_map->cnt);
             if (branch_map->full) {
-                if (is_u_discontinuity)
+                if (is_u_discontinuity) {
                     tr->length += keep;
-                else
+                } else {
+                    /* we don't need to record the address, indicate by settings
+                     * branchcnt to 0
+                     */
                     tr->length += 0;
+                    tr->branches = 0;
+                }
             } else {
                 tr->length += keep;
             }
         }
-        tr->branches = branch_map->cnt;
         tr->branch_map = branch_map->bits;
         *branch_map = (struct branch_map_state){0};
     }
@@ -643,7 +690,8 @@ static void emit_full_branch_map(struct tr_packet *tr,
 {
     assert(branch_map->cnt == 31);
     tr->format = F_BRANCH_FULL;
-    tr->branches = branch_map->cnt;
+    /* full branch map withouth address is indicated by settings branches to 0*/
+    tr->branches = 0;
     tr->branch_map = branch_map->bits;
     /* No address needed */
     tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + branch_map_len(31);
@@ -1192,7 +1240,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         case F_BRANCH_DIFF:
             dec_ctx.branch_map.cnt = packet->branches;
             dec_ctx.branch_map.bits = packet->branch_map;
-            dec_ctx.branch_map.full = packet->branches == 31;
+            dec_ctx.branch_map.full =
+                (packet->branches == 31) || (packet->branches == 0);
             break;
         case F_SYNC:
             break;
@@ -1222,24 +1271,17 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * address field
              * TODO: edgecase where we sign extend from msb of branchmap
              */
-            uint32_t lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN
-                                      + branch_map_len(dec_ctx.branch_map.cnt);
-            /* TODO: test with sext bit  = 0 etc */
-            /* TODO: does this initialization make sense? */
-            uint32_t sext_addr = packet->address;
-            if (c->config.full_address) {
-                sext_addr = packet->address;
-            } else {
-                sext_addr =
-                    sext32(packet->address, packet->length - lower_boundary);
-            }
 
-            uint32_t absolute_addr = sext_addr;
+            uint32_t absolute_addr = packet->address;
 
-            if ((dec_ctx.branch_map.full && (packet->length > lower_boundary))
-                || !dec_ctx.branch_map.full) {
+            if (dec_ctx.branch_map.cnt > 0)
                 dec_ctx.last_packet_addr = absolute_addr;
-            }
+
+            /* this indicates we don't have a valid address but still a full
+             * branch map
+             */
+            if (dec_ctx.branch_map.cnt == 0)
+                dec_ctx.branch_map.cnt = 31;
 
 
             while (!(dec_ctx.branch_map.cnt == 0
@@ -1360,17 +1402,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              */
             bool hit_discontinuity = dec_ctx.branch_map.full;
 
-            /* bits until address field */
-            uint32_t lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN
-                                      + branch_map_len(dec_ctx.branch_map.cnt);
-
-            uint32_t sext_addr =
-                sext32(packet->address, packet->length - lower_boundary);
-
-
-            /* uint32_t absolute_addr = dec_ctx.last_packet_addr -
-             * packet->address; */
-            uint32_t absolute_addr = dec_ctx.last_packet_addr - sext_addr;
+            uint32_t absolute_addr = dec_ctx.last_packet_addr - packet->address;
 
             dbg(c,
                 "F_BRANCH_DIFF resolved address:%" PRIx32 " from %" PRIx32
@@ -1382,9 +1414,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * address field
              * TODO: edgecase where we sign extend from msb of branchmap
              */
-            if ((dec_ctx.branch_map.full && (packet->length > lower_boundary))
-                || !dec_ctx.branch_map.full)
+            if (dec_ctx.branch_map.cnt > 0)
                 dec_ctx.last_packet_addr = absolute_addr;
+            /* this indicates we don't have a valid address but still a full
+             * branch map
+             */
+            if (dec_ctx.branch_map.cnt == 0)
+                dec_ctx.branch_map.cnt = 31;
 
             while (!(dec_ctx.branch_map.cnt == 0
                      && (hit_discontinuity || hit_address))) {
@@ -1585,9 +1621,11 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (c->config.full_address) {
                 absolute_addr = packet->address;
             } else {
-                uint32_t sext_addr = sext32(
-                    packet->address, packet->length - MSGTYPELEN - FORMATLEN);
-                absolute_addr = dec_ctx.last_packet_addr - sext_addr;
+                /* uint32_t sext_addr = sext32( */
+                /*     packet->address, packet->length - MSGTYPELEN -
+                 * FORMATLEN); */
+                /* absolute_addr = dec_ctx.last_packet_addr - sext_addr; */
+                absolute_addr = dec_ctx.last_packet_addr - packet->address;
             }
 
             dbg(c,

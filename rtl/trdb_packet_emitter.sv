@@ -78,8 +78,9 @@ module trdb_packet_emitter
     assign branch_map_flush_o = branch_map_flush_q;
 
     always_comb begin: branch_map_offset
-
-        if(branch_map_cnt_i <= 1) begin
+        if(branch_map_cnt_i == 0) begin
+            branch_packet_off = 31;
+        end else if(branch_map_cnt_i <= 1) begin
             branch_packet_off = 1;
         end else if(branch_map_cnt_i <= 9) begin
             branch_packet_off = 9;
@@ -114,7 +115,6 @@ module trdb_packet_emitter
         packet_len           = '0;
         branch_map_flush_d   = '0;
 
-        // TODO: actually this might not be necessary
         branch_map_edge_case = lc_u_discontinuity_i;
         packet_gen_valid     = '0;
 
@@ -167,6 +167,10 @@ module trdb_packet_emitter
                                                32'b0, branch_map_i[30:0]};
                     packet_len = 2 + FORMATLEN + BRANCHLEN + 31 +
                                  (branch_map_edge_case ? XLEN : 0);
+                    // if we dont have to put an address we indicate that by
+                    // settings branchmap to 0
+                    packet_bits[8:4] = branch_map_edge_case ?
+                                       packet_bits[8:4] : 5'b0;
                 end
             end
 

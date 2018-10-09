@@ -1042,5 +1042,9 @@ int main(int argc, char *argv[argc + 1])
         RUN_TEST(test_decompress_trace_differential, bin, stim);
     }
 
+    if (TESTS_SUCCESSFULL())
+        printf("ALL TESTS PASSED\n");
+    else
+        printf("ATLEAST ONE TEST FAILED\n");
     return TESTS_SUCCESSFULL() ? EXIT_SUCCESS : EXIT_FAILURE;
 }

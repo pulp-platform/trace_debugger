@@ -1,5 +1,5 @@
 /*
- * t Debugger Software for the PULP platform
+ * trdb - Debugger Software for the PULP platform
  *
  * Copyright (C) 2018 ETH Zurich and University of Bologna
  *
@@ -28,10 +28,13 @@
 #include "trace_debugger.h"
 #include "utils.h"
 
+/* TODO: move those static functions into utils.h */
 
 static uint32_t p_branch_map_len(uint32_t branches)
 {
-    if (branches <= 1) {
+    if (branches == 0) {
+        return 31;
+    } else if (branches <= 1) {
         return 1;
     } else if (branches <= 9) {
         return 9;
@@ -46,7 +49,30 @@ static uint32_t p_branch_map_len(uint32_t branches)
 }
 
 
-/* pulp specific packet serialization TODO: rename to pulp*/
+static uint32_t p_sign_extendable_bits(uint32_t addr)
+{
+    int clz = __builtin_clz(addr);
+    int clo = __builtin_clz(~addr);
+    return clz > clo ? clz : clo;
+}
+
+
+static uint32_t p_sext32(uint32_t val, uint32_t bit)
+{
+    if (bit == 0)
+        return 0;
+
+    if (bit == 32)
+        return val;
+
+    int m = 1U << (bit - 1);
+
+    val = val & ((1U << bit) - 1);
+    return (val ^ m) - m;
+}
+
+
+/* pulp specific packet serialization */
 int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                size_t *bitcnt, uint8_t align, uint8_t bin[])
 {
@@ -74,8 +100,6 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         /* we need enough space to do the packing it in uint128 */
         assert(128 > PULPPKTLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
         /* TODO: assert branch map to overfull */
-        /* TODO: branch map full logic handling */
-        /* TODO: for now we put the address always */
         data.bits =
             byte_len | (packet->msg_type << PULPPKTLEN)
             | (packet->format << (PULPPKTLEN + MSGTYPELEN))
@@ -86,13 +110,14 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         *bitcnt = PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len;
 
         /* if we have a full branch we don't necessarily need to emit address */
-        if ((packet->branches == 31
-             && packet->length > MSGTYPELEN + FORMATLEN + BRANCHLEN + len)
-            || packet->branches < 31) {
+        if (packet->branches > 0) {
             data.bits |=
                 ((__uint128_t)packet->address
                  << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
-            *bitcnt += XLEN;
+            if (trdb_is_full_address(c))
+                *bitcnt += XLEN;
+            else
+                *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
         }
         data.bits <<= align;
         memcpy(bin, data.bin,
@@ -101,11 +126,38 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         return 0;
     }
 
-    case F_BRANCH_DIFF:
-        err(c, "F_BRANCH_DIFF not implemented yet\n");
-        *bitcnt = 0;
-        return -1;
+    case F_BRANCH_DIFF: {
+        if (trdb_is_full_address(c)) {
+            err(c, "F_BRANCH_DIFF packet encountered but full_address set\n");
+            return -1;
+        }
+        uint32_t len = p_branch_map_len(packet->branches);
 
+        /* we need enough space to do the packing it in uint128 */
+        assert(128 > PULPPKTLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
+        /* TODO: assert branch map to overfull */
+        data.bits =
+            byte_len | (packet->msg_type << PULPPKTLEN)
+            | (packet->format << (PULPPKTLEN + MSGTYPELEN))
+            | (packet->branches << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
+        data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len))
+                     << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN);
+
+        *bitcnt = PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len;
+
+        /* if we have a full branch we don't necessarily need to emit address */
+        if (packet->branches > 0) {
+            data.bits |=
+                ((__uint128_t)packet->address
+                 << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
+            *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
+        }
+        data.bits <<= align;
+        memcpy(bin, data.bin,
+               (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
+
+        return 0;
+    }
     case F_ADDR_ONLY:
         assert(128 > PULPPKTLEN + MSGTYPELEN + FORMATLEN + XLEN);
         data.bits = byte_len | (packet->msg_type << PULPPKTLEN)
@@ -113,9 +165,14 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                     | ((__uint128_t)packet->address
                        << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
 
-        *bitcnt = PULPPKTLEN + MSGTYPELEN + FORMATLEN + XLEN;
+        *bitcnt = PULPPKTLEN + MSGTYPELEN + FORMATLEN;
+        if (trdb_is_full_address(c))
+            *bitcnt += XLEN;
+        else
+            *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
 
         data.bits <<= align;
+        /* this cuts off superfluous bits */
         memcpy(bin, data.bin,
                (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
         return 0;
@@ -213,7 +270,8 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     *packet = (struct tr_packet){0};
 
     /* approxmation in multiple of 8*/
-    packet->length = header & MASK_FROM(PULPPKTLEN) * 8;
+    packet->length =
+        (header & MASK_FROM(PULPPKTLEN)) * 8 + MSGTYPELEN + FORMATLEN;
     packet->msg_type = (payload.bits >>= PULPPKTLEN) & MASK_FROM(MSGTYPELEN);
 
     switch (packet->msg_type) {
@@ -221,18 +279,53 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     case W_TRACE:
         packet->format = (payload.bits >>= MSGTYPELEN) & MASK_FROM(FORMATLEN);
         payload.bits >>= FORMATLEN;
+
+        uint32_t blen = 0;
+        uint32_t lower_boundary = 0;
+
         switch (packet->format) {
         case F_BRANCH_FULL:
             packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
-            uint32_t len = p_branch_map_len(packet->branches);
-            packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(len);
-            packet->address = (payload.bits >>= len) & MASK_FROM(XLEN);
+            blen = p_branch_map_len(packet->branches);
+            packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(blen);
+
+            lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN + blen;
+
+            if (trdb_is_full_address(c)) {
+                packet->address = (payload.bits >>= blen) & MASK_FROM(XLEN);
+            } else {
+                packet->address = (payload.bits >>= blen) & MASK_FROM(XLEN);
+                packet->address =
+                    p_sext32(packet->address, packet->length - lower_boundary);
+            }
             return 0;
         case F_BRANCH_DIFF:
-            err(c, "not implemented yet\n");
-            return -1;
+            if (trdb_is_full_address(c)) {
+                err(c,
+                    "F_BRANCH_DIFF packet encountered but full_address set\n");
+                return -1;
+            }
+            packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
+            blen = p_branch_map_len(packet->branches);
+            packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(blen);
+            lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN + blen;
+
+            if (trdb_is_full_address(c)) {
+                packet->address = (payload.bits >>= blen) & MASK_FROM(XLEN);
+            } else {
+                packet->address = (payload.bits >>= blen) & MASK_FROM(XLEN);
+                packet->address =
+                    p_sext32(packet->address, packet->length - lower_boundary);
+            }
+
+            return 0;
         case F_ADDR_ONLY:
-            packet->address = payload.bits & MASK_FROM(XLEN);
+            if (trdb_is_full_address(c)) {
+                packet->address = payload.bits & MASK_FROM(XLEN);
+            } else {
+                packet->address = p_sext32(
+                    payload.bits, packet->length - MSGTYPELEN - FORMATLEN);
+            }
             return 0;
         case F_SYNC:
             packet->subformat = payload.bits & MASK_FROM(FORMATLEN);

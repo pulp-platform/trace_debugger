@@ -26,7 +26,6 @@
 
 #include "trace_debugger.h"
 
-
 /**
  * Packs the @p packet into an array @p bin, aligned by @p align and writes the
  * packet length in bits into @p bitcnt. This function is specific to the PULP
@@ -43,7 +42,6 @@
  */
 int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                size_t *bitcnt, uint8_t align, uint8_t bin[]);
-
 
 /**
  * Read a packet from @p fp stored in the PULP binary format.

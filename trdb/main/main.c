@@ -49,6 +49,7 @@ static char args_doc[] = "TRACE-OR-PACKETS";
 #define TRDB_OPT_NO_ALIASES 2
 #define TRDB_OPT_PREFIX_ADDRESSES 3
 #define TRDB_OPT_INLINES 4
+#define TRDB_OPT_FULL_ADDR 5
 
 
 static struct argp_option options[] = {
@@ -63,6 +64,8 @@ static struct argp_option options[] = {
     {"trace-file", 't', 0, 0, "Input file is a trace file"},
     {"dump", 'h', 0, 0, "Dump trace or packets in human readable format"},
     {"extract", 'x', 0, 0, "Take a packet file and produce a stimuli file"},
+    {"full-address", TRDB_OPT_FULL_ADDR, 0, 0,
+     "Assume no sign-extension compression on addresses"},
     {"disassemble", 'd', 0, 0, "disassemble the output"},
     {"no-aliases", TRDB_OPT_NO_ALIASES, 0, 0,
      "Do not use aliases for disassembled instructions"},
@@ -76,14 +79,15 @@ static struct argp_option options[] = {
     {"function-context", 's', 0, 0,
      "Show when address coincides with function name entrypoint"},
     {"line-numbers", 'l', 0, 0, "Include line numbers and filenames in output"},
-    {"inlines", TRDB_OPT_INLINES, 0, 0, "Print all inlines for source line (with -l)"},
+    {"inlines", TRDB_OPT_INLINES, 0, 0,
+     "Print all inlines for source line (with -l)"},
     {"output", 'o', "FILE", 0, "Write to FILE instead of stdout"},
     {0}};
 
 struct arguments {
     char *args[TRDB_NUM_ARGS];
     bool silent, verbose, compress, has_elf, disassemble, decompress,
-        trace_file, binary_output, human;
+        trace_file, binary_output, human, full_address;
     uint32_t settings_disasm;
     char *binary_format;
     char *output_file;
@@ -123,6 +127,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
     case 'x':
         arguments->decompress = true;
         break;
+    case TRDB_OPT_FULL_ADDR:
+        arguments->full_address = true;
+        break;
     case TRDB_OPT_NO_ALIASES:
         arguments->settings_disasm |= TRDB_NO_ALIASES;
         break;
@@ -145,8 +152,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         arguments->settings_disasm |= TRDB_LINE_NUMBERS;
         break;
     case TRDB_OPT_INLINES:
-	arguments->settings_disasm |= TRDB_INLINES;
-	break;
+        arguments->settings_disasm |= TRDB_INLINES;
+        break;
     case ARGP_KEY_ARG:
         if (state->arg_num >= TRDB_NUM_ARGS)
             argp_usage(state);
@@ -182,12 +189,13 @@ int main(int argc, char *argv[argc + 1])
     int status = EXIT_SUCCESS;
     struct arguments arguments;
     /* set default */
-    /* arguments = (struct arguments){0}; */
+    arguments = (struct arguments){0};
     arguments.silent = false;
     arguments.verbose = false;
     arguments.compress = false;
     arguments.binary_output = false;
     arguments.human = false;
+    arguments.full_address = false;
     arguments.has_elf = false;
     arguments.disassemble = false;
     arguments.decompress = false;
@@ -206,6 +214,9 @@ int main(int argc, char *argv[argc + 1])
         status = EXIT_FAILURE;
         goto fail;
     }
+
+    /* general settings */
+    trdb_set_full_address(ctx, arguments.full_address);
 
     /* prepare output */
     if (arguments.output_file[0] != '-') {
