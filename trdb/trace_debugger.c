@@ -159,6 +159,9 @@ struct trdb_stats {
     size_t instrbits;
     size_t instrs;
     size_t packets;
+    size_t zo_addresses;  /**< all zero or all ones addresses */
+    size_t zo_branchmaps; /**< all zero or all ones branchmaps */
+    size_t exception_packets;
     uint32_t sext_bits[32];
 };
 
@@ -525,7 +528,7 @@ static bool pulp_differential_addr(int *lead, uint32_t absolute,
 }
 
 
-static void emit_exception_packet(struct tr_packet *tr,
+static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
                                   struct tr_instr *lc_instr,
                                   struct tr_instr *tc_instr,
                                   struct tr_instr *nc_instr)
@@ -553,6 +556,7 @@ static void emit_exception_packet(struct tr_packet *tr,
     tr->tval = lc_instr->tval;
     tr->length =
         MSGTYPELEN + FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+    c->stats.exception_packets++;
 }
 
 
@@ -617,6 +621,8 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             tr->length = MSGTYPELEN + FORMATLEN + keep;
             /* record distribution */
             ctx->stats.sext_bits[keep - 1]++;
+            if (tr->address == 0 || tr->address == -1)
+                ctx->stats.zo_addresses++;
         }
         assert(branch_map->bits == 0);
     } else {
@@ -672,6 +678,10 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                 tr->address = full;
                 ctx->stats.sext_bits[keep - 1]++;
             }
+
+            if (tr->address == 0 || tr->address == -1)
+                ctx->stats.zo_addresses++;
+
             tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
                          + branch_map_len(branch_map->cnt);
             if (branch_map->full) {
@@ -814,7 +824,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        emit_exception_packet(tr, lc_instr, tc_instr, nc_instr);
+        emit_exception_packet(ctx, tr, lc_instr, tc_instr, nc_instr);
         *last_iaddr = tc_instr->iaddr;
 
         list_add(&tr->list, packet_list);

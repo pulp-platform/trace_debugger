@@ -807,10 +807,18 @@ int test_compress_cvs_trace(const char *trace_path)
         }
     }
     printf("%s\n", trace_path);
-    printf("instructions: %zu, packets: %zu, payload bytes: %zu\n", instrcnt,
-           ctx->stats.packets, ctx->stats.packetbits / 8);
-    printf("(Compression) Bits per instruction: %lf\n",
-           ctx->stats.packetbits / (double)ctx->stats.instrs);
+    printf(
+        "instructions: %zu, packets: %zu, payload bytes: %zu "
+        "exceptions: %zu z/o: %zu\n",
+        instrcnt, ctx->stats.packets, ctx->stats.packetbits / 8,
+        ctx->stats.exception_packets, ctx->stats.all_zeros_all_ones);
+    double bpi_payload = ctx->stats.packetbits / (double)ctx->stats.instrs;
+    double bpi_full = (ctx->stats.packetbits + ctx->stats.packets * 6)
+                      / (double)ctx->stats.instrs;
+    printf("(Compression) Bits per instruction (payload ): %lf\n", bpi_payload);
+    printf("(Compression) Bits per instruction (full+%2.lf%%): %lf\n",
+           bpi_full / bpi_payload * 100 - 100, bpi_full);
+
     printf("(Compression) Compression ratio: %lf\n",
            ctx->stats.packetbits / (double)ctx->stats.instrbits);
 
