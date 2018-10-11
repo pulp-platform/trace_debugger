@@ -767,23 +767,7 @@ int test_compress_cvs_trace(const char *trace_path)
     struct disassemble_info dinfo = {0};
     dunit.dinfo = &dinfo;
 
-    bfd_init();
-    abfd = bfd_openr("data/interrupt", NULL);
-
-    if (!(abfd && bfd_check_format(abfd, bfd_object)))
-        return TRDB_FAIL;
-
-    /* Override the stream the disassembler outputs to */
-    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
-    dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.print_address_func = riscv32_print_address;
-
-    dinfo.flavour = bfd_get_flavour(abfd);
-    dinfo.arch = bfd_get_arch(abfd);
-    dinfo.mach = bfd_get_mach(abfd);
-    dinfo.endian = abfd->xvec->byteorder;
-    disassemble_init_for_target(&dinfo);
-    dunit.disassemble_fn = disassembler(abfd);
+    init_disassembler_unit_for_pulp(&dunit, NULL);
 
     LIST_HEAD(instr_list);
     LIST_HEAD(packet_list);
@@ -806,11 +790,12 @@ int test_compress_cvs_trace(const char *trace_path)
         goto fail;
     }
 
+
     struct tr_instr *instr;
-    /* list_for_each_entry_reverse(instr, &instr_list, list) */
-    /* { */
-    /*     trdb_print_instr(stdout, instr); */
-    /* } */
+    list_for_each_entry_reverse(instr, &instr_list, list)
+    {
+        /* trdb_disassemble_instr(instr, &dunit); */
+    }
 
     list_for_each_entry_reverse(instr, &instr_list, list)
     {
@@ -895,7 +880,6 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         struct tr_instr *instr;
         list_for_each_entry_reverse(instr, &instr1_head, list)
         {
-            LOG_INFOT("%s", instr->str);
         }
     }
 
@@ -913,7 +897,6 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         }
 
         if (instr->iaddr != (*samples)[i].iaddr) {
-            LOG_ERRT("%s", instr->str);
             LOG_ERRT("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
             LOG_ERRT("reconst. instr: %" PRIx32 "\n", instr->iaddr);
             status = TRDB_FAIL;
@@ -1011,7 +994,6 @@ int test_decompress_trace_differential(const char *bin_path,
         struct tr_instr *instr;
         list_for_each_entry_reverse(instr, &instr1_head, list)
         {
-            LOG_INFOT("%s", instr->str);
         }
     }
 
@@ -1029,7 +1011,6 @@ int test_decompress_trace_differential(const char *bin_path,
         }
 
         if (instr->iaddr != (*samples)[i].iaddr) {
-            LOG_ERRT("%s", instr->str);
             LOG_ERRT("original instr: %" PRIx32 "\n", (*samples)[i].iaddr);
             LOG_ERRT("reconst. instr: %" PRIx32 "\n", instr->iaddr);
             status = TRDB_FAIL;

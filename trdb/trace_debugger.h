@@ -77,8 +77,6 @@ struct tr_instr {
     uint32_t iaddr : XLEN;     /**< instruction address */
     uint32_t instr : ILEN;     /**< raw instruction value */
     bool compressed;           /**< instruction was originally compressed */
-    char str[INSTR_STR_LEN];   /**< disassembled instruction string, only
-                                  sometimes valid */
     struct list_head list;     /**< anchor for linked list in list.h */
 };
 

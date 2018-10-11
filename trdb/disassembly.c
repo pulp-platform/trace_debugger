@@ -105,15 +105,28 @@ static int wide_output;
 
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
 {
-    const bfd_arch_info_type *riscv32_arch = bfd_scan_arch("riscv:rv32");
-    dinfo->stream = stdout;
+    init_disassemble_info(dinfo, stdout, (fprintf_ftype)fprintf);
     dinfo->fprintf_func = (fprintf_ftype)fprintf;
     dinfo->print_address_func = riscv32_print_address;
-    dinfo->flavour = bfd_target_elf_flavour; /* TODO: const */
-    dinfo->arch = riscv32_arch->arch;
-    dinfo->mach = riscv32_arch->mach;
+
+    dinfo->flavour = bfd_target_elf_flavour;
+    dinfo->arch = bfd_arch_riscv;
+    dinfo->mach = bfd_mach_riscv32;
     dinfo->endian = BFD_ENDIAN_LITTLE;
     disassemble_init_for_target(dinfo);
+}
+
+
+int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
+                                    char *options)
+{
+    struct disassemble_info *dinfo = dunit->dinfo;
+    if (!dinfo)
+        return -1;
+    init_disassemble_info_for_pulp(dinfo);
+    dinfo->disassembler_options = options;
+    dunit->disassemble_fn = print_insn_riscv;
+    return 0;
 }
 
 
@@ -2044,4 +2057,16 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
     }
 
     free(data);
+}
+
+
+void disassemble_single_instruction_slow(uint32_t instr, uint32_t addr)
+{
+    struct disassembler_unit dunit = {0};
+    struct disassemble_info dinfo = {0};
+    dunit.dinfo = &dinfo;
+
+    init_disassembler_unit_for_pulp(&dunit, NULL);
+
+    disassemble_single_instruction(instr, addr, &dunit);
 }

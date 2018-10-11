@@ -1067,7 +1067,6 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
 static int build_instr_fprintf(void *stream, const char *format, ...)
 {
     struct trdb_ctx *c = stream;
-    struct tr_instr *instr = c->dis_instr;
     char tmp[INSTR_STR_LEN];
     va_list args;
     va_start(args, format);
@@ -1079,12 +1078,13 @@ static int build_instr_fprintf(void *stream, const char *format, ...)
         err(c, "Encountered an error in vsnprintf\n");
     }
     va_end(args);
-    if (strlen(instr->str) + rv + 1 > INSTR_STR_LEN) {
-        err(c, "Can't append to buffer, truncating string\n");
-        strncat(instr->str, tmp, INSTR_STR_LEN - 1 - strlen(instr->str));
-    } else {
-        strncat(instr->str, tmp, rv);
-    }
+    /* if (strlen(instr->str) + rv + 1 > INSTR_STR_LEN) { */
+    /*     err(c, "Can't append to buffer, truncating string\n"); */
+    /*     strncat(instr->str, tmp, INSTR_STR_LEN - 1 - strlen(instr->str)); */
+    /* } else { */
+    /*     strncat(instr->str, tmp, rv); */
+    /* } */
+    dbg(c, tmp);
 
     return rv;
 }
@@ -1142,8 +1142,6 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
         err(c, "malloc: %s\n", strerror(errno));
         return -1;
     }
-
-    dbg(c, instr->str);
 
     memcpy(add, instr, sizeof(*add));
     list_add(&add->list, instr_list);

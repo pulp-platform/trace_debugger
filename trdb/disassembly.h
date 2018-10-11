@@ -395,6 +395,17 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
                                     struct disassembler_unit *dunit);
 
 /**
+ * Disassemble the given instr with the pretended address and print it calling
+ * fprintf_func. Will configure a disassembler with default settings for the
+ * PULP platform. This function is slow since we create a dissasembler for each
+ * call. It is to be used sparingly for single instructions.
+ *
+ * @param instr the raw instruction value up to 32 bits
+ * @param addr the address where the instruction is located at
+ */
+void disassemble_single_instruction_slow(uint32_t instr, uint32_t addr);
+
+/**
  * Disassemble the given instruction, indicated by its address @p addr and the
  * bfd @p abfd which contains it, using the settings in @p dunit and print it by
  * calling fprintf_func.
