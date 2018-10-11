@@ -113,6 +113,7 @@ void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
     dinfo->arch = riscv32_arch->arch;
     dinfo->mach = riscv32_arch->mach;
     dinfo->endian = BFD_ENDIAN_LITTLE;
+    disassemble_init_for_target(dinfo);
 }
 
 

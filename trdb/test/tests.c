@@ -757,6 +757,86 @@ fail:
 }
 
 
+int test_compress_cvs_trace(const char *trace_path)
+{
+    int status = TRDB_SUCCESS;
+    bfd *abfd = NULL;
+    struct trdb_ctx *ctx = trdb_new();
+
+    struct disassembler_unit dunit = {0};
+    struct disassemble_info dinfo = {0};
+    dunit.dinfo = &dinfo;
+
+    bfd_init();
+    abfd = bfd_openr("data/interrupt", NULL);
+
+    if (!(abfd && bfd_check_format(abfd, bfd_object)))
+        return TRDB_FAIL;
+
+    /* Override the stream the disassembler outputs to */
+    init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
+    dinfo.fprintf_func = (fprintf_ftype)fprintf;
+    dinfo.print_address_func = riscv32_print_address;
+
+    dinfo.flavour = bfd_get_flavour(abfd);
+    dinfo.arch = bfd_get_arch(abfd);
+    dinfo.mach = bfd_get_mach(abfd);
+    dinfo.endian = abfd->xvec->byteorder;
+    disassemble_init_for_target(&dinfo);
+    dunit.disassemble_fn = disassembler(abfd);
+
+    LIST_HEAD(instr_list);
+    LIST_HEAD(packet_list);
+    if (!ctx) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    ctx->dunit = &dunit;
+    ctx->config.full_address = false;
+    ctx->config.pulp_vector_table_packet = false;
+
+    size_t instrcnt =
+        trdb_cvs_to_trace_list(ctx, trace_path, &status, &instr_list);
+    if (status != 0) {
+        LOG_ERRT("CVS to tr_instr failed\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    struct tr_instr *instr;
+    /* list_for_each_entry_reverse(instr, &instr_list, list) */
+    /* { */
+    /*     trdb_print_instr(stdout, instr); */
+    /* } */
+
+    list_for_each_entry_reverse(instr, &instr_list, list)
+    {
+        int step = trdb_compress_trace_step(ctx, &packet_list, instr);
+        if (step == -1) {
+            LOG_ERRT("Compress trace failed\n");
+            status = TRDB_FAIL;
+            goto fail;
+        }
+    }
+    printf("%s\n", trace_path);
+    printf("instructions: %zu, packets: %zu, payload bytes: %zu\n", instrcnt,
+           ctx->stats.packets, ctx->stats.packetbits / 8);
+    printf("(Compression) Bits per instruction: %lf\n",
+           ctx->stats.packetbits / (double)ctx->stats.instrs);
+    printf("(Compression) Compression ratio: %lf\n",
+           ctx->stats.packetbits / (double)ctx->stats.instrbits);
+
+
+fail:
+    trdb_free_packet_list(&packet_list);
+    trdb_free_instr_list(&instr_list);
+    trdb_free(ctx);
+    return status;
+}
+
+
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
     struct trdb_ctx *ctx = trdb_new();
@@ -1003,7 +1083,15 @@ int main(int argc, char *argv[argc + 1])
 
     };
 
+    const char *tv_cvs[] = {
+        "data/cvs/dhrystone.spike_trace", "data/cvs/median.spike_trace",
+        "data/cvs/mm.spike_trace",        "data/cvs/mt-matmul.spike_trace",
+        "data/cvs/mt-vvadd.spike_trace",  "data/cvs/multiply.spike_trace",
+        "data/cvs/pmp.spike_trace",       "data/cvs/qsort.spike_trace",
+        "data/cvs/rsort.spike_trace",     "data/cvs/spmv.spike_trace",
+        "data/cvs/towers.spike_trace",    "data/cvs/vvadd.spike_trace"};
 
+    /* const char *tv_cvs[] = {"data/cvs/pmp.spike_trace"}; */
     INIT_TESTS();
     /* for (size_t i = 0; i < 8; i++) */
     /*     RUN_TEST(test_trdb_serialize_packet, i); */
@@ -1021,12 +1109,23 @@ int main(int argc, char *argv[argc + 1])
     /* NOTE: there is a memory leak ~230 bytes in riscv-dis.c with struct
      * riscv_subset for each instantiation of a disassembler.
      */
-    /* RUN_TEST(test_disassemble_trace, "data/interrupt", "data/trdb_stimuli");
+    /* RUN_TEST(test_disassemble_trace, "data/interrupt",
+    "data/trdb_stimuli");
      */
     RUN_TEST(test_disassemble_trace_with_bfd, "data/interrupt",
              "data/trdb_stimuli");
 
     RUN_TEST(test_compress_trace, "data/trdb_stimuli", "data/trdb_packets");
+
+    for (unsigned j = 0; j < TRDB_ARRAY_SIZE(tv_cvs); j++) {
+        const char *stim = tv_cvs[j];
+        if (access(stim, R_OK)) {
+            LOG_ERRT("File not found, skipping test at %s\n", stim);
+            continue;
+        }
+        RUN_TEST(test_compress_cvs_trace, stim);
+    }
+
 
     if (TRDB_ARRAY_SIZE(tv) % 2 != 0)
         LOG_ERRT("Test vector strings are incomplete.");
@@ -1041,6 +1140,7 @@ int main(int argc, char *argv[argc + 1])
         RUN_TEST(test_decompress_trace, bin, stim);
         RUN_TEST(test_decompress_trace_differential, bin, stim);
     }
+
 
     if (TESTS_SUCCESSFULL())
         printf("ALL TESTS PASSED\n");

@@ -35,10 +35,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-/* forward declarations */
-struct trdb_ctx;
-
-/* TODO: berkley */
+/* define functions which help figure out what function we are dealing with */
 #define DECLARE_INSN(code, match, mask)                                        \
     static const uint32_t match_##code = match;                                \
     static const uint32_t mask_##code = mask;                                  \
@@ -49,6 +46,22 @@ struct trdb_ctx;
 
 #include "riscv_encoding.h"
 #undef DECLARE_INSN
+
+#define OP_MASK_RD 0x1f
+#define OP_SH_RD 7
+#define MASK_RD (OP_MASK_RD << OP_SH_RD)
+
+static bool is_really_c_jalr_instr(long instr)
+{
+    /* we demand that rd is nonzero */
+    return is_c_jalr_instr(instr) && ((instr & MASK_RD) != 0);
+}
+
+static bool is_really_c_jr_instr(long instr)
+{
+    /* we demand that rd is nonzero */
+    return is_c_jr_instr(instr) && ((instr & MASK_RD) != 0);
+}
 
 /**
  * Used to capture all information and functions needed to disassemble.
@@ -66,6 +79,8 @@ struct disassembler_unit {
 #define TRDB_SOURCE_CODE 32
 #define TRDB_FUNCTION_CONTEXT 64
 #define TRDB_INLINES 128
+
+struct trdb_ctx;
 
 /**
  * Store disassembly configuration and context.

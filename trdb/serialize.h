@@ -91,3 +91,42 @@ int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
  */
 int trdb_write_packets(struct trdb_ctx *c, const char *path,
                        struct list_head *packet_list);
+
+/**
+ * Read a stimuli file at @p path into a list of tr_instr. This function
+ * allocates the struts in a sequential fashion.
+ *
+ * @param c the context/state of the trace debugger
+ * @param path where the stimuli file is located at
+ * @param status will be written with -1 on failure, 0 on success
+ * @param instrs list anchor where to append the tr_instr to
+ * @return number of read tr_instr
+ */
+size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
+                                  int *status, struct list_head *instrs);
+
+/**
+ * Read a stimuli file at @p path into an array of tr_instr.
+ *
+ * @param c the context/state of the trace debugger
+ * @param path where the stimuli file is located at
+ * @param samples where to write the read array of tr_instr
+ * @param status will be written with -1 on failure, 0 on success
+ * @return number of read tr_instr
+ */
+size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
+                             struct tr_instr **samples, int *status);
+
+
+/**
+ * Load cvs file, where each line represents an input vector to the trace
+ * debugger, into a list of tr_instr.
+ *
+ * @param c the context/state of the trace debugger
+ * @param path where the cvs file is located at
+ * @param status will be written with -1 on failure, 0 on success
+ * @param instrs list anchor where to append the tr_instr to
+ * @return number of read tr_instr
+ */
+size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
+                              struct list_head *instrs);

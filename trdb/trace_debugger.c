@@ -60,15 +60,14 @@ struct trdb_config {
      */
     bool use_pulp_sext;
 
+    /* Don't regard ret's as unpredictable discontinuity */
+    bool implicit_rets;
+    /* Use additional packets to jump over vector table */
+    bool pulp_vector_table_packet;
+
     /* TODO: move this */
     /* set to true to always diassemble to most general representation */
     bool no_aliases;
-    /* different address format, TODO: doesn't work */
-    bool prefix_addresses;
-    /* demangle symbols using bfd */
-    bool do_demangle;
-    /* display file offsets for displayed symbols */
-    bool display_file_offsets;
 };
 
 /* Records the state of the CPU. The compression routine looks at a sequence of
@@ -230,8 +229,10 @@ static int log_priority(const char *priority)
 
 void trdb_reset_compression(struct trdb_ctx *ctx)
 {
-    ctx->config = (struct trdb_config){
-        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
+    ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
+                                       .full_address = true,
+                                       .no_aliases = true,
+                                       .pulp_vector_table_packet = true};
 
     ctx->lastc = (struct trdb_state){.privilege = 7};
     ctx->thisc = (struct trdb_state){.privilege = 7};
@@ -245,8 +246,10 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
 
 void trdb_reset_decompression(struct trdb_ctx *ctx)
 {
-    ctx->config = (struct trdb_config){
-        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
+    ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
+                                       .full_address = true,
+                                       .no_aliases = true,
+                                       .pulp_vector_table_packet = true};
 
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
@@ -261,8 +264,10 @@ struct trdb_ctx *trdb_new()
     if (!ctx)
         return NULL;
 
-    ctx->config = (struct trdb_config){
-        .resync_max = UINT64_MAX, .full_address = true, .no_aliases = true};
+    ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
+                                       .full_address = true,
+                                       .no_aliases = true,
+                                       .pulp_vector_table_packet = true};
 
     ctx->lastc = (struct trdb_state){.privilege = 7};
     ctx->thisc = (struct trdb_state){.privilege = 7};
@@ -332,14 +337,13 @@ void trdb_set_full_address(struct trdb_ctx *ctx, bool v)
 
 static bool is_branch(uint32_t instr)
 {
-    /* static bool is_##code##_instr(long insn) */
-    /* TODO: add rvc instr */
-    assert((instr & 3) == 3);
     bool is_riscv_branch = is_beq_instr(instr) || is_bne_instr(instr)
                            || is_blt_instr(instr) || is_bge_instr(instr)
                            || is_bltu_instr(instr) || is_bgeu_instr(instr);
     bool is_pulp_branch = is_p_bneimm_instr(instr) || is_p_beqimm_instr(instr);
-    return is_riscv_branch || is_pulp_branch;
+    bool is_riscv_compressed_branch =
+        is_c_beqz_instr(instr) || is_c_bnez_instr(instr);
+    return is_riscv_branch || is_pulp_branch || is_riscv_compressed_branch;
     /* auipc */
 }
 
@@ -347,7 +351,6 @@ static bool is_branch(uint32_t instr)
 static bool branch_taken(bool before_compressed, uint32_t addr_before,
                          uint32_t addr_after)
 {
-    /* can this cause issues with RVC + degenerate jump (+2)? -> yes*/
     /* TODO: this definitely doens't work for 64 bit instructions */
     /* since we have already decompressed instructions, but still compressed
      * addresses we need this additional flag to tell us what the isntruction
@@ -385,9 +388,9 @@ static uint32_t branch_map_len(uint32_t branches)
  */
 static bool is_unpred_discontinuity(uint32_t instr)
 {
-    /* Should also work just fine with rvc instructions */
     return is_jalr_instr(instr) || is_mret_instr(instr) || is_sret_instr(instr)
-           || is_uret_instr(instr);
+           || is_uret_instr(instr) || is_really_c_jalr_instr(instr)
+           || is_really_c_jr_instr(instr);
 }
 
 
@@ -713,6 +716,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 {
     int generated_packet = 0;
     bool full_address = ctx->config.full_address;
+    bool pulp_vector_table_packet = ctx->config.pulp_vector_table_packet;
 
     /* for each cycle */
     // TODO: fix this hack by doing unqualified instead
@@ -812,7 +816,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         generated_packet = 1;
         /* end of cycle */
 
-    } else if (lastc->emitted_exception_sync) {
+    } else if (lastc->emitted_exception_sync && pulp_vector_table_packet) {
         /* First we assume that the vector table entry is a jump. Since that
          * entry can change during runtime, we need to emit the jump
          * destination address, which is the second instruction of the trap
@@ -962,8 +966,9 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 
     if (ctx->dunit) {
         /* TODO: unfortunately this ignores log_fn */
-        if (trdb_get_log_priority(ctx) == LOG_DEBUG)
+        if (trdb_get_log_priority(ctx) == LOG_DEBUG) {
             trdb_disassemble_instr(instr, ctx->dunit);
+        }
     } else {
         dbg(ctx, "0x%08jx  0x%08jx\n", (uintmax_t)instr->iaddr,
             (uintmax_t)instr->instr);
@@ -1698,173 +1703,6 @@ fail:
 }
 
 
-size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
-                                  int *status, struct list_head *instrs)
-{
-    *status = 0;
-    struct tr_instr *sample = NULL;
-
-    FILE *fp = fopen(path, "r");
-    if (!fp) {
-        err(c, "fopen: %s\n", strerror(errno));
-        *status = -1;
-        goto fail;
-    }
-    size_t scnt = 0;
-
-    int ret = 0;
-    int valid = 0;
-    int exception = 0;
-    int interrupt = 0;
-    uint32_t cause = 0;
-    uint32_t tval = 0;
-    uint32_t priv = 0;
-    uint32_t iaddr = 0;
-    uint32_t instr = 0;
-    int compressed = 0;
-
-    while (
-        (ret = fscanf(fp,
-                      "valid= %d exception= %d interrupt= %d cause= %" SCNx32
-                      " tval= %" SCNx32 " priv= %" SCNx32
-                      " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
-                      &valid, &exception, &interrupt, &cause, &tval, &priv,
-                      &compressed, &iaddr, &instr))
-        != EOF) {
-        // TODO: make this configurable so that we don't have to store so
-        // much data
-        /* if (!valid) { */
-        /*     continue; */
-        /* } */
-        sample = malloc(sizeof(*sample));
-        if (!sample) {
-            err(c, "malloc: %s\n", strerror(errno));
-            *status = -1;
-            goto fail;
-        }
-
-        *sample = (struct tr_instr){0};
-        sample->valid = valid;
-        sample->exception = exception;
-        sample->interrupt = interrupt;
-        sample->cause = cause;
-        sample->tval = tval;
-        sample->priv = priv;
-        sample->iaddr = iaddr;
-        sample->instr = instr;
-        sample->compressed = compressed;
-
-        list_add(&sample->list, instrs);
-
-        scnt++;
-    }
-
-    if (ferror(fp)) {
-        err(c, "fscanf: %s\n", strerror(errno));
-        *status = -1;
-        goto fail;
-    }
-
-    if (fp)
-        fclose(fp);
-    return scnt;
-fail:
-    if (fp)
-        fclose(fp);
-    // TODO: it's maybe better to not free the whole list, but just the part
-    // where failed
-    trdb_free_instr_list(instrs);
-    return 0;
-}
-
-
-/* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
-size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
-                             struct tr_instr **samples, int *status)
-{
-    *status = 0;
-    FILE *fp = fopen(path, "r");
-    if (!fp) {
-        err(c, "fopen: %s\n", strerror(errno));
-        *status = -1;
-        goto fail;
-    }
-    size_t scnt = 0;
-
-    int ret = 0;
-    int valid = 0;
-    int exception = 0;
-    int interrupt = 0;
-    uint32_t cause = 0;
-    uint32_t tval = 0;
-    uint32_t priv = 0;
-    uint32_t iaddr = 0;
-    uint32_t instr = 0;
-    int compressed = 0;
-
-    size_t size = 128;
-    *samples = malloc(size * sizeof(**samples));
-    if (!*samples) {
-        *status = -1;
-        goto fail;
-    }
-
-    while (
-        (ret = fscanf(fp,
-                      "valid= %d exception= %d interrupt= %d cause= %" SCNx32
-                      " tval= %" SCNx32 " priv= %" SCNx32
-                      " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
-                      &valid, &exception, &interrupt, &cause, &tval, &priv,
-                      &compressed, &iaddr, &instr))
-        != EOF) {
-        // TODO: make this configurable so that we don't have to store so much
-        // data
-        /* if (!valid) { */
-        /*     continue; */
-        /* } */
-        if (scnt >= size) {
-            size = 2 * size;
-            struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
-            if (!tmp) {
-                err(c, "realloc: %s\n", strerror(errno));
-                *status = -1;
-                goto fail;
-            }
-            *samples = tmp;
-        }
-        (*samples)[scnt] = (struct tr_instr){0};
-        (*samples)[scnt].valid = valid;
-        (*samples)[scnt].exception = exception;
-        (*samples)[scnt].interrupt = interrupt;
-        (*samples)[scnt].cause = cause;
-        (*samples)[scnt].tval = tval;
-        (*samples)[scnt].priv = priv;
-        (*samples)[scnt].iaddr = iaddr;
-        (*samples)[scnt].instr = instr;
-        (*samples)[scnt].compressed = compressed;
-        scnt++;
-    }
-    /* initialize the remaining unitialized memory */
-    memset((*samples) + scnt, 0, size - scnt);
-
-    if (ferror(fp)) {
-        err(c, "fscanf: %s\n", strerror(errno));
-        *status = -1;
-        goto fail;
-    }
-
-    if (fp)
-        fclose(fp);
-    return scnt;
-fail:
-    if (fp)
-        fclose(fp);
-    free(*samples);
-    *samples = NULL;
-    return 0;
-}
-
-
 void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                             struct disassembler_unit *dunit)
 {
@@ -1901,6 +1739,7 @@ void trdb_disassemble_instr(struct tr_instr *instr,
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx  ", (uintmax_t)instr->instr);
     (*dinfo->fprintf_func)(dinfo->stream, "%s",
                            instr->exception ? "TRAP!  " : "");
+
     disassemble_single_instruction(instr->instr, instr->iaddr, dunit);
 }
 
@@ -2057,13 +1896,13 @@ void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
 void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *instr)
 {
     dbg(c, "INSTR\n");
+    dbg(c, "    iaddr     : 0x%08" PRIx32 "\n", instr->iaddr);
+    dbg(c, "    instr     : 0x%08" PRIx32 "\n", instr->instr);
+    dbg(c, "    priv      : 0x%" PRIx32 "\n", instr->priv);
     dbg(c, "    exception : %s\n", instr->exception ? "true" : "false");
-    dbg(c, "    interrupt : %s\n", instr->interrupt ? "true" : "false");
     dbg(c, "    cause     : 0x%" PRIx32 "\n", instr->cause);
     dbg(c, "    tval      : 0x%" PRIx32 "\n", instr->tval);
-    dbg(c, "    priv      : 0x%" PRIx32 "\n", instr->priv);
-    dbg(c, "    iaddr     : 0x%" PRIx32 "\n", instr->iaddr);
-    dbg(c, "    instr     : 0x%" PRIx32 "\n", instr->instr);
+    dbg(c, "    interrupt : %s\n", instr->interrupt ? "true" : "false");
     dbg(c, "    compressed: %s\n", instr->compressed ? "true" : "false");
 }
 
@@ -2071,15 +1910,16 @@ void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *instr)
 void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
 {
     fprintf(stream, "INSTR\n");
+
+    fprintf(stream, "    iaddr     : 0x%08" PRIx32 "\n", instr->iaddr);
+    fprintf(stream, "    instr     : 0x%08" PRIx32 "\n", instr->instr);
+    fprintf(stream, "    priv      : 0x%" PRIx32 "\n", instr->priv);
     fprintf(stream, "    exception : %s\n",
             instr->exception ? "true" : "false");
-    fprintf(stream, "    interrupt : %s\n",
-            instr->interrupt ? "true" : "false");
     fprintf(stream, "    cause     : 0x%" PRIx32 "\n", instr->cause);
     fprintf(stream, "    tval      : 0x%" PRIx32 "\n", instr->tval);
-    fprintf(stream, "    priv      : 0x%" PRIx32 "\n", instr->priv);
-    fprintf(stream, "    iaddr     : 0x%" PRIx32 "\n", instr->iaddr);
-    fprintf(stream, "    instr     : 0x%" PRIx32 "\n", instr->instr);
+    fprintf(stream, "    interrupt : %s\n",
+            instr->interrupt ? "true" : "false");
     fprintf(stream, "    compressed: %s\n",
             instr->compressed ? "true" : "false");
 }

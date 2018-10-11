@@ -473,3 +473,303 @@ fail:
         fclose(fp);
     return status;
 }
+
+
+size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
+                                  int *status, struct list_head *instrs)
+{
+    *status = 0;
+    struct tr_instr *sample = NULL;
+
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        err(c, "fopen: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+    size_t scnt = 0;
+
+    int ret = 0;
+    int valid = 0;
+    int exception = 0;
+    int interrupt = 0;
+    uint32_t cause = 0;
+    uint32_t tval = 0;
+    uint32_t priv = 0;
+    uint32_t iaddr = 0;
+    uint32_t instr = 0;
+    int compressed = 0;
+
+    while (
+        (ret = fscanf(fp,
+                      "valid= %d exception= %d interrupt= %d cause= %" SCNx32
+                      " tval= %" SCNx32 " priv= %" SCNx32
+                      " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
+                      &valid, &exception, &interrupt, &cause, &tval, &priv,
+                      &compressed, &iaddr, &instr))
+        != EOF) {
+        // TODO: make this configurable so that we don't have to store so
+        // much data
+        /* if (!valid) { */
+        /*     continue; */
+        /* } */
+        sample = malloc(sizeof(*sample));
+        if (!sample) {
+            err(c, "malloc: %s\n", strerror(errno));
+            *status = -1;
+            goto fail;
+        }
+
+        *sample = (struct tr_instr){0};
+        sample->valid = valid;
+        sample->exception = exception;
+        sample->interrupt = interrupt;
+        sample->cause = cause;
+        sample->tval = tval;
+        sample->priv = priv;
+        sample->iaddr = iaddr;
+        sample->instr = instr;
+        sample->compressed = compressed;
+
+        list_add(&sample->list, instrs);
+
+        scnt++;
+    }
+
+    if (ferror(fp)) {
+        err(c, "fscanf: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+
+    if (fp)
+        fclose(fp);
+    return scnt;
+fail:
+    if (fp)
+        fclose(fp);
+    // TODO: it's maybe better to not free the whole list, but just the part
+    // where failed
+    trdb_free_instr_list(instrs);
+    return 0;
+}
+
+
+/* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
+size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
+                             struct tr_instr **samples, int *status)
+{
+    *status = 0;
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        err(c, "fopen: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+    size_t scnt = 0;
+
+    int ret = 0;
+    int valid = 0;
+    int exception = 0;
+    int interrupt = 0;
+    uint32_t cause = 0;
+    uint32_t tval = 0;
+    uint32_t priv = 0;
+    uint32_t iaddr = 0;
+    uint32_t instr = 0;
+    int compressed = 0;
+
+    size_t size = 128;
+    *samples = malloc(size * sizeof(**samples));
+    if (!*samples) {
+        *status = -1;
+        goto fail;
+    }
+
+    while (
+        (ret = fscanf(fp,
+                      "valid= %d exception= %d interrupt= %d cause= %" SCNx32
+                      " tval= %" SCNx32 " priv= %" SCNx32
+                      " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
+                      &valid, &exception, &interrupt, &cause, &tval, &priv,
+                      &compressed, &iaddr, &instr))
+        != EOF) {
+        // TODO: make this configurable so that we don't have to store so much
+        // data
+        /* if (!valid) { */
+        /*     continue; */
+        /* } */
+        if (scnt >= size) {
+            size = 2 * size;
+            struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
+            if (!tmp) {
+                err(c, "realloc: %s\n", strerror(errno));
+                *status = -1;
+                goto fail;
+            }
+            *samples = tmp;
+        }
+        (*samples)[scnt] = (struct tr_instr){0};
+        (*samples)[scnt].valid = valid;
+        (*samples)[scnt].exception = exception;
+        (*samples)[scnt].interrupt = interrupt;
+        (*samples)[scnt].cause = cause;
+        (*samples)[scnt].tval = tval;
+        (*samples)[scnt].priv = priv;
+        (*samples)[scnt].iaddr = iaddr;
+        (*samples)[scnt].instr = instr;
+        (*samples)[scnt].compressed = compressed;
+        scnt++;
+    }
+    /* initialize the remaining unitialized memory */
+    memset((*samples) + scnt, 0, size - scnt);
+
+    if (ferror(fp)) {
+        err(c, "fscanf: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+
+    if (fp)
+        fclose(fp);
+    return scnt;
+fail:
+    if (fp)
+        fclose(fp);
+    free(*samples);
+    *samples = NULL;
+    return 0;
+}
+
+
+size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
+                              struct list_head *instrs)
+{
+    *status = 0;
+    struct tr_instr *sample = NULL;
+
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        err(c, "fopen: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+    size_t scnt = 0;
+
+    int valid = 0;
+    int exception = 0;
+    int interrupt = 0;
+    uint32_t cause = 0;
+    uint32_t tval = 0;
+    uint32_t priv = 0;
+    uint32_t iaddr = 0;
+    uint32_t instr = 0;
+
+    char *line = NULL;
+    size_t len = 0;
+
+    /* reading header line */
+    if (getline(&line, &len, fp) == -1) {
+        err(c, "failed to parse header of cvs\n");
+        *status = -1;
+        goto fail;
+    }
+
+    if (!strcmp(line,
+                "VALID,ADDRESS,INSN,PRIVILEGE,"
+                "EXCEPTION,ECAUSE,TVAL,INTERRUPT")) {
+        err(c, "cvs header does not match expected value\n");
+        *status = -1;
+        goto fail;
+    }
+
+    /* parse data into tr_instr list */
+    while (getline(&line, &len, fp) != -1) {
+
+        sample = malloc(sizeof(*sample));
+        if (!sample) {
+            err(c, "malloc: %s\n", strerror(errno));
+            *status = -1;
+            goto fail;
+        }
+        *sample = (struct tr_instr){0};
+
+        int ele = 7;
+        const char *tok;
+        for (tok = strtok(line, ","); tok && *tok; tok = strtok(NULL, ",\n")) {
+
+            if (ele < 0) {
+                err(c, "reading too many tokens per line\n");
+                *status = -1;
+                goto fail;
+            }
+
+            switch (ele) {
+            case 7:
+                sscanf(tok, "%d", &valid);
+                sample->valid = valid;
+                break;
+            case 6:
+                sscanf(tok, "%" SCNx32 "", &iaddr);
+                sample->iaddr = iaddr;
+                break;
+            case 5:
+                sscanf(tok, "%" SCNx32 "", &instr);
+                sample->instr = instr;
+                sample->compressed = ((instr & 3) != 3);
+                break;
+            case 4:
+                sscanf(tok, "%" SCNx32 "", &priv);
+                sample->priv = priv;
+                break;
+            case 3:
+                sscanf(tok, "%d", &exception);
+                sample->exception = exception;
+                break;
+            case 2:
+                sscanf(tok, "%" SCNx32 "", &cause);
+                sample->cause = cause;
+                break;
+            case 1:
+                sscanf(tok, "%" SCNx32 "", &tval);
+                sample->tval = tval;
+                break;
+            case 0:
+                sscanf(tok, "%d", &interrupt);
+                sample->interrupt = interrupt;
+                break;
+            }
+            ele--;
+        }
+
+        if (ele > 0) {
+            err(c, "wrong number of tokens on line, still %d remaining\n", ele);
+            *status = -1;
+            goto fail;
+        }
+
+
+        list_add(&sample->list, instrs);
+
+        scnt++;
+    }
+
+    free(line);
+
+    if (ferror(fp)) {
+        err(c, "fscanf: %s\n", strerror(errno));
+        *status = -1;
+        goto fail;
+    }
+
+    if (fp)
+        fclose(fp);
+    return scnt;
+fail:
+    if (fp)
+        fclose(fp);
+    // TODO: it's maybe better to not free the whole list, but just the part
+    // where failed
+    trdb_free_instr_list(instrs);
+    return 0;
+}
