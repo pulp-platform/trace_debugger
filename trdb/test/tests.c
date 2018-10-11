@@ -760,7 +760,6 @@ fail:
 int test_compress_cvs_trace(const char *trace_path)
 {
     int status = TRDB_SUCCESS;
-    bfd *abfd = NULL;
     struct trdb_ctx *ctx = trdb_new();
 
     struct disassembler_unit dunit = {0};
@@ -811,7 +810,7 @@ int test_compress_cvs_trace(const char *trace_path)
         "instructions: %zu, packets: %zu, payload bytes: %zu "
         "exceptions: %zu z/o: %zu\n",
         instrcnt, ctx->stats.packets, ctx->stats.packetbits / 8,
-        ctx->stats.exception_packets, ctx->stats.all_zeros_all_ones);
+        ctx->stats.exception_packets, ctx->stats.zo_addresses);
     double bpi_payload = ctx->stats.packetbits / (double)ctx->stats.instrs;
     double bpi_full = (ctx->stats.packetbits + ctx->stats.packets * 6)
                       / (double)ctx->stats.instrs;
