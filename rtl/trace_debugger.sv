@@ -18,6 +18,7 @@ module trace_debugger
     #(parameter APB_ADDR_WIDTH = 32)
     (input logic                clk_i,
      input logic                rst_ni,
+     input logic                test_mode_i,
 
      // data from the cpu
      input logic                ivalid_i, //TODO: pipelined valid
@@ -37,9 +38,11 @@ module trace_debugger
      output logic               packet_word_valid_o,
      input logic                stall_i);
 
+
     // general control of this module
     // clock enabled
     logic                       trace_enable;
+    logic                       clk_gated;
     // tracing enabled
     logic                       trace_activated;
     // proper privileges for debugging
@@ -194,14 +197,18 @@ module trace_debugger
     // TODO: make this configurationr register mapped
     assign packet_after_exception                      = '1;
 
+    // unimplemented, just tie to zero
+    assign lc_tval = '0;
+    assign tc_context = '0;
+
 `ifndef SYNTHESIS
     trace_valid_and_debug: assert property
-    (@(posedge clk_i) disable iff (~rst_ni) (trace_enable |-> debug_mode))
+    (@(posedge clk_gated) disable iff (~rst_ni) (trace_enable |=> debug_mode))
         else $info("[TRDB]    @%t: Tracing works only in debug mode",
                    $time);
 `endif
 
-    // buffer variables. Certain variables we need to hold up to three cycles
+    // Buffer variables. Certain variables we need to hold up to three cycles
     assign interrupt0_d = interrupt_q;
     assign interrupt1_d = interrupt0_q;
     assign cause0_d = cause_q;
@@ -311,7 +318,7 @@ module trace_debugger
 
     // update branch map, careful there is a direct combinatorial path
     trdb_branch_map i_trdb_branch_map
-        (.clk_i(clk_i),
+        (.clk_i(clk_gated),
          .rst_ni(rst_ni),
          .valid_i(tc_is_branch && trace_valid && tc_qualified),
          .branch_taken_i(tc_branch_taken),
@@ -324,7 +331,7 @@ module trace_debugger
     // decides, by looking at the history of instructions, whether a packet is
     // necessary or not
     trdb_priority i_trdb_priority
-        (.clk_i(clk_i),
+        (.clk_i(clk_gated),
          .rst_ni(rst_ni),
          // there might be some data stuck in the
          // pipeline if valid never goes high again (e.g.
@@ -367,7 +374,7 @@ module trace_debugger
     trdb_timer
         #(.TIMER_WIDTH(TIMER_WIDTH))
     i_trdb_timer
-        (.clk_i(clk_i),
+        (.clk_i(clk_gated),
          .rst_ni(rst_ni),
          .manual_rst_i(timer_rst),
          .tu_req_i(tu_req),
@@ -378,7 +385,7 @@ module trace_debugger
 
     // whole packet generation logic
     trdb_packet_emitter i_trdb_packet_emitter
-        (.clk_i(clk_i),
+        (.clk_i(clk_gated),
          .rst_ni(rst_ni),
          .packet_format_i(packet_format),
          .packet_subformat_i(packet_subformat),
@@ -414,7 +421,7 @@ module trace_debugger
          .packet_grant_i(packet_is_read));
 
     trdb_stream_align8 i_trdb_stream_align
-        (.clk_i(clk_i),
+        (.clk_i(clk_gated),
          .rst_ni(rst_ni),
          .packet_bits_i(packet_bits),
          .packet_len_i(packet_len),
@@ -429,7 +436,7 @@ module trace_debugger
     assign packet_word_valid_o = packet_word_valid;
 
     // TODO: assert that we are not dealing with an unsupported instruction
-    always_ff @(posedge clk_i, negedge rst_ni) begin
+    always_ff @(posedge clk_gated, negedge rst_ni) begin
         if(~rst_ni) begin
             ivalid_q           <= '0;
             iexception_q       <= '0;
@@ -445,8 +452,10 @@ module trace_debugger
             cause0_q           <= '0;
             cause1_q           <= '0;
             priv0_q            <= 3'h7; //we always start in M-mode
+            privchange0_q      <= '0;
             exception0_q       <= '0;
             exception1_q       <= '0;
+            exception2_q       <= '0;
             u_discontinuity0_q <= '0;
             u_discontinuity1_q <= '0;
             is_branch0_q       <= '0;
@@ -513,6 +522,8 @@ module trace_debugger
     i_trdb_reg
         (.clk_i(clk_i),
          .rst_ni(rst_ni),
+         .test_mode_i(test_mode_i),
+         .clk_gated_o(clk_gated),
          .per_rdata_o(per_rdata),
          .per_ready_o(per_ready),
          .per_wdata_i(per_wdata),

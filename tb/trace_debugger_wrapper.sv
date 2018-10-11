@@ -17,6 +17,7 @@ module trace_debugger_wrapper
     trace_debugger i_trace_debugger
         (.clk_i(duv_if.clk_i),
          .rst_ni(duv_if.rst_ni),
+         .test_mode_i(duv_if.test_mode_i),
          .ivalid_i(duv_if.ivalid),
          .iexception_i(duv_if.iexception),
          .interrupt_i(duv_if.interrupt),

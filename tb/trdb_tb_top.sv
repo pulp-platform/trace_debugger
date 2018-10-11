@@ -22,9 +22,11 @@ module trdb_tb_top
     logic      clk = 'b1;
     logic      rst_n = 'b0;
     logic      eos_s = 'b0; //end of simulation
+    logic      test_mode;
 
+    assign test_mode = '0;
 
-    trace_debugger_if duv_if(clk, rst_n);
+    trace_debugger_if duv_if(clk, rst_n, test_mode);
 
     //instantiate duv
     trace_debugger_wrapper i_trace_debugger_wrapper(.duv_if(duv_if.duv));

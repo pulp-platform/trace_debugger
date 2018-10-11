@@ -17,6 +17,8 @@ module trdb_reg
     #(parameter APB_ADDR_WIDTH = 12)
     (input logic                      clk_i,
      input logic                      rst_ni,
+     input logic                      test_mode_i,
+     output logic                     clk_gated_o,
 
      // write and reads from the APB
      output logic [31:0]              per_rdata_o,
@@ -59,9 +61,11 @@ module trdb_reg
      input logic                      sw_grant_i,
 
      // timer packet request through user
-     output logic                     tu_req_o
-);
+     output logic                     tu_req_o);
 
+
+    // clock gating for everything but the ctrl register
+    logic                             clk_gated;
 
     // hold control status
     logic [TRDB_CTRL_SIZE-1:0] ctrl_q, ctrl_d;
@@ -205,9 +209,25 @@ module trdb_reg
         end
     end
 
+    // clock gating logic
+    pulp_clock_gating i_trdb_clock_gating
+        (.clk_i(clk_i),
+         .test_en_i(test_mode_i),
+         .en_i(ctrl_q[TRDB_ENABLE]),
+         .clk_o(clk_gated));
+
+    assign clk_gated_o = clk_gated;
+
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
-            ctrl_q        <= 'h0;
+            ctrl_q <= 'h0;
+        end else begin
+            ctrl_q <= ctrl_d;
+        end
+    end
+
+    always_ff @(posedge clk_gated, negedge rst_ni) begin
+        if(~rst_ni) begin
             status_q      <= 'h0;
             filter_q      <= 'h0;
             dump_q        <= 'h0;
@@ -216,7 +236,6 @@ module trdb_reg
             lower_addr_q  <= 'h0;
 
         end else begin
-            ctrl_q        <= ctrl_d;
             status_q      <= status_d;
             filter_q      <= filter_d;
             dump_q        <= dump_d;
