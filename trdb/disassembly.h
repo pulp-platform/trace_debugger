@@ -27,13 +27,14 @@
 #ifndef __DISASSEMBLY_H__
 #define __DISASSEMBLY_H__
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
 #include "bfd.h"
 #include "demangle.h"
 #include "dis-asm.h"
 #include "trace_debugger.h"
-#include <inttypes.h>
-#include <stdbool.h>
 
 /* define functions which help figure out what function we are dealing with */
 #define DECLARE_INSN(code, match, mask)                                        \
@@ -47,9 +48,27 @@
 #include "riscv_encoding.h"
 #undef DECLARE_INSN
 
+/* ABI names for x-registers */
+#define X_RA 1
+#define X_SP 2
+#define X_GP 3
+#define X_TP 4
+#define X_T0 5
+#define X_T1 6
+#define X_T2 7
+#define X_T3 28
+
 #define OP_MASK_RD 0x1f
 #define OP_SH_RD 7
 #define MASK_RD (OP_MASK_RD << OP_SH_RD)
+
+#define OP_MASK_RS1 0x1f
+#define OP_SH_RS1 15
+#define MASK_RS1 (OP_MASK_RS1 << OP_SH_RS1)
+
+#define RV_X(x, s, n) (((x) >> (s)) & ((1 << (n)) - 1))
+#define ENCODE_ITYPE_IMM(x) (RV_X(x, 0, 12) << 20)
+#define MASK_IMM ENCODE_ITYPE_IMM(-1U)
 
 static bool is_really_c_jalr_instr(long instr)
 {
@@ -61,6 +80,17 @@ static bool is_really_c_jr_instr(long instr)
 {
     /* we demand that rd is nonzero */
     return is_c_jr_instr(instr) && ((instr & MASK_RD) != 0);
+}
+
+static bool is_c_ret_instr(long instr)
+{
+    return (instr & (MASK_C_JR | MASK_RD)) == (MATCH_C_JR | (X_RA << OP_SH_RD));
+}
+
+static bool is_ret_instr(long instr)
+{
+    return (instr & (MASK_JALR | MASK_RD | MASK_RS1 | MASK_IMM))
+           == (MATCH_JALR | (X_RA << OP_SH_RS1));
 }
 
 /**
@@ -164,6 +194,16 @@ static inline unsigned int riscv_instr_len(uint64_t instr)
  * @param dinfo filled with information of the PULP platform
  */
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
+
+
+/**
+ * Initialize disassembler_unit with settings for the PULP platform.
+ * @param dunit filled with information for PULP
+ * @param options configure the formatting behaviour or NULL
+ * @return -1 on failure 0 on success
+ */
+int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
+                                    char *options);
 
 /**
  * Initialize disassemble_info from libopcodes by grabbing data out of @p abfd.
@@ -367,4 +407,5 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
 void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
                                            bfd_vma addr,
                                            struct disassembler_unit *dunit);
+
 #endif

@@ -61,7 +61,7 @@ struct trdb_config {
     bool use_pulp_sext;
 
     /* Don't regard ret's as unpredictable discontinuity */
-    bool implicit_rets;
+    bool implicit_ret;
     /* Use additional packets to jump over vector table */
     bool pulp_vector_table_packet;
 
@@ -386,11 +386,19 @@ static uint32_t branch_map_len(uint32_t branches)
  * entries. For plain RISC-V I this is just the jalr instruction. For the PULP
  * extensions, the hardware loop instruction have to be considered too.
  */
-static bool is_unpred_discontinuity(uint32_t instr)
+static bool is_unpred_discontinuity(uint32_t instr, bool implicit_ret)
 {
-    return is_jalr_instr(instr) || is_mret_instr(instr) || is_sret_instr(instr)
-           || is_uret_instr(instr) || is_really_c_jalr_instr(instr)
-           || is_really_c_jr_instr(instr);
+    bool jump = is_jalr_instr(instr) || is_really_c_jalr_instr(instr)
+                || is_really_c_jr_instr(instr);
+    bool exception_ret =
+        is_mret_instr(instr) || is_sret_instr(instr) || is_uret_instr(instr);
+
+    /* this allows us to mark ret's as not being discontinuities, if we want */
+    bool not_ret = true;
+    if (implicit_ret)
+        not_ret = !(is_c_ret_instr(instr) || is_ret_instr(instr));
+
+    return (jump || exception_ret) && not_ret;
 }
 
 
@@ -717,6 +725,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     int generated_packet = 0;
     bool full_address = ctx->config.full_address;
     bool pulp_vector_table_packet = ctx->config.pulp_vector_table_packet;
+    bool implicit_ret = ctx->config.implicit_ret;
 
     /* for each cycle */
     // TODO: fix this hack by doing unqualified instead
@@ -740,7 +749,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     nextc->qualified = true;
     nextc->unqualified = !nextc->qualified;
     nextc->exception = instr->exception;
-    nextc->unpred_disc = is_unpred_discontinuity(instr->instr);
+    nextc->unpred_disc = is_unpred_discontinuity(instr->instr, implicit_ret);
     nextc->privilege = instr->priv;
     nextc->privilege_change = (thisc->privilege != nextc->privilege);
 
@@ -838,7 +847,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 
         filter->resync_pend = false;
         generated_packet = 1;
-        /* end of cycle */
 
     } else if (firstc_qualified || thisc->unhalted || thisc->privilege_change
                || (filter->resync_pend && branch_map->cnt == 0)) {
@@ -857,7 +865,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 
         filter->resync_pend = false;
         generated_packet = 1;
-        /* end of cycle */
 
     } else if (lastc->unpred_disc) {
         /* Send te_inst:
@@ -873,7 +880,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         list_add(&tr->list, packet_list);
 
         generated_packet = 1;
-        /* end of cycle */
 
     } else if (filter->resync_pend && branch_map->cnt > 0) {
         /* we treat resync_pend && branches == 0 before */
@@ -890,7 +896,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         list_add(&tr->list, packet_list);
 
         generated_packet = 1;
-        /* end of cycle */
 
     } else if (nextc->halt || nextc->exception || nextc->privilege_change
                || nextc->unqualified) {
@@ -907,7 +912,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         list_add(&tr->list, packet_list);
 
         generated_packet = 1;
-        /* end of cycle */
 
     } else if (branch_map->full) {
         /* Send te_inst:
@@ -920,7 +924,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         list_add(&tr->list, packet_list);
 
         generated_packet = 1;
-        /* end of cycle */
 
     } else if (thisc->context_change) {
         /* Send te_inst:
@@ -1158,6 +1161,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
      * host format
      */
     /* TODO: supports only statically linked elf executables */
+    bool full_address = c->config.full_address;
+    bool implicit_ret = c->config.implicit_ret;
+    bool no_aliases = c->config.no_aliases;
 
     /* find section belonging to start_address */
     bfd_vma start_address = abfd->start_address;
@@ -1175,8 +1181,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     struct tr_instr dis_instr = {0};
 
     dunit.dinfo = &dinfo;
-    init_disassembler_unit(&dunit, abfd,
-                           c->config.no_aliases ? "no-aliases" : NULL);
+    init_disassembler_unit(&dunit, abfd, no_aliases ? "no-aliases" : NULL);
     /* advanced fprintf output handling */
     dunit.dinfo->fprintf_func = build_instr_fprintf;
     /* dunit.dinfo->stream = &instr; */
@@ -1314,7 +1319,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(dis_instr.instr)) {
+                    if (!is_unpred_discontinuity(dis_instr.instr,
+                                                 implicit_ret)) {
                         break;
                     }
                     info(c, "Detected mret, uret or sret\n");
@@ -1389,7 +1395,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 }
             }
         } else if (packet->format == F_BRANCH_DIFF) {
-            if (c->config.full_address) {
+            if (full_address) {
                 err(c,
                     "F_BRANCH_DIFF shouldn't happen, decoder configured with full_address\n");
                 goto fail;
@@ -1451,7 +1457,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(dis_instr.instr)) {
+                    if (!is_unpred_discontinuity(dis_instr.instr,
+                                                 implicit_ret)) {
                         break;
                     }
                     info(c, "Detected mret, uret or sret\n");
@@ -1570,7 +1577,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 /* TODO: we need this hack since {m,s,u} ret are not
                  * classified in libopcodes
                  */
-                if (!is_unpred_discontinuity(dis_instr.instr)) {
+                if (!is_unpred_discontinuity(dis_instr.instr, implicit_ret)) {
                     break;
                 }
                 info(c, "Detected mret, uret or sret\n");
@@ -1623,7 +1630,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             bool hit_discontinuity = false;
 
             uint32_t absolute_addr;
-            if (c->config.full_address) {
+            if (full_address) {
                 absolute_addr = packet->address;
             } else {
                 /* uint32_t sext_addr = sext32( */
@@ -1664,7 +1671,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(dis_instr.instr)) {
+                    if (!is_unpred_discontinuity(dis_instr.instr,
+                                                 implicit_ret)) {
                         break;
                     }
                     info(c, "Detected mret, uret or sret\n");

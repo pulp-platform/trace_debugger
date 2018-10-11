@@ -796,6 +796,7 @@ int test_compress_cvs_trace(const char *trace_path)
     ctx->dunit = &dunit;
     ctx->config.full_address = false;
     ctx->config.pulp_vector_table_packet = false;
+    ctx->config.implicit_ret = true;
 
     size_t instrcnt =
         trdb_cvs_to_trace_list(ctx, trace_path, &status, &instr_list);
