@@ -204,7 +204,7 @@ void trdb_set_log_fn(struct trdb_ctx *ctx,
  * logged.
  *
  * @param ctx a trace debugger context
- * @return the current loggin priority
+ * @return the current logging priority
  */
 int trdb_get_log_priority(struct trdb_ctx *ctx);
 
@@ -213,14 +213,75 @@ int trdb_get_log_priority(struct trdb_ctx *ctx);
  * logged.
  *
  * @param ctx a trace debugger context
- * @param priority the new loggint priority
+ * @param priority the new logging priority
  */
 void trdb_set_log_priority(struct trdb_ctx *ctx, int priority);
 
-
+/**
+ * Get if we are always generating full address packets and don't do compression
+ * by omitting sign bits. Otherwise we also generate differential address
+ * packets and always compress the sign bits.
+ *
+ * @param ctx a trace debugger context
+ * @return the address compression behaviour
+ */
 bool trdb_is_full_address(struct trdb_ctx *ctx);
 
+/**
+ * Set if we want to always generate full address packets and don't do
+ * compression by omitting sign bits. Otherwise we also generate differential
+ * address packets and always compress the sign bits.
+ *
+ * @param ctx a trace debugger context
+ * @param v address compression behaviour
+ */
 void trdb_set_full_address(struct trdb_ctx *ctx, bool v);
+
+/**
+ * Get whether currently packets are not generated for ret instructions. If
+ * enabled, this invokes the specific detection of ret instructions (which is
+ * just an alias for a jalr instruction) and prevents the emission of a packet.
+ * We can do this since if the decoder keeps track of the called functions and
+ * thus the RAS (return address stack) it can infer where a ret instruction
+ * points to.
+ *
+ * @param ctx a trace debugger context
+ * @return generat additional packets
+ */
+bool trdb_get_implicit_ret(struct trdb_ctx *ctx);
+
+/**
+ * Set whether a ret instruction should generate a packet. If enabled, this
+ * invokes the specific detection of ret instructions (which is just an alias
+ * for a jalr instruction) and prevents the emission of a packet. We can do this
+ * since if the decoder keeps track of the called functions and thus the RAS
+ * (return address stack) it can infer where a ret instruction points to.
+ *
+ * @param ctx a trace debugger context
+ * @param implicit_ret true to prevent additional packets
+ */
+void trdb_set_implicit_ret(struct trdb_ctx *ctx, bool implicit_ret);
+
+/**
+ * Get whether currently an extra packet is generated for an exception. This is
+ * useful for the PULP platform since this allows us to figure out where the
+ * vector table entries point to (which are initialized during runtime).
+ *
+ * @param ctx a trace debugger context
+ * @return whether an extra packet is generated
+ */
+bool trdb_get_pulp_extra_packet(struct trdb_ctx *ctx);
+
+/**
+ * Set whether we should generated an additional packet after an exception
+ * packet. This is useful for the PULP platform since this allows us to figure
+ * out where the vector table entries point to (which are initialized during
+ * runtime).
+ *
+ * @param ctx a trace debugger context
+ * @param extra_packets whether an extra packet should be generated
+ */
+void trdb_set_pulp_extra_packet(struct trdb_ctx *ctx, bool extra_packet);
 
 /**
  * Compress the given sequence of instruction to a sequence of packets.

@@ -334,15 +334,39 @@ void trdb_set_log_priority(struct trdb_ctx *ctx, int priority)
 }
 
 
+void trdb_set_full_address(struct trdb_ctx *ctx, bool v)
+{
+    ctx->config.full_address = v;
+}
+
+
 bool trdb_is_full_address(struct trdb_ctx *ctx)
 {
     return ctx->config.full_address;
 }
 
 
-void trdb_set_full_address(struct trdb_ctx *ctx, bool v)
+void trdb_set_implicit_ret(struct trdb_ctx *ctx, bool implicit_ret)
 {
-    ctx->config.full_address = v;
+    ctx->config.implicit_ret = implicit_ret;
+}
+
+
+bool trdb_get_implicit_ret(struct trdb_ctx *ctx)
+{
+    return ctx->config.implicit_ret;
+}
+
+
+void trdb_set_pulp_extra_packet(struct trdb_ctx *ctx, bool extra_packet)
+{
+    ctx->config.pulp_vector_table_packet = extra_packet;
+}
+
+
+bool trdb_get_pulp_extra_packet(struct trdb_ctx *ctx)
+{
+    return ctx->config.pulp_vector_table_packet;
 }
 
 
