@@ -29,6 +29,7 @@
 #include <errno.h>
 #include "trace_debugger.h"
 #include "disassembly.h"
+#include "serialize.h"
 #include "list.h"
 #include "utils.h"
 
@@ -50,6 +51,9 @@ struct trdb_config {
     /* bool iaddress_lsb_p; */
     /* bool implicit_except; */
     /* bool set_trace; */
+
+    /* collect as much information as possible, but slower execution */
+    bool full_statistics;
 
     /* set to true to always use absolute addresses in packets, this is used for
      * decompression and compression
@@ -156,6 +160,7 @@ struct trdb_dec_state {
 struct trdb_stats {
     size_t payloadbits;
     size_t packetbits;
+    size_t pulpbits;
     size_t instrbits;
     size_t instrs;
     size_t packets;
@@ -235,7 +240,8 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
     ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
                                        .full_address = true,
                                        .no_aliases = true,
-                                       .pulp_vector_table_packet = true};
+                                       .pulp_vector_table_packet = true,
+                                       .full_statistics = true};
 
     ctx->lastc = (struct trdb_state){.privilege = 7};
     ctx->thisc = (struct trdb_state){.privilege = 7};
@@ -252,7 +258,8 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
     ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
                                        .full_address = true,
                                        .no_aliases = true,
-                                       .pulp_vector_table_packet = true};
+                                       .pulp_vector_table_packet = true,
+                                       .full_statistics = true};
 
     ctx->branch_map = (struct branch_map_state){0};
     ctx->filter = (struct filter_state){0};
@@ -270,7 +277,8 @@ struct trdb_ctx *trdb_new()
     ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
                                        .full_address = true,
                                        .no_aliases = true,
-                                       .pulp_vector_table_packet = true};
+                                       .pulp_vector_table_packet = true,
+                                       .full_statistics = true};
 
     ctx->lastc = (struct trdb_state){.privilege = 7};
     ctx->thisc = (struct trdb_state){.privilege = 7};
@@ -411,6 +419,14 @@ static bool is_unsupported(uint32_t instr)
     return is_lp_setup_instr(instr) || is_lp_counti_instr(instr)
            || is_lp_count_instr(instr) || is_lp_endi_instr(instr)
            || is_lp_starti_instr(instr) || is_lp_setupi_instr(instr);
+}
+
+
+static uint32_t sign_extendable_bits64(uint64_t addr)
+{
+    int clz = __builtin_clzl(addr);
+    int clo = __builtin_clzl(~addr);
+    return clz > clo ? clz : clo;
 }
 
 
@@ -681,9 +697,18 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 
             if (tr->address == 0 || tr->address == -1)
                 ctx->stats.zo_addresses++;
-
+            uint32_t ext =
+                XLEN + branch_map_len(branch_map->cnt)
+                - sign_extendable_bits64(
+                      ((uint64_t)tr->address << XLEN)
+                      | ((uint64_t)branch_map->bits
+                         << (XLEN - branch_map_len(branch_map->cnt))))
+                + 1;
             tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
                          + branch_map_len(branch_map->cnt);
+            /* tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN */
+            /* 	+ext; */
+
             if (branch_map->full) {
                 if (is_u_discontinuity) {
                     tr->length += keep;
@@ -716,6 +741,8 @@ static void emit_full_branch_map(struct tr_packet *tr,
     tr->branch_map = branch_map->bits;
     /* No address needed */
     tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + branch_map_len(31);
+    /* tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN */
+    /*              + (31 - sign_extendable_bits(branch_map->bits) + 1); */
     *branch_map = (struct branch_map_state){0};
 }
 
@@ -968,8 +995,19 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     ctx->stats.instrs++;
     if (generated_packet) {
         *branch_map = (struct branch_map_state){0};
-        ctx->stats.packetbits += (tr->length - MSGTYPELEN);
+        ctx->stats.payloadbits += (tr->length - MSGTYPELEN);
         ctx->stats.packets++;
+
+        if (ctx->config.full_statistics) {
+            /* figure out pulp payload by serializing and couting bits */
+            uint8_t bin[16] = {0};
+            size_t bitcnt = 0;
+            if (trdb_pulp_serialize_packet(ctx, tr, &bitcnt, 0, bin)) {
+                err(ctx, "failed to count bits of pulp packet\n");
+            }
+            /* we have to round up to the next full byte */
+            ctx->stats.pulpbits += ((bitcnt / 8) + (bitcnt % 8 != 0)) * 8;
+        }
     }
 
     if (generated_packet) {

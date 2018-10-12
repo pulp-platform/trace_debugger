@@ -809,17 +809,25 @@ int test_compress_cvs_trace(const char *trace_path)
     printf(
         "instructions: %zu, packets: %zu, payload bytes: %zu "
         "exceptions: %zu z/o: %zu\n",
-        instrcnt, ctx->stats.packets, ctx->stats.packetbits / 8,
+        instrcnt, ctx->stats.packets, ctx->stats.payloadbits / 8,
         ctx->stats.exception_packets, ctx->stats.zo_addresses);
-    double bpi_payload = ctx->stats.packetbits / (double)ctx->stats.instrs;
-    double bpi_full = (ctx->stats.packetbits + ctx->stats.packets * 6)
+    double bpi_payload = ctx->stats.payloadbits / (double)ctx->stats.instrs;
+    double bpi_full = (ctx->stats.payloadbits + ctx->stats.packets * 6)
                       / (double)ctx->stats.instrs;
-    printf("(Compression) Bits per instruction (payload ): %lf\n", bpi_payload);
-    printf("(Compression) Bits per instruction (full+%2.lf%%): %lf\n",
-           bpi_full / bpi_payload * 100 - 100, bpi_full);
+    double bpi_pulp = (ctx->stats.pulpbits / (double)ctx->stats.instrs);
+    printf("(Compression) Bits per instruction (payload         ): %lf\n",
+           bpi_payload);
+    printf(
+        "(Compression) Bits per instruction (payload + header): %lf "
+        "(+%2.lf%%)\n",
+        bpi_full, bpi_full / bpi_payload * 100 - 100);
+    printf(
+        "(Compression) Bits per instruction (pulp            ): %lf "
+        "(+%2.lf%%)\n ",
+        bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
 
     printf("(Compression) Compression ratio: %lf\n",
-           ctx->stats.packetbits / (double)ctx->stats.instrbits);
+           ctx->stats.payloadbits / (double)ctx->stats.instrbits);
 
 
 fail:
@@ -873,9 +881,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
     printf("%s\n", bin_path);
     printf("(Compression) Bits per instruction: %lf\n",
-           ctx->stats.packetbits / (double)ctx->stats.instrs);
+           ctx->stats.payloadbits / (double)ctx->stats.instrs);
     printf("(Compression) Compression ratio: %lf\n",
-           ctx->stats.packetbits / (double)ctx->stats.instrbits);
+           ctx->stats.payloadbits / (double)ctx->stats.instrbits);
 
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
@@ -977,9 +985,9 @@ int test_decompress_trace_differential(const char *bin_path,
     }
     printf("%s\n", bin_path);
     printf("(Compression) Bits per instruction: %lf\n",
-           ctx->stats.packetbits / (double)ctx->stats.instrs);
+           ctx->stats.payloadbits / (double)ctx->stats.instrs);
     printf("(Compression) Compression ratio: %lf\n",
-           ctx->stats.packetbits / (double)ctx->stats.instrbits);
+           ctx->stats.payloadbits / (double)ctx->stats.instrbits);
     printf("(Compression) Sign extension distribution:\n");
     unsigned sum = 0;
     for (unsigned i = 0; i < 32; i++) {
