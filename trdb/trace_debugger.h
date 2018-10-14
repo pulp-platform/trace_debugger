@@ -218,6 +218,22 @@ int trdb_get_log_priority(struct trdb_ctx *ctx);
 void trdb_set_log_priority(struct trdb_ctx *ctx, int priority);
 
 /**
+ * Set the disassembling context used in @p ctx.
+ *
+ * @param ctx a trace debugger context
+ * @param dunit the configured disassembler
+ */
+void trdb_set_dunit(struct trdb_ctx *ctx, struct disassembler_unit *dunit);
+
+/**
+ * Get the disassemble context used in @p ctx.
+ *
+ * @param ctx a trace debugger context
+ * @return the current disassembler used
+ */
+struct disassembler_unit *trdb_get_dunit(struct trdb_ctx *ctx);
+
+/**
  * Get if we are always generating full address packets and don't do compression
  * by omitting sign bits. Otherwise we also generate differential address
  * packets and always compress the sign bits.
@@ -246,7 +262,7 @@ void trdb_set_full_address(struct trdb_ctx *ctx, bool v);
  * points to.
  *
  * @param ctx a trace debugger context
- * @return generat additional packets
+ * @return generate additional packets
  */
 bool trdb_get_implicit_ret(struct trdb_ctx *ctx);
 
@@ -282,6 +298,81 @@ bool trdb_get_pulp_extra_packet(struct trdb_ctx *ctx);
  * @param extra_packets whether an extra packet should be generated
  */
 void trdb_set_pulp_extra_packet(struct trdb_ctx *ctx, bool extra_packet);
+
+/**
+ * Get whether full branch maps are compressed by omitting bits that can be
+ * inferred using sign extension.
+ *
+ * @param ctx a trace debugger context
+ * @return if we compress full branch maps
+ */
+bool trdb_get_compress_branch_map(struct trdb_ctx *ctx);
+
+/**
+ * Set whether full branch maps should be compressed by omitting bits that can
+ * be inferred using sign extension.
+ *
+ * @param ctx a trace debugger context
+ * @param compress the new compression behaviour
+ */
+void trdb_set_compress_branch_map(struct trdb_ctx *ctx, bool compress);
+
+/**
+ * Get the current number of bits of all the payloads which were produced
+ * by calling trdb_compress_trace_step.
+ *
+ * @param ctx a trace debugger context
+ * @return number of bits of all payloads
+ */
+size_t trdb_get_payloadbits(struct trdb_ctx *ctx);
+
+/**
+ * Get the current number of bits of required to store all packets which were
+ * produced by calling trdb_compress_trace_step. This includes all
+ * overhead including quantization loss because pulp packets are always byte
+ * aligned.
+ *
+ * @param ctx a trace debugger context
+ * @return number of bits of all pulp packets
+ */
+size_t trdb_get_pulpbits(struct trdb_ctx *ctx);
+
+/**
+ * Get the current number of emitted packets which were produced by calling
+ * trdb_compress_trace_step.
+ *
+ * @param ctx a trace debugger context
+ * @eturn number of emitted packets
+ */
+size_t trdb_get_packetcnt(struct trdb_ctx *ctx);
+
+/**
+ * Get the current number of instructions that went through
+ * trdb_compress_trace_step.
+ *
+ * @param ctx a trace debugger context
+ * @return number of instructions that were compressed
+ */
+size_t trdb_get_instrcnt(struct trdb_ctx *ctx);
+
+/**
+ * Get the current number of instruction bits that went through
+ * trdb_compress_trace_step. This considers RVC instructions.
+ *
+ * @param ctx a trace debugger context
+ * @return number of instruction bits
+ */
+size_t trdb_get_instrbits(struct trdb_ctx *ctx);
+
+
+/**
+ * Get the current number of exception packets that were produced by calling
+ * trdb_compress_trace_step.
+ *
+ * @param ctx a trace debugger context
+ * @return number of exception packets produced
+ */
+size_t trdb_get_exception_packetcnt(struct trdb_ctx *ctx);
 
 /**
  * Compress the given sequence of instruction to a sequence of packets.

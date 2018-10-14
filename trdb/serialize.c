@@ -118,7 +118,15 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                 *bitcnt += XLEN;
             else
                 *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
-        }
+        } else {
+	    /* no address, but compress full branch map*/
+	    if(trdb_get_compress_branch_map(c)){
+		*bitcnt -=len;
+		uint32_t sext = p_sign_extendable_bits(packet->branch_map << 1);
+		if(sext > 31) sext = 31;
+		*bitcnt += (31 - sext + 1);
+	    }
+	}
         data.bits <<= align;
         memcpy(bin, data.bin,
                (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
@@ -151,7 +159,16 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                 ((__uint128_t)packet->address
                  << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
             *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
-        }
+        }  else {
+	    /* no address, but compress full branch map*/
+	    if(trdb_get_compress_branch_map(c)){
+		*bitcnt -=len;
+		uint32_t sext = p_sign_extendable_bits(packet->branch_map << 1);
+		if(sext > 31) sext = 31;
+		*bitcnt += (31 - sext + 1);
+	    }
+	}
+
         data.bits <<= align;
         memcpy(bin, data.bin,
                (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));

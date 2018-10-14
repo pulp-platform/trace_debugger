@@ -63,11 +63,12 @@ struct trdb_config {
      * full_address = false
      */
     bool use_pulp_sext;
-
     /* Don't regard ret's as unpredictable discontinuity */
     bool implicit_ret;
     /* Use additional packets to jump over vector table */
     bool pulp_vector_table_packet;
+    /* whether we compress full branch maps */
+    bool compress_full_branch_map;
 
     /* TODO: move this */
     /* set to true to always diassemble to most general representation */
@@ -334,6 +335,18 @@ void trdb_set_log_priority(struct trdb_ctx *ctx, int priority)
 }
 
 
+void trdb_set_dunit(struct trdb_ctx *ctx, struct disassembler_unit *dunit)
+{
+    ctx->dunit = dunit;
+}
+
+
+struct disassembler_unit *trdb_get_dunit(struct trdb_ctx *ctx)
+{
+    return ctx->dunit;
+}
+
+
 void trdb_set_full_address(struct trdb_ctx *ctx, bool v)
 {
     ctx->config.full_address = v;
@@ -367,6 +380,55 @@ void trdb_set_pulp_extra_packet(struct trdb_ctx *ctx, bool extra_packet)
 bool trdb_get_pulp_extra_packet(struct trdb_ctx *ctx)
 {
     return ctx->config.pulp_vector_table_packet;
+}
+
+
+void trdb_set_compress_branch_map(struct trdb_ctx *ctx, bool compress)
+{
+    ctx->config.compress_full_branch_map = compress;
+}
+
+
+bool trdb_get_compress_branch_map(struct trdb_ctx *ctx)
+{
+
+    return ctx->config.compress_full_branch_map;
+}
+
+
+size_t trdb_get_payloadbits(struct trdb_ctx *ctx)
+{
+    return ctx->stats.payloadbits;
+}
+
+
+size_t trdb_get_pulpbits(struct trdb_ctx *ctx)
+{
+    return ctx->stats.pulpbits;
+}
+
+
+size_t trdb_get_packetcnt(struct trdb_ctx *ctx)
+{
+    return ctx->stats.packets;
+}
+
+
+size_t trdb_get_instrcnt(struct trdb_ctx *ctx)
+{
+    return ctx->stats.instrs;
+}
+
+
+size_t trdb_get_instrbits(struct trdb_ctx *ctx)
+{
+    return ctx->stats.instrbits;
+}
+
+
+size_t trdb_get_exception_packetcnt(struct trdb_ctx *ctx)
+{
+    return ctx->stats.exception_packets;
 }
 
 
@@ -446,10 +508,15 @@ static bool is_unsupported(uint32_t instr)
 }
 
 
+static uint32_t sign_extendable_bits128(__uint128_t addr)
+{
+    return 0;
+}
+
 static uint32_t sign_extendable_bits64(uint64_t addr)
 {
-    int clz = __builtin_clzl(addr);
-    int clo = __builtin_clzl(~addr);
+    int clz = __builtin_clzll(addr);
+    int clo = __builtin_clzll(~addr);
     return clz > clo ? clz : clo;
 }
 
@@ -721,13 +788,13 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 
             if (tr->address == 0 || tr->address == -1)
                 ctx->stats.zo_addresses++;
-            uint32_t ext =
-                XLEN + branch_map_len(branch_map->cnt)
-                - sign_extendable_bits64(
-                      ((uint64_t)tr->address << XLEN)
-                      | ((uint64_t)branch_map->bits
-                         << (XLEN - branch_map_len(branch_map->cnt))))
-                + 1;
+            uint32_t sext = sign_extendable_bits64(
+                ((uint64_t)tr->address << XLEN)
+                | ((uint64_t)branch_map->bits
+                   << (XLEN - branch_map_len(branch_map->cnt))));
+            if (sext > XLEN + branch_map_len(branch_map->cnt))
+                sext = XLEN + branch_map_len(branch_map->cnt);
+            uint32_t ext = XLEN + branch_map_len(branch_map->cnt) - sext + 1;
             tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
                          + branch_map_len(branch_map->cnt);
             /* tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN */
@@ -755,7 +822,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 }
 
 
-static void emit_full_branch_map(struct tr_packet *tr,
+static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
                                  struct branch_map_state *branch_map)
 {
     assert(branch_map->cnt == 31);
@@ -764,9 +831,13 @@ static void emit_full_branch_map(struct tr_packet *tr,
     tr->branches = 0;
     tr->branch_map = branch_map->bits;
     /* No address needed */
-    tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + branch_map_len(31);
-    /* tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN */
-    /*              + (31 - sign_extendable_bits(branch_map->bits) + 1); */
+    uint32_t sext = sign_extendable_bits(branch_map->bits << 1);
+    if (sext > 31)
+        sext = 31;
+    if (ctx->config.compress_full_branch_map)
+        tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + (31 - sext + 1);
+    else
+        tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + branch_map_len(31);
     *branch_map = (struct branch_map_state){0};
 }
 
@@ -979,7 +1050,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * no address
          */
         ALLOC_PACKET(tr);
-        emit_full_branch_map(tr, branch_map);
+        emit_full_branch_map(ctx, tr, branch_map);
 
         list_add(&tr->list, packet_list);
 

@@ -780,6 +780,7 @@ int test_compress_cvs_trace(const char *trace_path)
     ctx->config.full_address = false;
     ctx->config.pulp_vector_table_packet = false;
     ctx->config.implicit_ret = true;
+    /* ctx->config.compress_full_branch_map = true; */
 
     size_t instrcnt =
         trdb_cvs_to_trace_list(ctx, trace_path, &status, &instr_list);
@@ -819,15 +820,12 @@ int test_compress_cvs_trace(const char *trace_path)
            bpi_payload);
     printf(
         "(Compression) Bits per instruction (payload + header): %lf "
-        "(+%2.lf%%)\n",
+        "(%+2.lf%%)\n",
         bpi_full, bpi_full / bpi_payload * 100 - 100);
     printf(
         "(Compression) Bits per instruction (pulp            ): %lf "
-        "(+%2.lf%%)\n ",
+        "(%+2.lf%%)\n ",
         bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
-
-    printf("(Compression) Compression ratio: %lf\n",
-           ctx->stats.payloadbits / (double)ctx->stats.instrbits);
 
 
 fail:
@@ -882,8 +880,6 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     printf("%s\n", bin_path);
     printf("(Compression) Bits per instruction: %lf\n",
            ctx->stats.payloadbits / (double)ctx->stats.instrs);
-    printf("(Compression) Compression ratio: %lf\n",
-           ctx->stats.payloadbits / (double)ctx->stats.instrbits);
 
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
@@ -986,8 +982,6 @@ int test_decompress_trace_differential(const char *bin_path,
     printf("%s\n", bin_path);
     printf("(Compression) Bits per instruction: %lf\n",
            ctx->stats.payloadbits / (double)ctx->stats.instrs);
-    printf("(Compression) Compression ratio: %lf\n",
-           ctx->stats.payloadbits / (double)ctx->stats.instrbits);
     printf("(Compression) Sign extension distribution:\n");
     unsigned sum = 0;
     for (unsigned i = 0; i < 32; i++) {
