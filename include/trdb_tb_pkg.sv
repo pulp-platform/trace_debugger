@@ -17,9 +17,9 @@ package trdb_tb_pkg;
     parameter int DEBUG             = 1;
     parameter int VERBOSE           = 0;
     parameter int FULL_ADDRESS      = 0;
+    parameter int IMPLICIT_RET      = 0;
 
     // stimuli file
-    const string stimuli_path       = "trdb/data/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/uart_loopback/build/pulpissimo-riscy/trdb_stimuli";
@@ -57,6 +57,7 @@ package trdb_tb_pkg;
     import "DPI-C" function void trdb_sv_alloc();
     import "DPI-C" function void trdb_sv_free();
     import "DPI-C" function void trdb_sv_set_full_address(input int full_address);
+    import "DPI-C" function void trdb_sv_set_implicit_ret(input int implicit_ret);
     import "DPI-C" function void trdb_sv_feed_trace
         (input logic ivalid, iexception, interrupt,
          input logic [CAUSELEN-1:0]    cause, input logic [XLEN-1:0] tval,

@@ -69,6 +69,7 @@ class Scoreboard;
 
         // configure golden model
         trdb_sv_set_full_address(FULL_ADDRESS);
+        trdb_sv_set_implicit_ret(IMPLICIT_RET);
 
         // acquire stimuli
         inbox.get(stimuli);

@@ -38,6 +38,7 @@ module trdb_reg
      output logic                     trace_activated_o,
      output logic                     trace_full_addr_o,
      input logic                      trace_req_deactivate_i,
+     output logic                     trace_implicit_ret_o,
 
      // signals that control the filtering settings
      output logic                     apply_filters_o,
@@ -94,6 +95,7 @@ module trdb_reg
     assign clear_fifo_o = ctrl_q[TRDB_CLEAR_FIFO];
     assign flush_stream_o = ctrl_q[TRDB_FLUSH_STREAM];
     assign trace_full_addr_o = ctrl_q[TRDB_FULL_ADDR];
+    assign trace_implicit_ret_o = ctrl_q[TRDB_IMPLICIT_RET];
 
     // status reg outgoing signals
     assign apply_filters_o = filter_q[TRDB_APPLY_FILTERS];

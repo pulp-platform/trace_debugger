@@ -117,6 +117,10 @@ module trace_debugger
     logic                       qualified0_q, qualified0_d, qualified1_q,
                                 qualified1_d;
 
+    // variables for discontinuity decision making
+    logic                       trace_implicit_ret;
+    logic                       not_ret;
+
     // variables for the branch map
     logic                       branch_map_flush;
     logic                       branch_map_full;
@@ -293,10 +297,18 @@ module trace_debugger
     // jalr, mret, sret, uret
     always_comb begin: is_discontinuity
         u_discontinuity0_d
-            = ((instr_q & MASK_JALR) == MATCH_JALR) ||
+                                     = ((instr_q & MASK_JALR) == MATCH_JALR) ||
               ((instr_q & MASK_MRET) == MATCH_MRET) ||
               ((instr_q & MASK_SRET) == MATCH_SRET) ||
               ((instr_q & MASK_URET) == MATCH_URET);
+        // allows us to mark ret's as not being discontinuities, if we want
+        not_ret = '1;
+        if(trace_implicit_ret)
+            not_ret        = !((instr_q &
+                                (MASK_JALR | MASK_RD | MASK_RS1 | MASK_IMM)) ==
+                               (MATCH_JALR | (X_RA << OP_SH_RS1)));
+
+        u_discontinuity0_d = u_discontinuity0_d && not_ret;
     end
 
     // figure out whether we are dealing with the first qualified instruction
@@ -537,6 +549,7 @@ module trace_debugger
          .trace_activated_o(trace_activated),
          .trace_full_addr_o(trace_full_addr),
          .trace_req_deactivate_i(trace_req_deactivate),
+         .trace_implicit_ret_o(trace_implicit_ret),
          .apply_filters_o(apply_filters),
          .trace_selected_priv_o(trace_selected_priv),
          .trace_which_priv_o(trace_which_priv),
