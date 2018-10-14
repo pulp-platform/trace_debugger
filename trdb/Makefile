@@ -58,6 +58,9 @@ MAIN_OBJS	= $(MAIN_SRCS:.c=.o)
 TEST_SRCS	= $(wildcard test/*.c)
 TEST_OBJS	= $(TEST_SRCS:.c=.o)
 
+BENCHMARK_SRCS  = $(wildcard benchmark/*.c)
+BENCHMARK_OBJS  = $(BENCHMARK_SRCS:.c=.o)
+
 DPI_SRCS	= $(wildcard dpi/*.c)
 DPI_OBJS	= $(DPI_SRCS:.c=.o)
 
@@ -67,6 +70,7 @@ INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
 
 BIN		= trdb
 TEST_BIN	= tests
+BENCHMARK_BIN   = benchmarks
 # golden model lib for simulator
 GMLIB		= libtrdb
 
@@ -78,7 +82,7 @@ VALGRIND	= valgrind
 DOC		= doxygen
 
 
-all: $(BIN) $(TEST_BIN)
+all: $(BIN) $(TEST_BIN) $(BENCHMARK_BIN)
 
 debug: CFLAGS = $(CFLAGS_DEBUG)
 debug: all
@@ -105,6 +109,10 @@ $(BIN): $(OBJS) $(MAIN_OBJS)
 $(TEST_BIN): $(OBJS) $(TEST_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)
 
+$(BENCHMARK_BIN): $(OBJS) $(BENCHMARK_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(BENCHMARK_OBJS) $(OBJS) \
+		$(LDLIBS)
+
 $(GMLIB).so: $(OBJS) $(DPI_OBJS)
 #	gcc -o $(GMLIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)
 	ld -shared -E --exclude-libs ALL -o $(GMLIB).so -lc $(LDFLAGS) \
@@ -122,6 +130,10 @@ run:
 .PHONY: test
 test:
 	./$(TEST_BIN)
+
+.PHONY: benchmark
+benchmark:
+	./$(BENCHMARK_BIN)
 
 .PHONY: check
 check: test
@@ -144,8 +156,8 @@ docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
 
 .PHONY: clean
 clean:
-	rm -rf $(BIN) $(TEST_BIN) $(GMLIB).so $(OBJS) $(MAIN_OBJS) $(TEST_OBJS) \
-		$(DPI_OBJS)
+	rm -rf $(BIN) $(TEST_BIN) $(BENCHMARK_BIN) $(GMLIB).so $(OBJS) \
+		$(MAIN_OBJS) $(TEST_OBJS) $(BENCHMARK_OBJS) $(DPI_OBJS)
 
 .PHONY: distclean
 distclean: clean
