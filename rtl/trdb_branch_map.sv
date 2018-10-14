@@ -42,10 +42,10 @@ module trdb_branch_map
 
         if(valid_i) begin
             if(flush_i) begin
-                map_d[0]    = branch_taken_i;
+                map_d[0]    = ~branch_taken_i;
                 branchcnt_d = 5'b1;
             end else begin
-                map_d[branchcnt_q] = branch_taken_i;
+                map_d[branchcnt_q] = ~branch_taken_i;
                 branchcnt_d        = branchcnt_q + 1;
             end
         end

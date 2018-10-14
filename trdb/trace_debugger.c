@@ -853,9 +853,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 
     if (is_branch(tc_instr->instr)) {
         /* update branch map */
-        /* in hardware maybe mask and compare is better ? */
-        if (branch_taken(tc_instr->compressed, tc_instr->iaddr,
-                         nc_instr->iaddr))
+        if (!branch_taken(tc_instr->compressed, tc_instr->iaddr,
+                          nc_instr->iaddr))
             branch_map->bits = branch_map->bits | (1u << branch_map->cnt);
         branch_map->cnt++;
         if (branch_map->cnt == 31) {
@@ -1443,7 +1442,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* this case allows us to exhaust the branch bits */
                     {
                         /* 32 would be undefined */
-                        bool branch_taken = dec_ctx.branch_map.bits & 1;
+                        bool branch_taken = !(dec_ctx.branch_map.bits & 1);
                         dec_ctx.branch_map.bits >>= 1;
                         dec_ctx.branch_map.cnt--;
                         if (dinfo.target == 0)
@@ -1579,7 +1578,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* this case allows us to exhaust the branch bits */
                     {
                         /* 32 would be undefined */
-                        bool branch_taken = dec_ctx.branch_map.bits & 1;
+                        bool branch_taken = !(dec_ctx.branch_map.bits & 1);
                         dec_ctx.branch_map.bits >>= 1;
                         dec_ctx.branch_map.cnt--;
                         if (dinfo.target == 0)
