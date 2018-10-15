@@ -48,6 +48,7 @@ module trdb_packet_emitter
 
      // information for trdb_priority to decide what packet type we need
      output logic [XLEN-1:0]        diff_addr_o,
+
      // packet fifo control and status
      input logic                    clear_fifo_i,
      output logic                   fifo_overflow_o,
@@ -88,6 +89,7 @@ module trdb_packet_emitter
 
     // compute and handle differential addresses
     logic [XLEN-1:0]               caddr;
+    logic [XLEN-1:0]               diff_addr;
     logic [XLEN-1:0]               last_addr_q, last_addr_d;
 
     assign branch_map_flush_o = branch_map_flush_q;
@@ -120,13 +122,14 @@ module trdb_packet_emitter
             else $error("[TRDB]   @%t: Packet FIFO is overflowing.", $time);
 `endif
 
+    assign diff_addr = last_addr_q - iaddr_i;
+
+    assign diff_addr_o = diff_addr;
 
     always_comb begin: compress_address
        caddr = (use_full_addr_i || packet_format_i == F_BRANCH_FULL) ?
-               iaddr_i : last_addr_q - iaddr_i;
+               iaddr_i : diff_addr;
     end
-
-    assign diff_addr_o = caddr;
 
 
     always_comb begin: set_packet_bits
