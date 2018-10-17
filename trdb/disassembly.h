@@ -141,7 +141,7 @@ struct trdb_disasm_aux {
                               representation */
     bool prefix_addresses; /**< different address format */
     bool do_demangle;      /**< demangle symbols using bfd */
-    bool display_file_offsets;  /** < display file offsets for displayed symbols
+    bool display_file_offsets;  /**< display file offsets for displayed symbols
                                  */
     bool with_line_numbers;     /**< periodically show line numbers mixed with
                                    assembly */

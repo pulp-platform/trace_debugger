@@ -50,6 +50,7 @@ static char args_doc[] = "TRACE-OR-PACKETS";
 #define TRDB_OPT_PREFIX_ADDRESSES 3
 #define TRDB_OPT_INLINES 4
 #define TRDB_OPT_FULL_ADDR 5
+#define TRDB_OPT_CVS 6
 
 
 static struct argp_option options[] = {
@@ -59,6 +60,7 @@ static struct argp_option options[] = {
     {"bfd", 'b', "ELF", 0,
      "ELF binary with which the traces/packets were produced"},
     {"compress", 'c', 0, 0, "Take a stimuli file and compress to packets"},
+    {"cvs", TRDB_OPT_CVS, 0, 0, "Set TRACE-OR-PACKETS file type to cvs"},
     {"binary-format", 'p', "FORMAT", 0,
      "Specify binary input/output format, by default like the pulp trace debugger"},
     {"trace-file", 't', 0, 0, "Input file is a trace file"},
@@ -87,7 +89,7 @@ static struct argp_option options[] = {
 struct arguments {
     char *args[TRDB_NUM_ARGS];
     bool silent, verbose, compress, has_elf, disassemble, decompress,
-        trace_file, binary_output, human, full_address;
+        trace_file, binary_output, human, full_address, cvs;
     uint32_t settings_disasm;
     char *binary_format;
     char *output_file;
@@ -111,6 +113,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         break;
     case 'c':
         arguments->compress = true;
+        break;
+    case TRDB_OPT_CVS:
+        arguments->cvs = true;
         break;
     case 'p':
         arguments->binary_output = true;
@@ -193,6 +198,7 @@ int main(int argc, char *argv[argc + 1])
     arguments.silent = false;
     arguments.verbose = false;
     arguments.compress = false;
+    arguments.cvs = false;
     arguments.binary_output = false;
     arguments.human = false;
     arguments.full_address = false;
@@ -217,6 +223,8 @@ int main(int argc, char *argv[argc + 1])
 
     /* general settings */
     trdb_set_full_address(ctx, arguments.full_address);
+    /* trdb_set_implicit_ret(ctx, true); */
+    /* trdb_set_pulp_extra_packet(ctx, true); */
 
     /* prepare output */
     if (arguments.output_file[0] != '-') {
@@ -265,7 +273,6 @@ fail:
 }
 
 
-/* TODO: compress to pulp binary output too */
 static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
                           struct arguments *arguments)
 {
@@ -275,26 +282,48 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     /* read stimuli file and convert to internal data structure */
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
+    LIST_HEAD(instr_list);
+
     int success = 0;
-    size_t samplecnt =
-        trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
+    size_t samplecnt = 0;
+    if (arguments->cvs) {
+        samplecnt = trdb_cvs_to_trace_list(c, arguments->args[0], &success,
+                                           &instr_list);
+    } else {
+        samplecnt =
+            trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
+    }
+
     if (success != 0) {
         fprintf(stderr, "trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }
 
+    struct tr_instr *instr;
 
     /* step by step compression */
-    for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step(c, &packet_list, &(*samples)[i]);
-        if (step == -1) {
-            fprintf(stderr, "compress trace failed\n");
-            status = EXIT_FAILURE;
-            goto fail;
+    if (arguments->cvs) {
+        list_for_each_entry_reverse(instr, &instr_list, list)
+        {
+            int step = trdb_compress_trace_step(c, &packet_list, instr);
+            if (step == -1) {
+                fprintf(stderr, "compress trace failed (cvs)\n");
+                status = EXIT_FAILURE;
+                goto fail;
+            }
+        }
+    } else {
+        for (size_t i = 0; i < samplecnt; i++) {
+            int step =
+                trdb_compress_trace_step(c, &packet_list, &(*samples)[i]);
+            if (step == -1) {
+                fprintf(stderr, "compress trace failed\n");
+                status = EXIT_FAILURE;
+                goto fail;
+            }
         }
     }
-
     /* we either produce binary or human readable output */
     if (arguments->binary_output) {
         struct tr_packet *packet;
@@ -313,6 +342,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
 fail:
     free(*samples);
     trdb_free_packet_list(&packet_list);
+    trdb_free_instr_list(&instr_list);
 
     return status;
 }
