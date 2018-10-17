@@ -132,13 +132,28 @@ struct tr_packet {
     struct list_head list; /**< used to make a linked list of tr_packet */
 };
 
-/* For type punning.
- * It's pretty annoying to pack our packets tightly, since our packet members
- * are not 8 bit aligned. We assure that each packet is smaller that 128 bits,
- * pack all packet members into a 128 bit integer and read it out to bytes
- * through the union. Since uint8_t doesn't count as a char the compiler assumes
- * a uint8_t pointer can't alias a __uint128_t, thus the union. Or we could use
- * -fno-strict-aliasing.
+
+/**
+ * Keep information about generated packets
+ */
+struct trdb_packet_stats {
+    size_t packets;
+    size_t addr_only_packets;
+    size_t exception_packets;
+    size_t start_packets;
+    size_t diff_packets;
+    size_t abs_packets;
+    size_t bmap_full_packets;
+    size_t bmap_full_addr_packets;
+};
+
+/**
+ * For type punning of packet data. It's pretty annoying to pack our packets
+ * tightly, since our packet members are not 8 bit aligned. We assure that each
+ * packet is smaller that 128 bits, pack all packet members into a 128 bit
+ * integer and read it out to bytes through the union. Since uint8_t doesn't
+ * count as a char the compiler assumes a uint8_t pointer can't alias a
+ * __uint128_t, thus the union. Or we could use -fno-strict-aliasing.
  */
 union trdb_pack {
     __uint128_t bits; /* non-portable gcc stuff. TODO: fix */
@@ -364,15 +379,15 @@ size_t trdb_get_instrcnt(struct trdb_ctx *ctx);
  */
 size_t trdb_get_instrbits(struct trdb_ctx *ctx);
 
-
 /**
- * Get the current number of exception packets that were produced by calling
- * trdb_compress_trace_step.
+ * Get packet generation statistics of trdb_compress_trace_step through a
+ * trdb_packet_stats struct:
  *
  * @param ctx a trace debugger context
- * @return number of exception packets produced
+ * @param stats a packet statistics struct
  */
-size_t trdb_get_exception_packetcnt(struct trdb_ctx *ctx);
+void trdb_get_packet_stats(struct trdb_ctx *ctx,
+                           struct trdb_packet_stats *stats);
 
 /**
  * Compress the given sequence of instruction to a sequence of packets.

@@ -167,7 +167,13 @@ struct trdb_stats {
     size_t packets;
     size_t zo_addresses;  /**< all zero or all ones addresses */
     size_t zo_branchmaps; /**< all zero or all ones branchmaps */
+    size_t addr_only_packets;
     size_t exception_packets;
+    size_t start_packets;
+    size_t diff_packets;
+    size_t abs_packets;
+    size_t bmap_full_packets;
+    size_t bmap_full_addr_packets;
     uint32_t sext_bits[32];
 };
 
@@ -426,9 +432,17 @@ size_t trdb_get_instrbits(struct trdb_ctx *ctx)
 }
 
 
-size_t trdb_get_exception_packetcnt(struct trdb_ctx *ctx)
+void trdb_get_packet_stats(struct trdb_ctx *ctx,
+                           struct trdb_packet_stats *stats)
 {
-    return ctx->stats.exception_packets;
+    stats->packets = ctx->stats.packets;
+    stats->addr_only_packets = ctx->stats.addr_only_packets;
+    stats->exception_packets = ctx->stats.exception_packets;
+    stats->start_packets = ctx->stats.start_packets;
+    stats->diff_packets = ctx->stats.diff_packets;
+    stats->abs_packets = ctx->stats.abs_packets;
+    stats->bmap_full_packets = ctx->stats.bmap_full_packets;
+    stats->bmap_full_addr_packets = ctx->stats.bmap_full_addr_packets;
 }
 
 
@@ -507,11 +521,6 @@ static bool is_unsupported(uint32_t instr)
            || is_lp_starti_instr(instr) || is_lp_setupi_instr(instr);
 }
 
-
-static uint32_t sign_extendable_bits128(__uint128_t addr)
-{
-    return 0;
-}
 
 static uint32_t sign_extendable_bits64(uint64_t addr)
 {
@@ -666,7 +675,8 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
 }
 
 
-static void emit_start_packet(struct tr_packet *tr, struct tr_instr *tc_instr,
+static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
+                              struct tr_instr *tc_instr,
                               struct tr_instr *nc_instr)
 {
     tr->format = F_SYNC;      /* sync */
@@ -681,6 +691,7 @@ static void emit_start_packet(struct tr_packet *tr, struct tr_instr *tc_instr,
         tr->branch = 0;
     tr->address = tc_instr->iaddr;
     tr->length = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
+    c->stats.start_packets++;
 }
 
 
@@ -730,6 +741,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (tr->address == 0 || tr->address == -1)
                 ctx->stats.zo_addresses++;
         }
+        ctx->stats.addr_only_packets++;
         assert(branch_map->bits == 0);
     } else {
         if (branch_map->full && is_u_discontinuity)
@@ -745,6 +757,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (branch_map->full) {
                 if (is_u_discontinuity) {
                     tr->length += XLEN;
+                    ctx->stats.bmap_full_addr_packets++;
                 } else {
                     /* we don't need to record the address, indicate by settings
                      * branchcnt to 0
@@ -752,8 +765,10 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                     tr->length += 0;
                     tr->branches = 0;
                 }
+                ctx->stats.bmap_full_packets++;
             } else {
                 tr->length += XLEN;
+                ctx->stats.abs_packets++;
             }
         } else {
             /* In this mode we try to compress the instruction address by taking
@@ -802,15 +817,21 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (branch_map->full) {
                 if (is_u_discontinuity) {
                     tr->length += keep;
+                    ctx->stats.bmap_full_addr_packets++;
                 } else {
                     /* we don't need to record the address, indicate by settings
                      * branchcnt to 0
                      */
                     tr->length += 0;
                     tr->branches = 0;
+                    ctx->stats.bmap_full_packets++;
                 }
             } else {
                 tr->length += keep;
+                if (use_differential)
+                    ctx->stats.diff_packets++;
+                else
+                    ctx->stats.abs_packets++;
             }
         }
         tr->branch_map = branch_map->bits;
@@ -838,6 +859,8 @@ static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
     else
         tr->length = FORMATLEN + BRANCHLEN + branch_map_len(31);
     *branch_map = (struct branch_map_state){0};
+
+    ctx->stats.bmap_full_packets++;
 }
 
 /* helper macro to reduce boilerplate in trdb_compress_trace_step */
@@ -970,7 +993,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        emit_start_packet(tr, tc_instr, nc_instr);
+        emit_start_packet(ctx, tr, tc_instr, nc_instr);
         *last_iaddr = tc_instr->iaddr;
 
         list_add(&tr->list, packet_list);
@@ -988,7 +1011,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * resync_pend = 0
          */
         ALLOC_PACKET(tr);
-        emit_start_packet(tr, tc_instr, nc_instr);
+        emit_start_packet(ctx, tr, tc_instr, nc_instr);
         *last_iaddr = tc_instr->iaddr;
 
         list_add(&tr->list, packet_list);

@@ -83,11 +83,20 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
             goto fail;
         }
     }
+    struct trdb_packet_stats stats = {0};
+    trdb_get_packet_stats(ctx, &stats);
+
     size_t packets = trdb_get_packetcnt(ctx);
     size_t payloadbits = trdb_get_payloadbits(ctx);
     size_t instrs = trdb_get_instrcnt(ctx);
     size_t pulpbits = trdb_get_pulpbits(ctx);
-    size_t exception_packets = trdb_get_exception_packetcnt(ctx);
+    size_t exception_packets = stats.exception_packets;
+    size_t addr_only_packets = stats.addr_only_packets;
+    size_t start_packets = stats.start_packets;
+    size_t diff_packets = stats.diff_packets;
+    size_t abs_packet = stats.abs_packets;
+    size_t bmap_full_packets = stats.bmap_full_packets;
+    size_t bmap_full_addr_packets = stats.bmap_full_addr_packets;
     size_t zo_addresses = 0;
 
     /* compare also against the version which doesn't use address and branchmap
@@ -117,11 +126,12 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     if (comparison->instrcnt != instrcnt)
         printf("Number of instruction mismatch! %zu, %zu\n",
                comparison->instrcnt, instrcnt);
+
+    printf("              pulp (ultra)\n");
     printf(
-        "instructions: %zu, packets: %zu, payload bytes: %zu (%zu) "
-        "exceptions: %zu z/o: %zu\n",
-        instrcnt, packets, payloadbits / 8, comparison->payload,
-        exception_packets, zo_addresses);
+        "instructions: %zu (%zu), packets: %zu (%zu), payload bytes: %zu (%zu)\n",
+        instrcnt, comparison->instrcnt, packets, comparison->packetcnt,
+        payloadbits / 8, comparison->payload, exception_packets);
     double bpi_noc_payload = noc_payloadbits / (double)noc_instrs;
     double bpi_payload = payloadbits / (double)instrs;
     double bpi_full = (payloadbits + packets * 6) / (double)instrs;
