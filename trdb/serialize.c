@@ -57,6 +57,21 @@ static uint32_t p_sign_extendable_bits(uint32_t addr)
 }
 
 
+static __uint128_t p_sext128(__uint128_t val, __uint128_t bit)
+{
+    if (bit == 0)
+        return 0;
+
+    if (bit == 128)
+        return val;
+
+    __uint128_t m = (__uint128_t)1 << (bit - 1);
+
+    val = val & (((__uint128_t)1 << bit) - 1);
+    return (val ^ m) - m;
+}
+
+
 static uint32_t p_sext32(uint32_t val, uint32_t bit)
 {
     if (bit == 0)
@@ -69,6 +84,24 @@ static uint32_t p_sext32(uint32_t val, uint32_t bit)
 
     val = val & ((1U << bit) - 1);
     return (val ^ m) - m;
+}
+
+
+static int p_clz_u128(__uint128_t u)
+{
+    uint64_t hi = u >> 64;
+    uint64_t lo = u;
+    int retval[3] = {__builtin_clzll(hi), __builtin_clzll(lo) + 64, 128};
+    int idx = !hi + ((!lo) & (!hi));
+    return retval[idx];
+}
+
+
+static uint32_t p_sign_extendable_bits128(__uint128_t addr)
+{
+    int clz = p_clz_u128(addr);
+    int clo = p_clz_u128(~addr);
+    return clz > clo ? clz : clo;
 }
 
 
@@ -292,6 +325,9 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     packet->length =
         (header & MASK_FROM(PULPPKTLEN)) * 8 + MSGTYPELEN + FORMATLEN;
     packet->msg_type = (payload.bits >>= PULPPKTLEN) & MASK_FROM(MSGTYPELEN);
+
+    /* implicit sign extension at packet length' bit */
+    payload.bits = p_sext128(payload.bits, packet->length);
 
     switch (packet->msg_type) {
     /* we are dealing with a regular trace packet */
