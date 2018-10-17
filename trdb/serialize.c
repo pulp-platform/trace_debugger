@@ -82,10 +82,10 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     }
 
     union trdb_pack data = {0};
-    /* We put the number of bytes (without header) as the packet length.
-     * The PULPPKTLEN, and both FORMATLEN are considered the header
+    /* We put the number of bytes (without header) as the packet length. The
+     * PULPPKTLEN, MSGTYPELEN and FORMATLEN are considered the header
      */
-    uint32_t bits_without_header = packet->length - 2 * FORMATLEN;
+    uint32_t bits_without_header = packet->length - FORMATLEN;
     uint32_t byte_len =
         bits_without_header / 8 + (bits_without_header % 8 != 0);
     if (byte_len >= 16) { // TODO: replace with pow or mask

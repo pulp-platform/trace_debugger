@@ -661,8 +661,7 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
     tr->ecause = lc_instr->cause;
     tr->interrupt = lc_instr->interrupt;
     tr->tval = lc_instr->tval;
-    tr->length =
-        MSGTYPELEN + FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+    tr->length = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
     c->stats.exception_packets++;
 }
 
@@ -681,7 +680,7 @@ static void emit_start_packet(struct tr_packet *tr, struct tr_instr *tc_instr,
     else
         tr->branch = 0;
     tr->address = tc_instr->iaddr;
-    tr->length = MSGTYPELEN + FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
+    tr->length = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
 }
 
 
@@ -713,7 +712,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 
         if (full_address) {
             tr->address = tc_instr->iaddr;
-            tr->length = MSGTYPELEN + FORMATLEN + XLEN;
+            tr->length = FORMATLEN + XLEN;
         } else {
             /* always differential in F_ADDR_ONLY*/
             uint32_t diff = last_iaddr - tc_instr->iaddr;
@@ -725,7 +724,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             /* should only be relevant for serialization */
             /* tr->address = MASK_FROM(keep) & diff; */
             tr->address = diff;
-            tr->length = MSGTYPELEN + FORMATLEN + keep;
+            tr->length = FORMATLEN + keep;
             /* record distribution */
             ctx->stats.sext_bits[keep - 1]++;
             if (tr->address == 0 || tr->address == -1)
@@ -741,8 +740,8 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
         if (full_address) {
             tr->format = F_BRANCH_FULL;
             tr->address = tc_instr->iaddr;
-            tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
-                         + branch_map_len(branch_map->cnt);
+            tr->length =
+                FORMATLEN + BRANCHLEN + branch_map_len(branch_map->cnt);
             if (branch_map->full) {
                 if (is_u_discontinuity) {
                     tr->length += XLEN;
@@ -795,9 +794,9 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (sext > XLEN + branch_map_len(branch_map->cnt))
                 sext = XLEN + branch_map_len(branch_map->cnt);
             uint32_t ext = XLEN + branch_map_len(branch_map->cnt) - sext + 1;
-            tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN
-                         + branch_map_len(branch_map->cnt);
-            /* tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN */
+            tr->length =
+                FORMATLEN + BRANCHLEN + branch_map_len(branch_map->cnt);
+            /* tr->length = FORMATLEN + BRANCHLEN */
             /* 	+ext; */
 
             if (branch_map->full) {
@@ -835,9 +834,9 @@ static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
     if (sext > 31)
         sext = 31;
     if (ctx->config.compress_full_branch_map)
-        tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + (31 - sext + 1);
+        tr->length = FORMATLEN + BRANCHLEN + (31 - sext + 1);
     else
-        tr->length = MSGTYPELEN + FORMATLEN + BRANCHLEN + branch_map_len(31);
+        tr->length = FORMATLEN + BRANCHLEN + branch_map_len(31);
     *branch_map = (struct branch_map_state){0};
 }
 
@@ -1089,7 +1088,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     ctx->stats.instrs++;
     if (generated_packet) {
         *branch_map = (struct branch_map_state){0};
-        ctx->stats.payloadbits += (tr->length - MSGTYPELEN);
+        ctx->stats.payloadbits += (tr->length);
         ctx->stats.packets++;
 
         if (ctx->config.full_statistics) {
@@ -1773,9 +1772,6 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (full_address) {
                 absolute_addr = packet->address;
             } else {
-                /* uint32_t sext_addr = sext32( */
-                /*     packet->address, packet->length - MSGTYPELEN -
-                 * FORMATLEN); */
                 /* absolute_addr = dec_ctx.last_packet_addr - sext_addr; */
                 absolute_addr = dec_ctx.last_packet_addr - packet->address;
             }
