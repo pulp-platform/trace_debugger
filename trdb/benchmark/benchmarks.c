@@ -41,6 +41,17 @@ struct result {
     double bpi;
 };
 
+
+static char *conv_tf(bool b)
+{
+    return b ? "true" : "false";
+}
+
+static double percent(size_t a, size_t total)
+{
+    return (double)a / total * 100;
+}
+
 int compress_cvs_trace(const char *trace_path, struct result *comparison)
 {
     int status = 0;
@@ -58,12 +69,15 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
         status = -1;
         goto fail;
     }
+    bool full_address = false;
+    bool implicit_ret = true;
+    bool compress_bmap = false;
 
     trdb_set_dunit(ctx, &dunit);
-    trdb_set_full_address(ctx, false);
+    trdb_set_full_address(ctx, full_address);
     trdb_set_pulp_extra_packet(ctx, false);
-    trdb_set_implicit_ret(ctx, true);
-    trdb_set_compress_branch_map(ctx, true);
+    trdb_set_implicit_ret(ctx, implicit_ret);
+    trdb_set_compress_branch_map(ctx, compress_bmap);
 
     size_t instrcnt =
         trdb_cvs_to_trace_list(ctx, trace_path, &status, &instr_list);
@@ -94,7 +108,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     size_t addr_only_packets = stats.addr_only_packets;
     size_t start_packets = stats.start_packets;
     size_t diff_packets = stats.diff_packets;
-    size_t abs_packet = stats.abs_packets;
+    size_t abs_packets = stats.abs_packets;
     size_t bmap_full_packets = stats.bmap_full_packets;
     size_t bmap_full_addr_packets = stats.bmap_full_addr_packets;
     size_t zo_addresses = 0;
@@ -127,11 +141,22 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
         printf("Number of instruction mismatch! %zu, %zu\n",
                comparison->instrcnt, instrcnt);
 
-    printf("              pulp (ultra)\n");
     printf(
-        "instructions: %zu (%zu), packets: %zu (%zu), payload bytes: %zu (%zu)\n",
-        instrcnt, comparison->instrcnt, packets, comparison->packetcnt,
-        payloadbits / 8, comparison->payload, exception_packets);
+        "pulp settings: full address: %s / implicit return: %s / compress full branch map: %s\n",
+        conv_tf(full_address), conv_tf(implicit_ret), conv_tf(compress_bmap));
+    printf("pulp  instructions: %zu, packets: %zu, payload bytes: %zu\n",
+           instrcnt, packets, payloadbits / 8);
+    printf("ultra instructions: %zu, packets: %zu, payload bytes: %zu\n",
+           comparison->instrcnt, comparison->packetcnt, comparison->payload);
+    printf(
+        "pulp packet stats: diff: %zu (%2.2lf%%) / abs: %zu (%2.2lf%%) / "
+        "addr_only: %zu (%2.2lf%%) / bmap_full: %zu (%2.2lf%%) / "
+        "bmap_full_with_addr: %zu (%2.2lf%%)\n",
+        diff_packets, percent(diff_packets, packets), abs_packets,
+        percent(abs_packets, packets), addr_only_packets,
+        percent(addr_only_packets, packets), bmap_full_packets,
+        percent(bmap_full_packets, packets), bmap_full_addr_packets,
+        percent(bmap_full_addr_packets, packets));
     double bpi_noc_payload = noc_payloadbits / (double)noc_instrs;
     double bpi_payload = payloadbits / (double)instrs;
     double bpi_full = (payloadbits + packets * 6) / (double)instrs;
