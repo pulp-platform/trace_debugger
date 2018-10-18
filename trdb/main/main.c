@@ -223,6 +223,7 @@ int main(int argc, char *argv[argc + 1])
 
     /* general settings */
     trdb_set_full_address(ctx, arguments.full_address);
+    trdb_set_compress_branch_map(ctx, false);
     /* trdb_set_implicit_ret(ctx, true); */
     /* trdb_set_pulp_extra_packet(ctx, true); */
 

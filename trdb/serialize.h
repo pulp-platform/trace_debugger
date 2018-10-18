@@ -117,7 +117,6 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
 size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
                              struct tr_instr **samples, int *status);
 
-
 /**
  * Load cvs file, where each line represents an input vector to the trace
  * debugger, into a list of tr_instr.

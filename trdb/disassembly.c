@@ -116,7 +116,6 @@ void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
     disassemble_init_for_target(dinfo);
 }
 
-
 int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
                                     char *options)
 {
@@ -128,7 +127,6 @@ int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
     dunit->disassemble_fn = print_insn_riscv;
     return 0;
 }
-
 
 void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
                                     char *options)
@@ -144,7 +142,6 @@ void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
     dinfo->disassembler_options = options;
     disassemble_init_for_target(dinfo);
 }
-
 
 int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
                            char *options)
@@ -164,12 +161,10 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
     return 0;
 }
 
-
 void riscv32_print_address(bfd_vma addr, struct disassemble_info *dinfo)
 {
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx", (uintmax_t)addr);
 }
-
 
 /* Sort symbols into value order.  */
 static int compare_symbols(const void *ap, const void *bp)
@@ -202,10 +197,10 @@ static int compare_symbols(const void *ap, const void *bp)
 
     /* The symbols gnu_compiled and gcc2_compiled convey no real
        information, so put them after other symbols with the same value.  */
-    af = (strstr(an, "gnu_compiled") != NULL
-          || strstr(an, "gcc2_compiled") != NULL);
-    bf = (strstr(bn, "gnu_compiled") != NULL
-          || strstr(bn, "gcc2_compiled") != NULL);
+    af = (strstr(an, "gnu_compiled") != NULL ||
+          strstr(an, "gcc2_compiled") != NULL);
+    bf = (strstr(bn, "gnu_compiled") != NULL ||
+          strstr(bn, "gcc2_compiled") != NULL);
 
     if (af && !bf)
         return 1;
@@ -218,9 +213,8 @@ static int compare_symbols(const void *ap, const void *bp)
            symbol names get printed.  */
 
 #define file_symbol(s, sn, snl)                                                \
-    (((s)->flags & BSF_FILE) != 0                                              \
-     || ((sn)[(snl)-2] == '.'                                                  \
-         && ((sn)[(snl)-1] == 'o' || (sn)[(snl)-1] == 'a')))
+    (((s)->flags & BSF_FILE) != 0 ||                                           \
+     ((sn)[(snl)-2] == '.' && ((sn)[(snl)-1] == 'o' || (sn)[(snl)-1] == 'a')))
 
     af = file_symbol(a, an, anl);
     bf = file_symbol(b, bn, bnl);
@@ -261,8 +255,8 @@ static int compare_symbols(const void *ap, const void *bp)
             return 1;
     }
 
-    if (bfd_get_flavour(bfd_asymbol_bfd(a)) == bfd_target_elf_flavour
-        && bfd_get_flavour(bfd_asymbol_bfd(b)) == bfd_target_elf_flavour) {
+    if (bfd_get_flavour(bfd_asymbol_bfd(a)) == bfd_target_elf_flavour &&
+        bfd_get_flavour(bfd_asymbol_bfd(b)) == bfd_target_elf_flavour) {
         bfd_vma asz, bsz;
 
         asz = 0;
@@ -314,8 +308,8 @@ static int compare_relocs(const void *ap, const void *bp)
  */
 static bfd_boolean is_significant_symbol_name(const char *name)
 {
-    return strcmp(name, ".plt") == 0 || strcmp(name, ".got") == 0
-           || strcmp(name, ".plt.got") == 0;
+    return strcmp(name, ".plt") == 0 || strcmp(name, ".got") == 0 ||
+           strcmp(name, ".plt.got") == 0;
 }
 
 /* Filter out (in place) symbols that are useless for disassembly.
@@ -331,18 +325,17 @@ static long remove_useless_symbols(asymbol **symbols, long count)
 
         if (sym->name == NULL || sym->name[0] == '\0')
             continue;
-        if ((sym->flags & (BSF_DEBUGGING | BSF_SECTION_SYM))
-            && !is_significant_symbol_name(sym->name))
+        if ((sym->flags & (BSF_DEBUGGING | BSF_SECTION_SYM)) &&
+            !is_significant_symbol_name(sym->name))
             continue;
-        if (bfd_is_und_section(sym->section)
-            || bfd_is_com_section(sym->section))
+        if (bfd_is_und_section(sym->section) ||
+            bfd_is_com_section(sym->section))
             continue;
 
         *out_ptr++ = sym;
     }
     return out_ptr - symbols;
 }
-
 
 /* Print an address (VMA) to the output stream in INFO.
  * If SKIP_ZEROES is TRUE, omit leading zeroes.
@@ -366,7 +359,6 @@ static void trdb_print_value(bfd_vma vma, struct disassemble_info *inf,
     }
     (*inf->fprintf_func)(inf->stream, "%s", p);
 }
-
 
 /* Print the name of a symbol.  */
 static void trdb_print_symname(bfd *abfd, struct disassemble_info *inf,
@@ -406,7 +398,6 @@ static void trdb_print_symname(bfd *abfd, struct disassemble_info *inf,
         free(alloc);
 }
 
-
 /* Read in symbol table */
 static asymbol **slurp_symtab(struct trdb_ctx *c, bfd *abfd, long *symcount)
 {
@@ -439,7 +430,6 @@ static asymbol **slurp_symtab(struct trdb_ctx *c, bfd *abfd, long *symcount)
     }
     return sy;
 }
-
 
 /* Read in dynamic symbol table */
 static asymbol **slurp_dynamic_symtab(struct trdb_ctx *c, bfd *abfd,
@@ -474,7 +464,6 @@ static asymbol **slurp_dynamic_symtab(struct trdb_ctx *c, bfd *abfd,
     }
     return sy;
 }
-
 
 /* Locate a symbol given a bfd and a section and a VMA. If dunit->require_sec is
  * TRUE, then always require the symbol to be in the section. Returns NULL if
@@ -529,23 +518,21 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
      * first (non-section/non-debugging) one.
      */
     thisplace = min;
-    while (thisplace > 0
-           && (bfd_asymbol_value(sorted_syms[thisplace])
-               == bfd_asymbol_value(sorted_syms[thisplace - 1]))
-           && ((sorted_syms[thisplace - 1]->flags
-                & (BSF_SECTION_SYM | BSF_DEBUGGING))
-               == 0))
+    while (thisplace > 0 &&
+           (bfd_asymbol_value(sorted_syms[thisplace]) ==
+            bfd_asymbol_value(sorted_syms[thisplace - 1])) &&
+           ((sorted_syms[thisplace - 1]->flags &
+             (BSF_SECTION_SYM | BSF_DEBUGGING)) == 0))
         --thisplace;
 
     /* Prefer a symbol in the current section if we have multple symbols with
      * the same value, as can occur with overlays or zero size sections.
      */
     min = thisplace;
-    while (min < max_count
-           && (bfd_asymbol_value(sorted_syms[min])
-               == bfd_asymbol_value(sorted_syms[thisplace]))) {
-        if (sorted_syms[min]->section == sec
-            && inf->symbol_is_valid(sorted_syms[min], inf)) {
+    while (min < max_count && (bfd_asymbol_value(sorted_syms[min]) ==
+                               bfd_asymbol_value(sorted_syms[thisplace]))) {
+        if (sorted_syms[min]->section == sec &&
+            inf->symbol_is_valid(sorted_syms[min], inf)) {
             thisplace = min;
 
             if (place != NULL)
@@ -563,24 +550,24 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
      * but in that case there's no way to tell what's desired without looking at
      * the relocation table. Also give the target a chance to reject symbols.
      */
-    want_section = (aux->require_sec
-                    || ((abfd->flags & HAS_RELOC) != 0
-                        && vma >= bfd_get_section_vma(abfd, sec)
-                        && vma < (bfd_get_section_vma(abfd, sec)
-                                  + bfd_section_size(abfd, sec) / opb)));
-    if ((sorted_syms[thisplace]->section != sec && want_section)
-        || !inf->symbol_is_valid(sorted_syms[thisplace], inf)) {
+    want_section =
+        (aux->require_sec || ((abfd->flags & HAS_RELOC) != 0 &&
+                              vma >= bfd_get_section_vma(abfd, sec) &&
+                              vma < (bfd_get_section_vma(abfd, sec) +
+                                     bfd_section_size(abfd, sec) / opb)));
+    if ((sorted_syms[thisplace]->section != sec && want_section) ||
+        !inf->symbol_is_valid(sorted_syms[thisplace], inf)) {
         long i;
         long newplace = sorted_symcount;
 
         for (i = min - 1; i >= 0; i--) {
-            if ((sorted_syms[i]->section == sec || !want_section)
-                && inf->symbol_is_valid(sorted_syms[i], inf)) {
+            if ((sorted_syms[i]->section == sec || !want_section) &&
+                inf->symbol_is_valid(sorted_syms[i], inf)) {
                 if (newplace == sorted_symcount)
                     newplace = i;
 
-                if (bfd_asymbol_value(sorted_syms[i])
-                    != bfd_asymbol_value(sorted_syms[newplace]))
+                if (bfd_asymbol_value(sorted_syms[i]) !=
+                    bfd_asymbol_value(sorted_syms[newplace]))
                     break;
 
                 /* Remember this symbol and keep searching until we reach an
@@ -597,16 +584,16 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
              * with a larger value.
              */
             for (i = thisplace + 1; i < sorted_symcount; i++) {
-                if ((sorted_syms[i]->section == sec || !want_section)
-                    && inf->symbol_is_valid(sorted_syms[i], inf)) {
+                if ((sorted_syms[i]->section == sec || !want_section) &&
+                    inf->symbol_is_valid(sorted_syms[i], inf)) {
                     thisplace = i;
                     break;
                 }
             }
         }
 
-        if ((sorted_syms[thisplace]->section != sec && want_section)
-            || !inf->symbol_is_valid(sorted_syms[thisplace], inf))
+        if ((sorted_syms[thisplace]->section != sec && want_section) ||
+            !inf->symbol_is_valid(sorted_syms[thisplace], inf))
             /* There is no suitable symbol.  */
             return NULL;
     }
@@ -616,8 +603,8 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
      * matching a relocation to the address and using the symbol associated with
      * that relocation.
      */
-    if (!want_section && aux->dynrelbuf != NULL
-        && sorted_syms[thisplace]->value != vma
+    if (!want_section && aux->dynrelbuf != NULL &&
+        sorted_syms[thisplace]->value != vma
         /* If we have matched a synthetic symbol, then stick with that.  */
         && (sorted_syms[thisplace]->flags & BSF_SYNTHETIC) == 0) {
         long rel_count;
@@ -627,8 +614,8 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
              rel_count--;) {
             arelent *rel = rel_pp[rel_count];
 
-            if (rel->address == vma
-                && rel->sym_ptr_ptr != NULL
+            if (rel->address == vma &&
+                rel->sym_ptr_ptr != NULL
                 /* Absolute relocations do not provide a more helpful symbolic
                  * address.
                  */
@@ -651,7 +638,6 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
 
     return sorted_syms[thisplace];
 }
-
 
 /* Print an address and the offset to the nearest symbol.  */
 static void trdb_print_addr_with_sym(bfd *abfd, asection *sec, asymbol *sym,
@@ -689,8 +675,8 @@ static void trdb_print_addr_with_sym(bfd *abfd, asection *sec, asymbol *sym,
          * code in find_symbol_for_address might return an as yet unresolved
          * symbol associated with a dynamic reloc.
          */
-        else if ((bfd_get_file_flags(abfd) & (EXEC_P | DYNAMIC))
-                 && bfd_is_und_section(sym->section))
+        else if ((bfd_get_file_flags(abfd) & (EXEC_P | DYNAMIC)) &&
+                 bfd_is_und_section(sym->section))
             ;
         else if (bfd_asymbol_value(sym) > vma) {
             (*inf->fprintf_func)(inf->stream, "-0x");
@@ -707,7 +693,6 @@ static void trdb_print_addr_with_sym(bfd *abfd, asection *sec, asymbol *sym,
         inf->fprintf_func(inf->stream, " (File Offset: 0x%lx)",
                           (long int)(sec->filepos + (vma - sec->vma)));
 }
-
 
 /* Print an address (VMA), symbolically if possible. If SKIP_ZEROES is TRUE,
  * don't output leading zeroes.
@@ -734,8 +719,8 @@ static void trdb_print_addr(bfd_vma vma, struct disassemble_info *inf,
         return;
     }
 
-    if (aux->reloc != NULL && aux->reloc->sym_ptr_ptr != NULL
-        && *aux->reloc->sym_ptr_ptr != NULL) {
+    if (aux->reloc != NULL && aux->reloc->sym_ptr_ptr != NULL &&
+        *aux->reloc->sym_ptr_ptr != NULL) {
         sym = *aux->reloc->sym_ptr_ptr;
 
         /* Adjust the vma to the reloc.  */
@@ -752,7 +737,6 @@ static void trdb_print_addr(bfd_vma vma, struct disassemble_info *inf,
                              do_demangle, display_file_offsets);
 }
 
-
 /* Print VMA to INFO.  This function is passed to the disassembler
  * routine.
  */
@@ -767,7 +751,6 @@ void trdb_print_address(bfd_vma vma, struct disassemble_info *inf)
                     display_file_offsets);
 }
 
-
 /* Determine if the given address has a symbol associated with it.  */
 int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf)
 {
@@ -777,7 +760,6 @@ int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf)
 
     return (sym != NULL && (bfd_asymbol_value(sym) == vma));
 }
-
 
 int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                               struct disassembler_unit *dunit)
@@ -937,7 +919,6 @@ fail:
     return status;
 }
 
-
 void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                               struct disassembler_unit *dunit)
 
@@ -967,7 +948,6 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
         free(aux);
     }
 }
-
 
 void trdb_set_disassembly_conf(struct disassembler_unit *dunit,
                                uint32_t settings)
@@ -1033,7 +1013,6 @@ static const char *slurp_file(const char *fn, size_t *size)
     return map;
 }
 
-
 #define line_map_decrease 5
 /* Precompute array of lines for a mapped file. */
 static const char **index_file(const char *map, size_t size,
@@ -1082,7 +1061,6 @@ static const char **index_file(const char *map, size_t size,
     return linemap;
 }
 
-
 /* Tries to open MODNAME, and if successful adds a node to print_files
    linked list and returns that node.  Returns NULL on failure.  */
 static struct print_file_list *try_print_file_open(const char *origname,
@@ -1111,7 +1089,6 @@ static struct print_file_list *try_print_file_open(const char *origname,
     print_files = p;
     return p;
 }
-
 
 /* If the source file, as described in the symtab, is not found
    try to locate it in one of the paths specified with -I
@@ -1147,7 +1124,6 @@ static struct print_file_list *update_source_path(const char *filename)
     return NULL;
 }
 
-
 /* Print a source file line.  */
 static void print_line(struct print_file_list *p, unsigned int linenum)
 {
@@ -1164,7 +1140,6 @@ static void print_line(struct print_file_list *p, unsigned int linenum)
         putchar('\n');
 }
 
-
 /* Print a range of source code lines. */
 static void dump_lines(struct print_file_list *p, unsigned int start,
                        unsigned int end)
@@ -1178,7 +1153,6 @@ static void dump_lines(struct print_file_list *p, unsigned int start,
     }
     printf("\n");
 }
-
 
 /* Show the line number, or the source line, in a disassembly
    listing.  */
@@ -1218,7 +1192,6 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
         if (!path)
             goto fail;
 
-
         if (prefix_length)
             memcpy(path, prefix, prefix_length);
         path_up = path + prefix_length;
@@ -1247,15 +1220,14 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
         reloc = FALSE;
 
     if (with_line_numbers) {
-        if (functionname != NULL
-            && (prev_functionname == NULL
-                || strcmp(functionname, prev_functionname) != 0)) {
+        if (functionname != NULL &&
+            (prev_functionname == NULL ||
+             strcmp(functionname, prev_functionname) != 0)) {
             printf("%s():\n", functionname);
             prev_line = -1;
         }
-        if (linenumber > 0
-            && (linenumber != prev_line
-                || discriminator != prev_discriminator)) {
+        if (linenumber > 0 &&
+            (linenumber != prev_line || discriminator != prev_discriminator)) {
             if (discriminator > 0)
                 printf("%s:%u (discriminator %u)\n",
                        filename == NULL ? "???" : filename, linenumber,
@@ -1312,9 +1284,9 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
         }
     }
 
-    if (functionname != NULL
-        && (prev_functionname == NULL
-            || strcmp(functionname, prev_functionname) != 0)) {
+    if (functionname != NULL &&
+        (prev_functionname == NULL ||
+         strcmp(functionname, prev_functionname) != 0)) {
         if (prev_functionname != NULL)
             free(prev_functionname);
         prev_functionname = malloc(strlen(functionname) + 1);
@@ -1338,7 +1310,6 @@ fail:
     /* if(prev_functionname) */
     /* 	free(prev_functionname); */
 }
-
 
 /* sprintf to a "stream".  */
 static int ATTRIBUTE_PRINTF_2 objdump_sprintf(SFILE *f, const char *format, ...)
@@ -1460,7 +1431,6 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
         putchar(' ');
     }
 
-
     sfile.pos = 0;
     inf->fprintf_func = (fprintf_ftype)objdump_sprintf;
     inf->stream = &sfile;
@@ -1470,10 +1440,9 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
     /* if (machine) */
     /* 	inf->flags |= USER_SPECIFIED_MACHINE_TYPE; */
 
-    if (inf->disassembler_needs_relocs
-        && (bfd_get_file_flags(aux->abfd) & EXEC_P) == 0
-        && (bfd_get_file_flags(aux->abfd) & DYNAMIC) == 0
-        && *relppp < relppend) {
+    if (inf->disassembler_needs_relocs &&
+        (bfd_get_file_flags(aux->abfd) & EXEC_P) == 0 &&
+        (bfd_get_file_flags(aux->abfd) & DYNAMIC) == 0 && *relppp < relppend) {
         bfd_signed_vma distance_to_rel;
 
         distance_to_rel = (**relppp)->address - (rel_offset + addr_offset);
@@ -1492,13 +1461,12 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
                disassembler function which just returns the length
                of an instruction at a given address without trying
                to display its disassembly. */
-            || (distance_to_rel > 0
-                && distance_to_rel < (bfd_signed_vma)(previous_octets / opb))) {
+            || (distance_to_rel > 0 &&
+                distance_to_rel < (bfd_signed_vma)(previous_octets / opb))) {
             inf->flags |= INSN_HAS_RELOC;
             aux->reloc = **relppp;
         }
     }
-
 
     octets = (*disassemble_fn)(section->vma + addr_offset, inf);
 
@@ -1517,7 +1485,6 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
         }
         /* break; */
     }
-
 
     if (prefix_addresses ? show_raw_insn > 0 : show_raw_insn >= 0) {
         bfd_vma j;
@@ -1604,7 +1571,6 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
     else
         need_nl = TRUE;
 
-
     if (need_nl)
         printf("\n");
 
@@ -1614,7 +1580,6 @@ fail:
     if (sfile.buffer)
         free(sfile.buffer);
 }
-
 
 void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
                                            bfd_vma addr,
@@ -1657,9 +1622,8 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     /* Sections that do not contain machine
        code are not normally disassembled.  */
-    if (!disassemble_all
-        && ((section->flags & (SEC_CODE | SEC_HAS_CONTENTS))
-            != (SEC_CODE | SEC_HAS_CONTENTS))) {
+    if (!disassemble_all && ((section->flags & (SEC_CODE | SEC_HAS_CONTENTS)) !=
+                             (SEC_CODE | SEC_HAS_CONTENTS))) {
         err(c, "section contains no machine code\n");
         return;
     }
@@ -1683,8 +1647,8 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
         rel_pp = NULL;
         rel_offset = 0;
 
-        if ((section->flags & SEC_RELOC) != 0
-            && (dump_reloc_info || pinfo->disassembler_needs_relocs)) {
+        if ((section->flags & SEC_RELOC) != 0 &&
+            (dump_reloc_info || pinfo->disassembler_needs_relocs)) {
             long relsize;
 
             relsize = bfd_get_reloc_upper_bound(abfd, section);
@@ -1738,8 +1702,8 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     /* Skip over the relocs belonging to addresses below the
        start address.  */
-    while (rel_pp < rel_ppend
-           && (*rel_pp)->address < rel_offset + addr - section->vma)
+    while (rel_pp < rel_ppend &&
+           (*rel_pp)->address < rel_offset + addr - section->vma)
         ++rel_pp;
 
     /* printf (("\nDisassembly of section %s:\n"), section->name); */
@@ -1752,10 +1716,9 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
     /* PR 9774: If the target used signed addresses then we must make
        sure that we sign extend the value that we calculate for 'addr'
        in the loop below.  */
-    if (bfd_get_flavour(abfd) == bfd_target_elf_flavour
-        && (bed = get_elf_backend_data(abfd)) != NULL && bed->sign_extend_vma)
+    if (bfd_get_flavour(abfd) == bfd_target_elf_flavour &&
+        (bed = get_elf_backend_data(abfd)) != NULL && bed->sign_extend_vma)
         sign_adjust = (bfd_vma)1 << (bed->s->arch_size - 1);
-
 
     /* bfd_vma addr; */ // from parameters
     asymbol *nextsym;
@@ -1769,8 +1732,8 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
         int x;
 
         /* find first symbol value that is larger than addr */
-        for (x = place; (x < sorted_symcount
-                         && (bfd_asymbol_value(sorted_syms[x]) <= addr));
+        for (x = place; (x < sorted_symcount &&
+                         (bfd_asymbol_value(sorted_syms[x]) <= addr));
              ++x)
             continue;
 
@@ -1798,16 +1761,16 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
         nextsym = NULL;
     else {
 #define is_valid_next_sym(SYM)                                                 \
-    ((SYM)->section == section                                                 \
-     && (bfd_asymbol_value(SYM) > bfd_asymbol_value(sym))                      \
-     && pinfo->symbol_is_valid(SYM, pinfo))
+    ((SYM)->section == section &&                                              \
+     (bfd_asymbol_value(SYM) > bfd_asymbol_value(sym)) &&                      \
+     pinfo->symbol_is_valid(SYM, pinfo))
 
         /* Search forward for the next appropriate symbol in
            SECTION.  Note that all the symbols are sorted
            together into one big array, and that some sections
            may have overlapping addresses.  */
-        while (place < sorted_symcount
-               && !is_valid_next_sym(sorted_syms[place]))
+        while (place < sorted_symcount &&
+               !is_valid_next_sym(sorted_syms[place]))
             ++place;
 
         if (place >= sorted_symcount)
@@ -1829,12 +1792,12 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
     /* If a symbol is explicitly marked as being an object
        rather than a function, just dump the bytes without
        disassembling them.  */
-    if (disassemble_all || sym == NULL || sym->section != section
-        || bfd_asymbol_value(sym) > addr
-        || ((sym->flags & BSF_OBJECT) == 0
-            && (strstr(bfd_asymbol_name(sym), "gnu_compiled") == NULL)
-            && (strstr(bfd_asymbol_name(sym), "gcc2_compiled") == NULL))
-        || (sym->flags & BSF_FUNCTION) != 0)
+    if (disassemble_all || sym == NULL || sym->section != section ||
+        bfd_asymbol_value(sym) > addr ||
+        ((sym->flags & BSF_OBJECT) == 0 &&
+         (strstr(bfd_asymbol_name(sym), "gnu_compiled") == NULL) &&
+         (strstr(bfd_asymbol_name(sym), "gcc2_compiled") == NULL)) ||
+        (sym->flags & BSF_FUNCTION) != 0)
         insns = TRUE;
     else
         insns = FALSE;
@@ -1856,19 +1819,16 @@ fail:
         free(pinfo->buffer);
 }
 
-
 void dump_section_names(bfd *abfd)
 {
     bfd_map_over_sections(abfd, dump_section_header, NULL);
 }
-
 
 void dump_section_header(bfd *abfd, asection *section, void *ignored)
 {
     bfd_printf_vma(abfd, bfd_get_section_vma(abfd, section));
     printf("%s\n", bfd_get_section_name(abfd, section));
 }
-
 
 void dump_bin_info(bfd *abfd)
 {
@@ -1880,7 +1840,6 @@ void dump_bin_info(bfd *abfd)
     printf("endian : %d\n", abfd->xvec->byteorder);
 }
 
-
 void dump_target_list()
 {
     printf("Available target list:\n");
@@ -1890,13 +1849,11 @@ void dump_target_list()
     }
 }
 
-
 bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma)
 {
-    return (vma >= section->vma
-            && vma < (section->vma + bfd_section_size(abfd, section)));
+    return (vma >= section->vma &&
+            vma < (section->vma + bfd_section_size(abfd, section)));
 }
-
 
 asection *get_section_for_vma(bfd *abfd, bfd_vma vma)
 {
@@ -1909,12 +1866,11 @@ asection *get_section_for_vma(bfd *abfd, bfd_vma vma)
     return NULL;
 }
 
-
 void disassemble_section(bfd *abfd, asection *section, void *inf)
 {
     /* Do not disassemble sections without machine code*/
-    if ((section->flags & (SEC_CODE | SEC_HAS_CONTENTS))
-        != (SEC_CODE | SEC_HAS_CONTENTS)) {
+    if ((section->flags & (SEC_CODE | SEC_HAS_CONTENTS)) !=
+        (SEC_CODE | SEC_HAS_CONTENTS)) {
         return;
     }
     struct disassembler_unit *dunit = inf;
@@ -1977,7 +1933,6 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
 
     free(data);
 }
-
 
 void disassemble_block(size_t len, bfd_byte data[len],
                        struct disassembler_unit *dunit)
@@ -2058,7 +2013,6 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
 
     free(data);
 }
-
 
 void disassemble_single_instruction_slow(uint32_t instr, uint32_t addr)
 {

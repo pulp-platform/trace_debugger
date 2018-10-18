@@ -89,8 +89,8 @@ static bool is_c_ret_instr(long instr)
 
 static bool is_ret_instr(long instr)
 {
-    return (instr & (MASK_JALR | MASK_RD | MASK_RS1 | MASK_IMM))
-           == (MATCH_JALR | (X_RA << OP_SH_RS1));
+    return (instr & (MASK_JALR | MASK_RD | MASK_RS1 | MASK_IMM)) ==
+           (MATCH_JALR | (X_RA << OP_SH_RS1));
 }
 
 /**
@@ -194,7 +194,6 @@ static inline unsigned int riscv_instr_len(uint64_t instr)
  * @param dinfo filled with information of the PULP platform
  */
 void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
-
 
 /**
  * Initialize disassembler_unit with settings for the PULP platform.

@@ -48,14 +48,12 @@ static uint32_t p_branch_map_len(uint32_t branches)
     return -1;
 }
 
-
 static uint32_t p_sign_extendable_bits(uint32_t addr)
 {
     int clz = __builtin_clz(addr);
     int clo = __builtin_clz(~addr);
     return clz > clo ? clz : clo;
 }
-
 
 static __uint128_t p_sext128(__uint128_t val, __uint128_t bit)
 {
@@ -71,7 +69,6 @@ static __uint128_t p_sext128(__uint128_t val, __uint128_t bit)
     return (val ^ m) - m;
 }
 
-
 static uint32_t p_sext32(uint32_t val, uint32_t bit)
 {
     if (bit == 0)
@@ -86,7 +83,6 @@ static uint32_t p_sext32(uint32_t val, uint32_t bit)
     return (val ^ m) - m;
 }
 
-
 static int p_clz_u128(__uint128_t u)
 {
     uint64_t hi = u >> 64;
@@ -96,14 +92,12 @@ static int p_clz_u128(__uint128_t u)
     return retval[idx];
 }
 
-
 static uint32_t p_sign_extendable_bits128(__uint128_t addr)
 {
     int clz = p_clz_u128(addr);
     int clo = p_clz_u128(~addr);
     return clz > clo ? clz : clo;
 }
-
 
 /* pulp specific packet serialization */
 int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
@@ -133,10 +127,9 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         /* we need enough space to do the packing it in uint128 */
         assert(128 > PULPPKTLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
         /* TODO: assert branch map to overfull */
-        data.bits =
-            byte_len | (packet->msg_type << PULPPKTLEN)
-            | (packet->format << (PULPPKTLEN + MSGTYPELEN))
-            | (packet->branches << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
+        data.bits = byte_len | (packet->msg_type << PULPPKTLEN) |
+                    (packet->format << (PULPPKTLEN + MSGTYPELEN)) |
+                    (packet->branches << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
         data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len))
                      << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN);
 
@@ -178,10 +171,9 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         /* we need enough space to do the packing it in uint128 */
         assert(128 > PULPPKTLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
         /* TODO: assert branch map to overfull */
-        data.bits =
-            byte_len | (packet->msg_type << PULPPKTLEN)
-            | (packet->format << (PULPPKTLEN + MSGTYPELEN))
-            | (packet->branches << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
+        data.bits = byte_len | (packet->msg_type << PULPPKTLEN) |
+                    (packet->format << (PULPPKTLEN + MSGTYPELEN)) |
+                    (packet->branches << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
         data.bits |= ((__uint128_t)packet->branch_map & MASK_FROM(len))
                      << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN);
 
@@ -212,10 +204,10 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     }
     case F_ADDR_ONLY:
         assert(128 > PULPPKTLEN + MSGTYPELEN + FORMATLEN + XLEN);
-        data.bits = byte_len | (packet->msg_type << PULPPKTLEN)
-                    | (packet->format << (PULPPKTLEN + MSGTYPELEN))
-                    | ((__uint128_t)packet->address
-                       << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
+        data.bits = byte_len | (packet->msg_type << PULPPKTLEN) |
+                    (packet->format << (PULPPKTLEN + MSGTYPELEN)) |
+                    ((__uint128_t)packet->address
+                     << (PULPPKTLEN + MSGTYPELEN + FORMATLEN));
 
         *bitcnt = PULPPKTLEN + MSGTYPELEN + FORMATLEN;
         if (trdb_is_full_address(c))
@@ -239,28 +231,28 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
 
         /* common part to all sub formats */
         data.bits =
-            byte_len | (packet->msg_type << PULPPKTLEN)
-            | (packet->format << (PULPPKTLEN + MSGTYPELEN))
-            | (packet->subformat << (PULPPKTLEN + MSGTYPELEN + FORMATLEN))
-            | (packet->privilege << (PULPPKTLEN + MSGTYPELEN + 2 * FORMATLEN));
+            byte_len | (packet->msg_type << PULPPKTLEN) |
+            (packet->format << (PULPPKTLEN + MSGTYPELEN)) |
+            (packet->subformat << (PULPPKTLEN + MSGTYPELEN + FORMATLEN)) |
+            (packet->privilege << (PULPPKTLEN + MSGTYPELEN + 2 * FORMATLEN));
         *bitcnt = PULPPKTLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
 
         /* to reduce repetition */
         uint32_t suboffset = PULPPKTLEN + MSGTYPELEN + 2 * FORMATLEN + PRIVLEN;
         switch (packet->subformat) {
         case SF_START:
-            data.bits |= ((__uint128_t)packet->branch << suboffset)
-                         | ((__uint128_t)packet->address << (suboffset + 1));
+            data.bits |= ((__uint128_t)packet->branch << suboffset) |
+                         ((__uint128_t)packet->address << (suboffset + 1));
             *bitcnt += 1 + XLEN;
             break;
 
         case SF_EXCEPTION:
             data.bits |=
-                (packet->branch << suboffset)
-                | ((__uint128_t)packet->address << (suboffset + 1))
-                | ((__uint128_t)packet->ecause << (suboffset + 1 + XLEN))
-                | ((__uint128_t)packet->interrupt
-                   << (suboffset + 1 + XLEN + CAUSELEN));
+                (packet->branch << suboffset) |
+                ((__uint128_t)packet->address << (suboffset + 1)) |
+                ((__uint128_t)packet->ecause << (suboffset + 1 + XLEN)) |
+                ((__uint128_t)packet->interrupt
+                 << (suboffset + 1 + XLEN + CAUSELEN));
             // going to be zero anyway in our case
             //  | ((__uint128_t)packet->tval
             //   << (PULPPKTLEN + 4 + PRIVLEN + 1 + XLEN + CAUSELEN + 1));
@@ -279,7 +271,6 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     }
     return -1;
 }
-
 
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
                                  struct tr_packet *packet, uint32_t *bytes)
@@ -417,7 +408,6 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     return -1;
 }
 
-
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
                                struct list_head *packet_list)
 {
@@ -447,7 +437,6 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
     return 0;
 }
 
-
 int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                   FILE *fp)
 {
@@ -474,7 +463,6 @@ int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
     return 0;
 }
 
-
 int trdb_write_packets(struct trdb_ctx *c, const char *path,
                        struct list_head *packet_list)
 {
@@ -495,8 +483,7 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
 
     struct tr_packet *packet;
     /* TODO: do we need the rever version? I think we do*/
-    list_for_each_entry(packet, packet_list, list)
-    {
+    list_for_each_entry (packet, packet_list, list) {
         if (trdb_pulp_serialize_packet(c, packet, &bitcnt, alignment, bin)) {
             status = -1;
             goto fail;
@@ -529,7 +516,6 @@ fail:
     return status;
 }
 
-
 size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
                                   int *status, struct list_head *instrs)
 {
@@ -561,8 +547,7 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
                       " tval= %" SCNx32 " priv= %" SCNx32
                       " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
                       &valid, &exception, &interrupt, &cause, &tval, &priv,
-                      &compressed, &iaddr, &instr))
-        != EOF) {
+                      &compressed, &iaddr, &instr)) != EOF) {
         // TODO: make this configurable so that we don't have to store so
         // much data
         /* if (!valid) { */
@@ -609,7 +594,6 @@ fail:
     return 0;
 }
 
-
 /* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
 size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
                              struct tr_instr **samples, int *status)
@@ -647,8 +631,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
                       " tval= %" SCNx32 " priv= %" SCNx32
                       " compressed= %d addr= %" SCNx32 " instr= %" SCNx32 " \n",
                       &valid, &exception, &interrupt, &cause, &tval, &priv,
-                      &compressed, &iaddr, &instr))
-        != EOF) {
+                      &compressed, &iaddr, &instr)) != EOF) {
         // TODO: make this configurable so that we don't have to store so much
         // data
         /* if (!valid) { */
@@ -696,7 +679,6 @@ fail:
     return 0;
 }
 
-
 size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
                               struct list_head *instrs)
 {
@@ -730,9 +712,8 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
         goto fail;
     }
 
-    if (!strcmp(line,
-                "VALID,ADDRESS,INSN,PRIVILEGE,"
-                "EXCEPTION,ECAUSE,TVAL,INTERRUPT")) {
+    if (!strcmp(line, "VALID,ADDRESS,INSN,PRIVILEGE,"
+                      "EXCEPTION,ECAUSE,TVAL,INTERRUPT")) {
         err(c, "cvs header does not match expected value\n");
         *status = -1;
         goto fail;
@@ -802,7 +783,6 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
             *status = -1;
             goto fail;
         }
-
 
         list_add(&sample->list, instrs);
 

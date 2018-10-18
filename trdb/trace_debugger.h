@@ -132,7 +132,6 @@ struct tr_packet {
     struct list_head list; /**< used to make a linked list of tr_packet */
 };
 
-
 /**
  * Keep information about generated packets
  */
@@ -512,7 +511,6 @@ void trdb_print_instr(FILE *stream, const struct tr_instr *packet);
 bool trdb_compare_instr(struct trdb_ctx *c, const struct tr_instr *instr0,
                         const struct tr_instr *instr1);
 
-
 /**
  * Free the entries of a list of tr_packet, used to deallocate the list returned
  * by trdb_compress_trace().
@@ -528,7 +526,6 @@ void trdb_free_packet_list(struct list_head *packet_list);
  * @param instr_list list to free
  */
 void trdb_free_instr_list(struct list_head *instr_list);
-
 
 /* struct packet0 {
  *     uint32_t format : 2;   // 00

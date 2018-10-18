@@ -52,7 +52,6 @@
 static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
               "Machine must be little endian");
 
-
 /* static inline void __attribute__((always_inline, format(printf, 2, 3))) */
 /* trdb_log_null(struct trdb_ctx *ctx, const char *format, ...) */
 /* { */
@@ -65,7 +64,6 @@ void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...);
         if (trdb_get_log_priority(ctx) >= prio)                                \
             trdb_log(ctx, prio, __FILE__, __LINE__, __FUNCTION__, ##arg);      \
     } while (0)
-
 
 #ifdef ENABLE_LOGGING
 #    ifdef ENABLE_DEBUG
@@ -81,7 +79,6 @@ void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...);
 #    define err(ctx, arg...) trdb_log_null(ctx, ##arg)
 #endif
 
-
 #ifdef HAVE_SECURE_GETENV
 #    ifdef HAVE___SECURE_GETENV
 #        define secure_getenv __secure_getenv
@@ -92,13 +89,11 @@ void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...);
 #    define secure_getenv getenv
 #endif
 
-
 #define TRDB_EXPORT __attribute__((visibility("default")))
 
 void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
               const char *fn, const char *format, ...)
     __attribute__((format(printf, 6, 7)));
-
 
 /**
  * Write formatted string to stderr with the filename, linenumber and function

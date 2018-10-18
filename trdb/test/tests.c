@@ -77,7 +77,6 @@ static void shiftl_array(uint8_t arr[], size_t len, uint32_t shift)
     return;
 }
 
-
 static int test_disasm_bfd()
 {
     bfd *abfd = NULL;
@@ -127,7 +126,6 @@ static int test_disasm_bfd()
     return TRDB_SUCCESS;
 }
 
-
 static int test_trdb_dinfo_init(char *path)
 {
     int status = TRDB_SUCCESS;
@@ -156,7 +154,6 @@ fail:
     return status;
 }
 
-
 static int test_parse_packets(const char *path)
 {
     int status = TRDB_SUCCESS;
@@ -174,8 +171,7 @@ static int test_parse_packets(const char *path)
     }
     struct tr_packet *packet;
     if (TRDB_VERBOSE_TESTS) {
-        list_for_each_entry_reverse(packet, &packet_list, list)
-        {
+        list_for_each_entry_reverse (packet, &packet_list, list) {
             trdb_print_packet(stdout, packet);
         }
     }
@@ -184,7 +180,6 @@ fail:
     trdb_free_packet_list(&packet_list);
     return status;
 }
-
 
 static int test_trdb_serialize_packet(uint32_t shift)
 {
@@ -226,7 +221,6 @@ static int test_trdb_serialize_packet(uint32_t shift)
         LOG_ERRT("Packet bits don't match\n");
         status = TRDB_FAIL;
     }
-
 
     /* Testing F_BRANCH_FULL packet with non-full branch map */
     packet = (struct tr_packet){.msg_type = 2,
@@ -276,7 +270,6 @@ static int test_trdb_serialize_packet(uint32_t shift)
         status = TRDB_FAIL;
     }
 
-
     /* Testing F_SYNC start packet */
     packet = (struct tr_packet){.msg_type = 2,
                                 .format = F_SYNC,
@@ -302,7 +295,6 @@ static int test_trdb_serialize_packet(uint32_t shift)
         LOG_ERRT("Packet bits don't match\n");
         status = TRDB_FAIL;
     }
-
 
     /* Testing F_SYNC exception packet */
     packet = (struct tr_packet){.msg_type = 2,
@@ -413,7 +405,6 @@ fail:
     return status;
 }
 
-
 static int test_parse_stimuli_line()
 {
     int valid = 0;
@@ -441,12 +432,11 @@ static int test_parse_stimuli_line()
         return TRDB_FAIL;
     }
 
-    return (valid == 1 && exception == 0 && cause == 0 && tval == 0xff
-            && iaddr == 0x1c00809c && instr == 0xffff9317)
+    return (valid == 1 && exception == 0 && cause == 0 && tval == 0xff &&
+            iaddr == 0x1c00809c && instr == 0xffff9317)
                ? TRDB_SUCCESS
                : TRDB_FAIL;
 }
-
 
 static int test_stimuli_to_tr_instr(const char *path)
 {
@@ -464,7 +454,6 @@ static int test_stimuli_to_tr_instr(const char *path)
     free(*samples);
     return TRDB_SUCCESS;
 }
-
 
 static int test_stimuli_to_trace_list(const char *path)
 {
@@ -496,8 +485,7 @@ static int test_stimuli_to_trace_list(const char *path)
 
     int i = 0;
     struct tr_instr *instr;
-    list_for_each_entry_reverse(instr, &instr_list, list)
-    {
+    list_for_each_entry_reverse (instr, &instr_list, list) {
         if (i >= sizea) {
             LOG_ERRT("trying to access out of bounds index\n");
             goto fail;
@@ -518,7 +506,6 @@ fail:
     free(*samples);
     return TRDB_SUCCESS;
 }
-
 
 static int test_stimuli_to_packet_dump(const char *path)
 {
@@ -563,7 +550,6 @@ fail:
     return status;
 }
 
-
 static int test_disassemble_trace(const char *bin_path, const char *trace_path)
 {
     struct trdb_ctx *c = trdb_new();
@@ -602,7 +588,6 @@ fail:
     return status;
 }
 
-
 static int test_disassemble_trace_with_bfd(const char *bin_path,
                                            const char *trace_path)
 {
@@ -631,11 +616,10 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
     }
     if (TRDB_VERBOSE_TESTS) {
         trdb_disassemble_trace(samplecnt, *samples, &dunit);
-        trdb_set_disassembly_conf(&dunit, TRDB_LINE_NUMBERS | TRDB_SOURCE_CODE
-                                              | TRDB_FUNCTION_CONTEXT);
+        trdb_set_disassembly_conf(&dunit, TRDB_LINE_NUMBERS | TRDB_SOURCE_CODE |
+                                              TRDB_FUNCTION_CONTEXT);
         trdb_disassemble_trace_with_bfd(c, samplecnt, *samples, abfd, &dunit);
     }
-
 
 fail:
     trdb_free_dinfo_with_bfd(c, abfd, &dunit);
@@ -644,7 +628,6 @@ fail:
     bfd_close(abfd);
     return status;
 }
-
 
 int test_compress_trace(const char *trace_path, const char *packets_path)
 {
@@ -702,7 +685,6 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     }
     rewind(tmp_fp0);
 
-
     tmp_fp1 = fopen("tmp3", "w+");
     if (!tmp_fp1) {
         perror("fopen");
@@ -718,8 +700,8 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     ssize_t nread_expected;
 
     /* test stepwise compression against expected response */
-    while ((nread_expected = getline(&expected, &len, expected_packets))
-           != -1) {
+    while ((nread_expected = getline(&expected, &len, expected_packets)) !=
+           -1) {
         linecnt++;
         nread_compare = getline(&compare, &len, tmp_fp1);
         if (nread_compare == -1) {
@@ -728,8 +710,8 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
             status = TRDB_FAIL;
             goto fail;
         }
-        if (nread_expected != nread_compare
-            || strncmp(compare, expected, nread_expected) != 0) {
+        if (nread_expected != nread_compare ||
+            strncmp(compare, expected, nread_expected) != 0) {
             LOG_ERRT("Expected packets mismatch on line %zu\n", linecnt);
             LOG_ERRT("Expected: %s", expected);
             LOG_ERRT("Received: %s", compare);
@@ -755,7 +737,6 @@ fail:
     trdb_free_instr_list(&instr_head);
     return status;
 }
-
 
 int test_compress_cvs_trace(const char *trace_path)
 {
@@ -790,15 +771,12 @@ int test_compress_cvs_trace(const char *trace_path)
         goto fail;
     }
 
-
     struct tr_instr *instr;
-    list_for_each_entry_reverse(instr, &instr_list, list)
-    {
+    list_for_each_entry_reverse (instr, &instr_list, list) {
         /* trdb_disassemble_instr(instr, &dunit); */
     }
 
-    list_for_each_entry_reverse(instr, &instr_list, list)
-    {
+    list_for_each_entry_reverse (instr, &instr_list, list) {
         int step = trdb_compress_trace_step(ctx, &packet_list, instr);
         if (step == -1) {
             LOG_ERRT("Compress trace failed\n");
@@ -807,26 +785,22 @@ int test_compress_cvs_trace(const char *trace_path)
         }
     }
     printf("%s\n", trace_path);
-    printf(
-        "instructions: %zu, packets: %zu, payload bytes: %zu "
-        "exceptions: %zu z/o: %zu\n",
-        instrcnt, ctx->stats.packets, ctx->stats.payloadbits / 8,
-        ctx->stats.exception_packets, ctx->stats.zo_addresses);
+    printf("instructions: %zu, packets: %zu, payload bytes: %zu "
+           "exceptions: %zu z/o: %zu\n",
+           instrcnt, ctx->stats.packets, ctx->stats.payloadbits / 8,
+           ctx->stats.exception_packets, ctx->stats.zo_addresses);
     double bpi_payload = ctx->stats.payloadbits / (double)ctx->stats.instrs;
-    double bpi_full = (ctx->stats.payloadbits + ctx->stats.packets * 6)
-                      / (double)ctx->stats.instrs;
+    double bpi_full = (ctx->stats.payloadbits + ctx->stats.packets * 6) /
+                      (double)ctx->stats.instrs;
     double bpi_pulp = (ctx->stats.pulpbits / (double)ctx->stats.instrs);
     printf("(Compression) Bits per instruction (payload         ): %lf\n",
            bpi_payload);
-    printf(
-        "(Compression) Bits per instruction (payload + header): %lf "
-        "(%+2.lf%%)\n",
-        bpi_full, bpi_full / bpi_payload * 100 - 100);
-    printf(
-        "(Compression) Bits per instruction (pulp            ): %lf "
-        "(%+2.lf%%)\n ",
-        bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
-
+    printf("(Compression) Bits per instruction (payload + header): %lf "
+           "(%+2.lf%%)\n",
+           bpi_full, bpi_full / bpi_payload * 100 - 100);
+    printf("(Compression) Bits per instruction (pulp            ): %lf "
+           "(%+2.lf%%)\n ",
+           bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
 
 fail:
     trdb_free_packet_list(&packet_list);
@@ -834,7 +808,6 @@ fail:
     trdb_free(ctx);
     return status;
 }
-
 
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
@@ -889,8 +862,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
         struct tr_instr *instr;
-        list_for_each_entry_reverse(instr, &instr1_head, list)
-        {
+        list_for_each_entry_reverse (instr, &instr1_head, list) {
         }
     }
 
@@ -900,8 +872,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     struct tr_instr *instr;
     int processedcnt = 0;
     int i = 0;
-    list_for_each_entry_reverse(instr, &instr1_head, list)
-    {
+    list_for_each_entry_reverse (instr, &instr1_head, list) {
         /* skip all invalid instructions for the comparison */
         while (!(*samples)[i].valid || (*samples)[i].exception) {
             i++;
@@ -932,7 +903,6 @@ fail:
 
     return status;
 }
-
 
 int test_decompress_trace_differential(const char *bin_path,
                                        const char *trace_path)
@@ -992,7 +962,6 @@ int test_decompress_trace_differential(const char *bin_path,
                (ctx->stats.sext_bits[i] * 100 / (double)sum));
     }
 
-
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
 
@@ -1001,8 +970,7 @@ int test_decompress_trace_differential(const char *bin_path,
     if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
         struct tr_instr *instr;
-        list_for_each_entry_reverse(instr, &instr1_head, list)
-        {
+        list_for_each_entry_reverse (instr, &instr1_head, list) {
         }
     }
 
@@ -1012,8 +980,7 @@ int test_decompress_trace_differential(const char *bin_path,
     struct tr_instr *instr;
     int processedcnt = 0;
     int i = 0;
-    list_for_each_entry_reverse(instr, &instr1_head, list)
-    {
+    list_for_each_entry_reverse (instr, &instr1_head, list) {
         /* skip all invalid instructions for the comparison */
         while (!(*samples)[i].valid || (*samples)[i].exception) {
             i++;
@@ -1044,7 +1011,6 @@ fail:
 
     return status;
 }
-
 
 int main(int argc, char *argv[argc + 1])
 {
@@ -1117,7 +1083,6 @@ int main(int argc, char *argv[argc + 1])
         RUN_TEST(test_compress_cvs_trace, stim);
     }
 
-
     if (TRDB_ARRAY_SIZE(tv) % 2 != 0)
         LOG_ERRT("Test vector strings are incomplete.");
 
@@ -1131,7 +1096,6 @@ int main(int argc, char *argv[argc + 1])
         RUN_TEST(test_decompress_trace, bin, stim);
         RUN_TEST(test_decompress_trace_differential, bin, stim);
     }
-
 
     if (TESTS_SUCCESSFULL())
         printf("ALL TESTS PASSED\n");

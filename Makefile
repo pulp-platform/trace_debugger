@@ -148,7 +148,7 @@ TAGS: check-env
 	echo "Generating TAGS for driver..."
 	echo "Generating TAGS for RTL..."
 	$(CTAGS) -R -e -h=".c.h.sv.svh" --tag-relative=always \
-		--exclude=$(PULP_SDK_HOME) \
+		--exclude=$(PULP_SDK_HOME) --exclude=trdb/ \
 		. $(PULP_PROJECT_HOME) \
 		rtl/ tb/
 

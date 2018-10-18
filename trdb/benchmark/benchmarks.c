@@ -41,7 +41,6 @@ struct result {
     double bpi;
 };
 
-
 static char *conv_tf(bool b)
 {
     return b ? "true" : "false";
@@ -88,8 +87,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     }
 
     struct tr_instr *instr;
-    list_for_each_entry_reverse(instr, &instr_list, list)
-    {
+    list_for_each_entry_reverse (instr, &instr_list, list) {
         int step = trdb_compress_trace_step(ctx, &packet_list, instr);
         if (step == -1) {
             fprintf(stderr, "Compress trace failed\n");
@@ -123,8 +121,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     trdb_set_implicit_ret(ctx, false);
     trdb_set_compress_branch_map(ctx, false);
 
-    list_for_each_entry_reverse(instr, &instr_list, list)
-    {
+    list_for_each_entry_reverse (instr, &instr_list, list) {
         int step = trdb_compress_trace_step(ctx, &packet_list, instr);
         if (step == -1) {
             fprintf(stderr, "Compress trace failed\n");
@@ -148,36 +145,31 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
            instrcnt, packets, payloadbits / 8);
     printf("ultra instructions: %zu, packets: %zu, payload bytes: %zu\n",
            comparison->instrcnt, comparison->packetcnt, comparison->payload);
-    printf(
-        "pulp packet stats: diff: %zu (%2.2lf%%) / abs: %zu (%2.2lf%%) / "
-        "addr_only: %zu (%2.2lf%%) / bmap_full: %zu (%2.2lf%%) / "
-        "bmap_full_with_addr: %zu (%2.2lf%%)\n",
-        diff_packets, percent(diff_packets, packets), abs_packets,
-        percent(abs_packets, packets), addr_only_packets,
-        percent(addr_only_packets, packets), bmap_full_packets,
-        percent(bmap_full_packets, packets), bmap_full_addr_packets,
-        percent(bmap_full_addr_packets, packets));
+    printf("pulp packet stats: diff: %zu (%2.2lf%%) / abs: %zu (%2.2lf%%) / "
+           "addr_only: %zu (%2.2lf%%) / bmap_full: %zu (%2.2lf%%) / "
+           "bmap_full_with_addr: %zu (%2.2lf%%)\n",
+           diff_packets, percent(diff_packets, packets), abs_packets,
+           percent(abs_packets, packets), addr_only_packets,
+           percent(addr_only_packets, packets), bmap_full_packets,
+           percent(bmap_full_packets, packets), bmap_full_addr_packets,
+           percent(bmap_full_addr_packets, packets));
     double bpi_noc_payload = noc_payloadbits / (double)noc_instrs;
     double bpi_payload = payloadbits / (double)instrs;
     double bpi_full = (payloadbits + packets * 6) / (double)instrs;
     double bpi_pulp = (pulpbits / (double)instrs);
     printf("Bits per instruction (ultra           ): %lf\n", comparison->bpi);
-    printf(
-        "Bits per instruction (payload no compr): %lf "
-        "(%+2.lf%% vs ultra)\n",
-        bpi_noc_payload, (bpi_noc_payload / comparison->bpi * 100 - 100));
-    printf(
-        "Bits per instruction (payload         ): %lf "
-        "(%+2.lf%% vs ultra)\n",
-        bpi_payload, (bpi_payload / comparison->bpi) * 100 - 100);
-    printf(
-        "Bits per instruction (payload + header): %lf "
-        "(%+2.lf%% vs payload)\n",
-        bpi_full, bpi_full / bpi_payload * 100 - 100);
-    printf(
-        "Bits per instruction (pulp            ): %lf "
-        "(%+2.lf%% vs payload + header)\n",
-        bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
+    printf("Bits per instruction (payload no compr): %lf "
+           "(%+2.lf%% vs ultra)\n",
+           bpi_noc_payload, (bpi_noc_payload / comparison->bpi * 100 - 100));
+    printf("Bits per instruction (payload         ): %lf "
+           "(%+2.lf%% vs ultra)\n",
+           bpi_payload, (bpi_payload / comparison->bpi) * 100 - 100);
+    printf("Bits per instruction (payload + header): %lf "
+           "(%+2.lf%% vs payload)\n",
+           bpi_full, bpi_full / bpi_payload * 100 - 100);
+    printf("Bits per instruction (pulp            ): %lf "
+           "(%+2.lf%% vs payload + header)\n",
+           bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
     printf("\n");
 
 fail:

@@ -109,7 +109,6 @@ struct branch_map_state {
     uint32_t cnt;
 };
 
-
 /* We don't want to record all the time and this struct is used to indicate when
  * we do.
  */
@@ -127,7 +126,6 @@ struct filter_state {
     bool resync_pend;
     /* uint32_t resync_nh = 0;  */
 };
-
 
 /* Current state of the cpu during decompression. Allows one to
  * precisely emit a sequence  tr_instr. Handles the exception stack
@@ -157,7 +155,6 @@ struct trdb_dec_state {
     struct branch_map_state branch_map;
 };
 
-
 struct trdb_stats {
     size_t payloadbits;
     size_t packetbits;
@@ -176,7 +173,6 @@ struct trdb_stats {
     size_t bmap_full_addr_packets;
     uint32_t sext_bits[32];
 };
-
 
 /* Library context, needs to be passed to most function calls.
  * TODO: don't pass everything via stack
@@ -203,7 +199,6 @@ struct trdb_ctx {
                    int line, const char *fn, const char *format, va_list args);
 };
 
-
 void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
               const char *fn, const char *format, ...)
 {
@@ -214,7 +209,6 @@ void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
     va_end(args);
 }
 
-
 static void log_stderr(struct trdb_ctx *ctx, int priority, const char *file,
                        int line, const char *fn, const char *format,
                        va_list args)
@@ -222,7 +216,6 @@ static void log_stderr(struct trdb_ctx *ctx, int priority, const char *file,
     fprintf(stderr, "trdb: %s:%d:0: %s(): ", file, line, fn);
     vfprintf(stderr, format, args);
 }
-
 
 static int log_priority(const char *priority)
 {
@@ -241,7 +234,6 @@ static int log_priority(const char *priority)
     return 0;
 }
 
-
 void trdb_reset_compression(struct trdb_ctx *ctx)
 {
     ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
@@ -259,7 +251,6 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
     ctx->stats = (struct trdb_stats){0};
 }
 
-
 void trdb_reset_decompression(struct trdb_ctx *ctx)
 {
     ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
@@ -272,7 +263,6 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
     ctx->filter = (struct filter_state){0};
     ctx->stats = (struct trdb_stats){0};
 }
-
 
 struct trdb_ctx *trdb_new()
 {
@@ -309,7 +299,6 @@ struct trdb_ctx *trdb_new()
     return ctx;
 }
 
-
 void trdb_free(struct trdb_ctx *ctx)
 {
     if (!ctx)
@@ -317,7 +306,6 @@ void trdb_free(struct trdb_ctx *ctx)
     info(ctx, "context %p released\n", ctx);
     free(ctx);
 }
-
 
 void trdb_set_log_fn(struct trdb_ctx *ctx,
                      void (*log_fn)(struct trdb_ctx *ctx, int priority,
@@ -328,72 +316,60 @@ void trdb_set_log_fn(struct trdb_ctx *ctx,
     info(ctx, "custom logging function %p registered\n", log_fn);
 }
 
-
 int trdb_get_log_priority(struct trdb_ctx *ctx)
 {
     return ctx->log_priority;
 }
-
 
 void trdb_set_log_priority(struct trdb_ctx *ctx, int priority)
 {
     ctx->log_priority = priority;
 }
 
-
 void trdb_set_dunit(struct trdb_ctx *ctx, struct disassembler_unit *dunit)
 {
     ctx->dunit = dunit;
 }
-
 
 struct disassembler_unit *trdb_get_dunit(struct trdb_ctx *ctx)
 {
     return ctx->dunit;
 }
 
-
 void trdb_set_full_address(struct trdb_ctx *ctx, bool v)
 {
     ctx->config.full_address = v;
 }
-
 
 bool trdb_is_full_address(struct trdb_ctx *ctx)
 {
     return ctx->config.full_address;
 }
 
-
 void trdb_set_implicit_ret(struct trdb_ctx *ctx, bool implicit_ret)
 {
     ctx->config.implicit_ret = implicit_ret;
 }
-
 
 bool trdb_get_implicit_ret(struct trdb_ctx *ctx)
 {
     return ctx->config.implicit_ret;
 }
 
-
 void trdb_set_pulp_extra_packet(struct trdb_ctx *ctx, bool extra_packet)
 {
     ctx->config.pulp_vector_table_packet = extra_packet;
 }
-
 
 bool trdb_get_pulp_extra_packet(struct trdb_ctx *ctx)
 {
     return ctx->config.pulp_vector_table_packet;
 }
 
-
 void trdb_set_compress_branch_map(struct trdb_ctx *ctx, bool compress)
 {
     ctx->config.compress_full_branch_map = compress;
 }
-
 
 bool trdb_get_compress_branch_map(struct trdb_ctx *ctx)
 {
@@ -401,36 +377,30 @@ bool trdb_get_compress_branch_map(struct trdb_ctx *ctx)
     return ctx->config.compress_full_branch_map;
 }
 
-
 size_t trdb_get_payloadbits(struct trdb_ctx *ctx)
 {
     return ctx->stats.payloadbits;
 }
-
 
 size_t trdb_get_pulpbits(struct trdb_ctx *ctx)
 {
     return ctx->stats.pulpbits;
 }
 
-
 size_t trdb_get_packetcnt(struct trdb_ctx *ctx)
 {
     return ctx->stats.packets;
 }
-
 
 size_t trdb_get_instrcnt(struct trdb_ctx *ctx)
 {
     return ctx->stats.instrs;
 }
 
-
 size_t trdb_get_instrbits(struct trdb_ctx *ctx)
 {
     return ctx->stats.instrbits;
 }
-
 
 void trdb_get_packet_stats(struct trdb_ctx *ctx,
                            struct trdb_packet_stats *stats)
@@ -445,19 +415,17 @@ void trdb_get_packet_stats(struct trdb_ctx *ctx,
     stats->bmap_full_addr_packets = ctx->stats.bmap_full_addr_packets;
 }
 
-
 static bool is_branch(uint32_t instr)
 {
-    bool is_riscv_branch = is_beq_instr(instr) || is_bne_instr(instr)
-                           || is_blt_instr(instr) || is_bge_instr(instr)
-                           || is_bltu_instr(instr) || is_bgeu_instr(instr);
+    bool is_riscv_branch = is_beq_instr(instr) || is_bne_instr(instr) ||
+                           is_blt_instr(instr) || is_bge_instr(instr) ||
+                           is_bltu_instr(instr) || is_bgeu_instr(instr);
     bool is_pulp_branch = is_p_bneimm_instr(instr) || is_p_beqimm_instr(instr);
     bool is_riscv_compressed_branch =
         is_c_beqz_instr(instr) || is_c_bnez_instr(instr);
     return is_riscv_branch || is_pulp_branch || is_riscv_compressed_branch;
     /* auipc */
 }
-
 
 static bool branch_taken(bool before_compressed, uint32_t addr_before,
                          uint32_t addr_after)
@@ -471,7 +439,6 @@ static bool branch_taken(bool before_compressed, uint32_t addr_before,
     return before_compressed ? !(addr_before + 2 == addr_after)
                              : !(addr_before + 4 == addr_after);
 }
-
 
 static uint32_t branch_map_len(uint32_t branches)
 {
@@ -491,7 +458,6 @@ static uint32_t branch_map_len(uint32_t branches)
     return -1;
 }
 
-
 /* Some jumps can't be predicted i.e. the jump address can only be figured out
  * at runtime. That happens e.g. if the target address depends on some register
  * entries. For plain RISC-V I this is just the jalr instruction. For the PULP
@@ -499,8 +465,8 @@ static uint32_t branch_map_len(uint32_t branches)
  */
 static bool is_unpred_discontinuity(uint32_t instr, bool implicit_ret)
 {
-    bool jump = is_jalr_instr(instr) || is_really_c_jalr_instr(instr)
-                || is_really_c_jr_instr(instr);
+    bool jump = is_jalr_instr(instr) || is_really_c_jalr_instr(instr) ||
+                is_really_c_jr_instr(instr);
     bool exception_ret =
         is_mret_instr(instr) || is_sret_instr(instr) || is_uret_instr(instr);
 
@@ -512,15 +478,13 @@ static bool is_unpred_discontinuity(uint32_t instr, bool implicit_ret)
     return (jump || exception_ret) && not_ret;
 }
 
-
 /* Just crash and error if we hit one of those */
 static bool is_unsupported(uint32_t instr)
 {
-    return is_lp_setup_instr(instr) || is_lp_counti_instr(instr)
-           || is_lp_count_instr(instr) || is_lp_endi_instr(instr)
-           || is_lp_starti_instr(instr) || is_lp_setupi_instr(instr);
+    return is_lp_setup_instr(instr) || is_lp_counti_instr(instr) ||
+           is_lp_count_instr(instr) || is_lp_endi_instr(instr) ||
+           is_lp_starti_instr(instr) || is_lp_setupi_instr(instr);
 }
-
 
 static uint32_t sign_extendable_bits64(uint64_t addr)
 {
@@ -528,7 +492,6 @@ static uint32_t sign_extendable_bits64(uint64_t addr)
     int clo = __builtin_clzll(~addr);
     return clz > clo ? clz : clo;
 }
-
 
 static uint32_t sign_extendable_bits(uint32_t addr)
 {
@@ -581,7 +544,6 @@ static bool differential_addr(int *lead, uint32_t absolute,
     *lead = diff > abs ? diff : abs;
     return diff > abs; /* on tie we prefer absolute */
 }
-
 
 static int quantize_clz(int x)
 {
@@ -643,7 +605,6 @@ static bool pulp_differential_addr(int *lead, uint32_t absolute,
     return diff > abs; /* on tie we prefer absolute */
 }
 
-
 static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
                                   struct tr_instr *lc_instr,
                                   struct tr_instr *tc_instr,
@@ -654,9 +615,8 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
     tr->context = 0;              /* TODO: what comes here? */
     tr->privilege = tc_instr->priv;
 
-    if (is_branch(tc_instr->instr)
-        && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
-                         nc_instr->iaddr))
+    if (is_branch(tc_instr->instr) &&
+        !branch_taken(tc_instr->compressed, tc_instr->iaddr, nc_instr->iaddr))
         tr->branch = 1;
     else
         tr->branch = 0;
@@ -674,7 +634,6 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
     c->stats.exception_packets++;
 }
 
-
 static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
                               struct tr_instr *tc_instr,
                               struct tr_instr *nc_instr)
@@ -683,9 +642,8 @@ static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
     tr->subformat = SF_START; /* start */
     tr->context = 0;          /* TODO: what comes here? */
     tr->privilege = tc_instr->priv;
-    if (is_branch(tc_instr->instr)
-        && !branch_taken(tc_instr->compressed, tc_instr->iaddr,
-                         nc_instr->iaddr))
+    if (is_branch(tc_instr->instr) &&
+        !branch_taken(tc_instr->compressed, tc_instr->iaddr, nc_instr->iaddr))
         tr->branch = 1;
     else
         tr->branch = 0;
@@ -693,7 +651,6 @@ static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
     tr->length = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
     c->stats.start_packets++;
 }
-
 
 static uint32_t sext32(uint32_t val, uint32_t bit)
 {
@@ -708,7 +665,6 @@ static uint32_t sext32(uint32_t val, uint32_t bit)
     val = val & ((1U << bit) - 1);
     return (val ^ m) - m;
 }
-
 
 static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                                         struct tr_packet *tr,
@@ -803,9 +759,9 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (tr->address == 0 || tr->address == -1)
                 ctx->stats.zo_addresses++;
             uint32_t sext = sign_extendable_bits64(
-                ((uint64_t)tr->address << XLEN)
-                | ((uint64_t)branch_map->bits
-                   << (XLEN - branch_map_len(branch_map->cnt))));
+                ((uint64_t)tr->address << XLEN) |
+                ((uint64_t)branch_map->bits
+                 << (XLEN - branch_map_len(branch_map->cnt))));
             if (sext > XLEN + branch_map_len(branch_map->cnt))
                 sext = XLEN + branch_map_len(branch_map->cnt);
             uint32_t ext = XLEN + branch_map_len(branch_map->cnt) - sext + 1;
@@ -840,7 +796,6 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 
     return 0;
 }
-
 
 static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
                                  struct branch_map_state *branch_map)
@@ -1001,8 +956,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         filter->resync_pend = false;
         generated_packet = 1;
 
-    } else if (firstc_qualified || thisc->unhalted || thisc->privilege_change
-               || (filter->resync_pend && branch_map->cnt == 0)) {
+    } else if (firstc_qualified || thisc->unhalted || thisc->privilege_change ||
+               (filter->resync_pend && branch_map->cnt == 0)) {
 
         /* Start packet */
         /* Send te_inst:
@@ -1050,8 +1005,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 
         generated_packet = 1;
 
-    } else if (nextc->halt || nextc->exception || nextc->privilege_change
-               || nextc->unqualified) {
+    } else if (nextc->halt || nextc->exception || nextc->privilege_change ||
+               nextc->unqualified) {
         /* Send te_inst:
          * format 0/1/2
          */
@@ -1148,7 +1103,6 @@ fail_malloc:
     return -1;
 }
 
-
 static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
                              struct disassemble_info *dinfo)
 {
@@ -1223,7 +1177,6 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
     return instr_size;
 }
 
-
 /* libopcodes only knows how to call a fprintf based callback function. We abuse
  * it by passing through the void pointer our custom data (instead of a stream).
  * This ugly hack doesn't seem to be used by just me.
@@ -1253,7 +1206,6 @@ static int build_instr_fprintf(void *stream, const char *format, ...)
     return rv;
 }
 
-
 static void free_section_for_debugging(struct disassemble_info *dinfo)
 {
     if (!dinfo)
@@ -1263,7 +1215,6 @@ static void free_section_for_debugging(struct disassemble_info *dinfo)
     dinfo->buffer_length = 0;
     dinfo->section = NULL;
 }
-
 
 static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
                                        asection *section,
@@ -1297,7 +1248,6 @@ static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
     return 0;
 }
 
-
 static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
                      struct tr_instr *instr)
 {
@@ -1311,7 +1261,6 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
     list_add(&add->list, instr_list);
     return 0;
 }
-
 
 int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                           struct list_head *packet_list,
@@ -1366,8 +1315,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     struct list_head *p;
 
-    list_for_each_prev(p, packet_list)
-    {
+    list_for_each_prev (p, packet_list) {
         packet = list_entry(p, typeof(*packet), list);
         /* this is a bit ugly, we determine the next packet if it exists. Also
          * we have to iterate the list in reverse order
@@ -1455,9 +1403,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (dec_ctx.branch_map.cnt == 0)
                 dec_ctx.branch_map.cnt = 31;
 
-
-            while (!(dec_ctx.branch_map.cnt == 0
-                     && (hit_discontinuity || hit_address))) {
+            while (!(dec_ctx.branch_map.cnt == 0 &&
+                     (hit_discontinuity || hit_address))) {
 
                 int status = 0;
                 int size =
@@ -1515,8 +1462,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                             pc = absolute_addr;
                         }
                         hit_discontinuity = true;
-                    } else if (dec_ctx.branch_map.cnt > 0
-                               || dinfo.target != 0) {
+                    } else if (dec_ctx.branch_map.cnt > 0 ||
+                               dinfo.target != 0) {
                         /* we should not hit unpredictable
                          * discontinuities
                          */
@@ -1595,8 +1542,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (dec_ctx.branch_map.cnt == 0)
                 dec_ctx.branch_map.cnt = 31;
 
-            while (!(dec_ctx.branch_map.cnt == 0
-                     && (hit_discontinuity || hit_address))) {
+            while (!(dec_ctx.branch_map.cnt == 0 &&
+                     (hit_discontinuity || hit_address))) {
 
                 int status = 0;
                 int size =
@@ -1653,8 +1600,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                             pc = absolute_addr;
                         }
                         hit_discontinuity = true;
-                    } else if (dec_ctx.branch_map.cnt > 0
-                               || dinfo.target != 0) {
+                    } else if (dec_ctx.branch_map.cnt > 0 ||
+                               dinfo.target != 0) {
                         /* we should not hit unpredictable discontinuities */
                         pc = dinfo.target;
                     } else {
@@ -1869,7 +1816,6 @@ fail:
     return -1;
 }
 
-
 void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                             struct disassembler_unit *dunit)
 {
@@ -1884,7 +1830,6 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
         disassemble_single_instruction(trace[i].instr, trace[i].iaddr, dunit);
     }
 }
-
 
 void trdb_disassemble_trace_with_bfd(struct trdb_ctx *c, size_t len,
                                      struct tr_instr trace[len], bfd *abfd,
@@ -1910,7 +1855,6 @@ void trdb_disassemble_instr(struct tr_instr *instr,
     disassemble_single_instruction(instr->instr, instr->iaddr, dunit);
 }
 
-
 void trdb_disassemble_instr_with_bfd(struct trdb_ctx *c, struct tr_instr *instr,
                                      bfd *abfd, struct disassembler_unit *dunit)
 {
@@ -1920,16 +1864,13 @@ void trdb_disassemble_instr_with_bfd(struct trdb_ctx *c, struct tr_instr *instr,
     trdb_disassemble_instruction_with_bfd(c, abfd, instr->iaddr, dunit);
 }
 
-
 void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list)
 {
     struct tr_packet *packet;
-    list_for_each_entry_reverse(packet, packet_list, list)
-    {
+    list_for_each_entry_reverse (packet, packet_list, list) {
         trdb_print_packet(stream, packet);
     }
 }
-
 
 void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
 {
@@ -1995,7 +1936,6 @@ void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
     }
 }
 
-
 void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
 {
     switch (packet->msg_type) {
@@ -2059,7 +1999,6 @@ void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
     }
 }
 
-
 void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *instr)
 {
     dbg(c, "INSTR\n");
@@ -2072,7 +2011,6 @@ void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *instr)
     dbg(c, "    interrupt : %s\n", instr->interrupt ? "true" : "false");
     dbg(c, "    compressed: %s\n", instr->compressed ? "true" : "false");
 }
-
 
 void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
 {
@@ -2091,12 +2029,10 @@ void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
             instr->compressed ? "true" : "false");
 }
 
-
 bool trdb_compare_packet()
 {
     return false;
 }
-
 
 bool trdb_compare_instr(struct trdb_ctx *c, const struct tr_instr *instr0,
                         const struct tr_instr *instr1)
@@ -2118,7 +2054,6 @@ bool trdb_compare_instr(struct trdb_ctx *c, const struct tr_instr *instr0,
     return sum;
 }
 
-
 void trdb_free_packet_list(struct list_head *packet_list)
 {
     if (list_empty(packet_list))
@@ -2126,8 +2061,7 @@ void trdb_free_packet_list(struct list_head *packet_list)
 
     struct tr_packet *packet;
     struct tr_packet *packet_next;
-    list_for_each_entry_safe(packet, packet_next, packet_list, list)
-    {
+    list_for_each_entry_safe (packet, packet_next, packet_list, list) {
         free(packet);
     }
 }
@@ -2139,8 +2073,7 @@ void trdb_free_instr_list(struct list_head *instr_list)
 
     struct tr_instr *instr;
     struct tr_instr *instr_next;
-    list_for_each_entry_safe(instr, instr_next, instr_list, list)
-    {
+    list_for_each_entry_safe (instr, instr_next, instr_list, list) {
         free(instr);
     }
 }
