@@ -217,5 +217,21 @@ int main(int argc, char *argv[argc + 1])
             status = EXIT_FAILURE;
     }
 
+    const char *mibench_cvs[] = {
+        "data/mibench_cvs/cjpeg.trace", "data/mibench_cvs/djpeg.trace",
+        "data/fft.trace", "data/mibench_cvs/rijndael.trace",
+        "data/mibench_cvs/sha.trace"};
+
+    struct result dummy = {"dhyrstone", 1, 1, 1, 1};
+    for (unsigned j = 0; j < TRDB_ARRAY_SIZE(mibench_cvs); j++) {
+        const char *stim = mibench_cvs[j];
+        if (access(stim, R_OK)) {
+            fprintf(stderr, "File not found, skipping test at %s\n", stim);
+            continue;
+        }
+        if (compress_cvs_trace(stim, &dummy))
+            status = EXIT_FAILURE;
+    }
+
     return status;
 }
