@@ -673,6 +673,9 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                                         uint32_t last_iaddr, bool full_address,
                                         bool is_u_discontinuity)
 {
+    if (!ctx || !tr || !branch_map || !tc_instr)
+        return -trdb_internal;
+
     if (branch_map->cnt == 0) {
         tr->format = F_ADDR_ONLY;
         tr->branches = branch_map->cnt;
@@ -822,7 +825,7 @@ static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
 #define ALLOC_PACKET(name)                                                     \
     name = malloc(sizeof(*name));                                              \
     if (!name) {                                                               \
-        err(ctx, "malloc: %s\n", strerror(errno));                             \
+        status = -trdb_nomem;                                                  \
         goto fail_malloc;                                                      \
     }                                                                          \
     *name = (struct tr_packet){.msg_type = W_TRACE};
@@ -831,6 +834,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct list_head *packet_list,
                              struct tr_instr *instr)
 {
+    int status = 0;
     int generated_packet = 0;
     bool full_address = ctx->config.full_address;
     bool pulp_vector_table_packet = ctx->config.pulp_vector_table_packet;
@@ -891,6 +895,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
             "Instruction is not supported for compression: 0x%" PRIx32
             " at addr: 0x%" PRIx32 "\n",
             tc_instr->instr, tc_instr->iaddr);
+        status = -trdb_bad_instr;
         goto fail;
     }
 
@@ -979,10 +984,13 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0/1/2
          */
         ALLOC_PACKET(tr);
-        if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
-                                         *last_iaddr, full_address, true)) {
+        status = emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+                                              *last_iaddr, full_address, true);
+        if (status < 0) {
+            generated_packet = 0;
             goto fail;
         }
+
         *last_iaddr = tc_instr->iaddr;
 
         list_add(&tr->list, packet_list);
@@ -995,10 +1003,13 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0/1/2
          */
         ALLOC_PACKET(tr);
-        if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
-                                         *last_iaddr, full_address, false)) {
+        status = emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+                                              *last_iaddr, full_address, false);
+        if (status < 0) {
+            generated_packet = 0;
             goto fail;
         }
+
         *last_iaddr = tc_instr->iaddr;
 
         list_add(&tr->list, packet_list);
@@ -1011,10 +1022,13 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0/1/2
          */
         ALLOC_PACKET(tr);
-        if (emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
-                                         *last_iaddr, full_address, false)) {
+        status = emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+                                              *last_iaddr, full_address, false);
+        if (status < 0) {
+            generated_packet = 0;
             goto fail;
         }
+
         *last_iaddr = tc_instr->iaddr;
 
         list_add(&tr->list, packet_list);
@@ -1039,6 +1053,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * subformat 2
          */
         err(ctx, "context_change not supported\n");
+        status = -trdb_internal;
         goto fail;
         /* ALLOC_INIT_PACKET(tr); */
         /* tr->format = F_SYNC; */
@@ -1096,11 +1111,12 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
             (uintmax_t)instr->instr);
     }
 
-    /* also print packet */
-    return generated_packet;
 fail:
 fail_malloc:
-    return -1;
+    if (status == trdb_ok) {
+        return generated_packet;
+    } else
+        return status;
 }
 
 static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
@@ -1262,6 +1278,7 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
     return 0;
 }
 
+/* TODO: packet wise decompression with error events */
 int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                           struct list_head *packet_list,
                           struct list_head *instr_list)

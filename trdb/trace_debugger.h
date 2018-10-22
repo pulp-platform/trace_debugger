@@ -133,7 +133,7 @@ struct tr_packet {
 };
 
 /**
- * Keep information about generated packets
+ * Keep information about generated packets.
  */
 struct trdb_packet_stats {
     size_t packets;
@@ -145,6 +145,29 @@ struct trdb_packet_stats {
     size_t bmap_full_packets;
     size_t bmap_full_addr_packets;
 };
+
+/**
+ * Error codes.
+ */
+enum trdb_error_code {
+    trdb_ok,
+    trdb_internal,
+    trdb_invalid,
+    trdb_bad_instr,
+    trdb_bad_packet,
+    trdb_bad_config,
+    trdb_bad_cvs_header,
+    trdb_unimplemented,
+    trdb_nomem,
+    trdb_file_open,
+    trdb_file_size,
+    trdb_file_read,
+    trdb_file_write,
+    trdb_scan_file,
+    trdb_scan_state_invalid
+};
+
+const char *trdb_errstr(enum trdb_error_code);
 
 /**
  * For type punning of packet data. It's pretty annoying to pack our packets

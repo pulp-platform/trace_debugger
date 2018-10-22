@@ -52,7 +52,6 @@ static char args_doc[] = "TRACE-OR-PACKETS";
 #define TRDB_OPT_FULL_ADDR 5
 #define TRDB_OPT_CVS 6
 
-
 static struct argp_option options[] = {
     {"verbose", 'v', 0, 0, "Produce verbose output"},
     {"quiet", 'q', 0, 0, "Don't produce any output"},
@@ -182,7 +181,6 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
 static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                               struct arguments *arguments);
 
-
 static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *);
 
@@ -263,7 +261,6 @@ int main(int argc, char *argv[argc + 1])
         status = decompress_packets(ctx, output_fp, abfd, &arguments);
     }
 
-
 fail:
     trdb_free(ctx);
     if (output_fp)
@@ -272,7 +269,6 @@ fail:
         bfd_close(abfd);
     return status;
 }
-
 
 static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
                           struct arguments *arguments)
@@ -305,10 +301,9 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
 
     /* step by step compression */
     if (arguments->cvs) {
-        list_for_each_entry_reverse(instr, &instr_list, list)
-        {
+        list_for_each_entry_reverse (instr, &instr_list, list) {
             int step = trdb_compress_trace_step(c, &packet_list, instr);
-            if (step == -1) {
+            if (step < 0) {
                 fprintf(stderr, "compress trace failed (cvs)\n");
                 status = EXIT_FAILURE;
                 goto fail;
@@ -318,7 +313,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
         for (size_t i = 0; i < samplecnt; i++) {
             int step =
                 trdb_compress_trace_step(c, &packet_list, &(*samples)[i]);
-            if (step == -1) {
+            if (step < 0) {
                 fprintf(stderr, "compress trace failed\n");
                 status = EXIT_FAILURE;
                 goto fail;
@@ -328,8 +323,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     /* we either produce binary or human readable output */
     if (arguments->binary_output) {
         struct tr_packet *packet;
-        list_for_each_entry_reverse(packet, &packet_list, list)
-        {
+        list_for_each_entry_reverse (packet, &packet_list, list) {
             if (trdb_pulp_write_single_packet(c, packet, output_fp)) {
                 fprintf(stderr, "failed to serialize packets\n");
                 status = EXIT_FAILURE;
@@ -347,7 +341,6 @@ fail:
 
     return status;
 }
-
 
 static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                               struct arguments *arguments)
@@ -375,9 +368,8 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
 
     /* reconstruct the original instruction sequence */
     if (trdb_decompress_trace(c, abfd, &packet_list, &instr_list)) {
-        fprintf(stderr,
-                "failed to decompress packets due to either corrupt "
-                "packets or wrong bfd, continuing anyway...\n");
+        fprintf(stderr, "failed to decompress packets due to either corrupt "
+                        "packets or wrong bfd, continuing anyway...\n");
         status = EXIT_FAILURE;
     }
 
@@ -397,10 +389,8 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     dinfo.fprintf_func = (fprintf_ftype)fprintf;
     dinfo.stream = output_fp;
 
-
     struct tr_instr *instr;
-    list_for_each_entry_reverse(instr, &instr_list, list)
-    {
+    list_for_each_entry_reverse (instr, &instr_list, list) {
         if (arguments->disassemble)
             trdb_disassemble_instr_with_bfd(c, instr, abfd, &dunit);
         /* trdb_disassemble_instr(instr, &dunit); */
@@ -414,7 +404,6 @@ fail:
     trdb_free_instr_list(&instr_list);
     return status;
 }
-
 
 static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *arguments)
@@ -457,7 +446,6 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
         init_disassemble_info_for_pulp(&dinfo);
         dunit.disassemble_fn = print_insn_riscv;
     }
-
 
     trdb_disassemble_trace(samplecnt, *samples, &dunit);
 

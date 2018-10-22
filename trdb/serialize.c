@@ -105,7 +105,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
 {
     if (align >= 8) {
         err(c, "bad alignment value: %" PRId8 "\n", align);
-        return -1;
+        return -trdb_invalid;
     }
 
     union trdb_pack data = {0};
@@ -117,7 +117,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         bits_without_header / 8 + (bits_without_header % 8 != 0);
     if (byte_len >= 16) { // TODO: replace with pow or mask
         err(c, "bad packet length\n");
-        return -1;
+        return -trdb_bad_packet;
     }
 
     switch (packet->format) {
@@ -164,7 +164,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
     case F_BRANCH_DIFF: {
         if (trdb_is_full_address(c)) {
             err(c, "F_BRANCH_DIFF packet encountered but full_address set\n");
-            return -1;
+            return -trdb_bad_config;
         }
         uint32_t len = p_branch_map_len(packet->branches);
 
@@ -269,7 +269,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                (*bitcnt + align) / 8 + ((*bitcnt + align) % 8 != 0));
         return 0;
     }
-    return -1;
+    return -trdb_bad_packet;
 }
 
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
@@ -277,18 +277,16 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
 {
     uint8_t header = 0;
     union trdb_pack payload = {0};
-    if (!fp) {
-        err(c, "fp is null\n");
-        return -EINVAL;
-    }
+    if (!c || !fp || !packet || !bytes)
+        return -trdb_invalid;
+
     if (fread(&header, 1, 1, fp) != 1) {
-        if (feof(fp)) {
-            return -1;
-        } else if (ferror(fp)) {
-            err(c, "ferror: %s\n", strerror(errno));
-            return -1;
-        }
-        return -1;
+        if (feof(fp))
+            return -trdb_bad_packet;
+        else if (ferror(fp))
+            return -trdb_file_read;
+
+        return -trdb_internal; /* does not happen */
     }
 
     /* read packet length it bits (including header) */
@@ -300,12 +298,11 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     if (fread((payload.bin + 1), 1, byte_len - 1, fp) != byte_len - 1) {
         if (feof(fp)) {
             err(c, "incomplete packet read\n");
-            return -1;
-        } else if (ferror(fp)) {
-            err(c, "ferror: %s\n", strerror(errno));
-            return -1;
-        }
-        return -1;
+            return -trdb_bad_packet;
+        } else if (ferror(fp))
+            return -trdb_file_read;
+
+        return -trdb_internal; /* does not happen */
     }
     /* since we succefully read a packet we can now set bytes */
     *bytes = byte_len;
@@ -349,7 +346,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
             if (trdb_is_full_address(c)) {
                 err(c,
                     "F_BRANCH_DIFF packet encountered but full_address set\n");
-                return -1;
+                return -trdb_bad_config;
             }
             packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
             blen = p_branch_map_len(packet->branches);
@@ -377,10 +374,9 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
             packet->subformat = payload.bits & MASK_FROM(FORMATLEN);
             packet->privilege =
                 (payload.bits >>= FORMATLEN) & MASK_FROM(PRIVLEN);
-            if (packet->subformat == SF_CONTEXT) {
-                err(c, "not implemented\n");
-                return -1;
-            }
+            if (packet->subformat == SF_CONTEXT)
+                return -trdb_unimplemented;
+
             packet->branch = (payload.bits >>= PRIVLEN) & 1;
             packet->address = (payload.bits >>= 1) & MASK_FROM(XLEN);
             if (packet->subformat == SF_START)
@@ -402,31 +398,29 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
         return 0;
     default:
         err(c, "unknown message type in packet\n");
-        return -1;
+        return -trdb_bad_packet;
         break;
     }
-    return -1;
+    return -trdb_bad_packet;
 }
 
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
                                struct list_head *packet_list)
 {
     FILE *fp = fopen(path, "rb");
-    if (!fp) {
-        err(c, "fopen: %s\n", strerror(errno));
-        return -1;
-    }
+    if (!fp)
+        return -trdb_file_open;
+
     uint32_t total_bytes_read = 0;
     struct tr_packet *packet = NULL;
     struct tr_packet tmp = {0};
     uint32_t bytes = 0;
 
     /* read the file and malloc entries into the given linked list head */
-    while (trdb_pulp_read_single_packet(c, fp, &tmp, &bytes) != -1) {
+    while (trdb_pulp_read_single_packet(c, fp, &tmp, &bytes) == 0) {
         packet = malloc(sizeof(*packet));
         if (!packet) {
-            err(c, "malloc: %s\n", strerror(errno));
-            return -ENOMEM;
+            return -trdb_nomem;
         }
         *packet = tmp;
         total_bytes_read += bytes;
@@ -440,25 +434,23 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
 int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                   FILE *fp)
 {
+    int status = 0;
     size_t bitcnt = 0;
     size_t bytecnt = 0;
     uint8_t bin[16] = {0};
-    if (!fp) {
-        err(c, "bad file pointer\n");
-        return -1;
-    }
-    if (trdb_pulp_serialize_packet(c, packet, &bitcnt, 0, bin)) {
-        err(c, "failed to serialize packet\n");
-        return -1;
-    }
+    if (!c || !fp || !packet)
+        return -trdb_invalid;
+
+    status = trdb_pulp_serialize_packet(c, packet, &bitcnt, 0, bin);
+    if (status < 0)
+        return status;
+
     bytecnt = bitcnt / 8 + (bitcnt % 8 != 0);
     if (fwrite(bin, 1, bytecnt, fp) != bytecnt) {
         if (feof(fp)) {
             /* TODO: uhhh */
-        } else if (ferror(fp)) {
-            err(c, "ferror: %s\n", strerror(errno));
-            return -1;
-        }
+        } else if (ferror(fp))
+            return -trdb_file_write;
     }
     return 0;
 }
@@ -467,10 +459,12 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
                        struct list_head *packet_list)
 {
     int status = 0;
+    if (!c || !path || !packet_list)
+        return -trdb_invalid;
+
     FILE *fp = fopen(path, "wb");
     if (!fp) {
-        err(c, "fopen: %s\n", strerror(errno));
-        status = -1;
+        status = -trdb_file_open;
         goto fail;
     }
 
@@ -484,8 +478,8 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
     struct tr_packet *packet;
     /* TODO: do we need the rever version? I think we do*/
     list_for_each_entry (packet, packet_list, list) {
-        if (trdb_pulp_serialize_packet(c, packet, &bitcnt, alignment, bin)) {
-            status = -1;
+        status = trdb_pulp_serialize_packet(c, packet, &bitcnt, alignment, bin);
+        if (status < 0) {
             goto fail;
         }
         /* stitch two consecutive packets together */
@@ -497,8 +491,7 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
          * intersecting ones
          */
         if (fwrite(bin, 1, good, fp) != good) {
-            err(c, "fwrite: %s\n", strerror(errno));
-            status = -1;
+            status = -trdb_file_write;
             goto fail;
         }
         /* we keep that for the next packet */
@@ -507,8 +500,7 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
     }
     /* done, write remaining carry */
     if (!fwrite(&bin[good], 1, 1, fp)) {
-        err(c, "fwrite: %s\n", strerror(errno));
-        status = -1;
+        status = -trdb_file_write;
     }
 fail:
     if (fp)
@@ -520,12 +512,17 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
                                   int *status, struct list_head *instrs)
 {
     *status = 0;
+    FILE *fp = NULL;
+
+    if (!c || !path || !instrs) {
+        *status = -trdb_invalid;
+        goto fail;
+    }
     struct tr_instr *sample = NULL;
 
-    FILE *fp = fopen(path, "r");
+    fp = fopen(path, "r");
     if (!fp) {
-        err(c, "fopen: %s\n", strerror(errno));
-        *status = -1;
+        *status = -trdb_file_open;
         goto fail;
     }
     size_t scnt = 0;
@@ -555,8 +552,7 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
         /* } */
         sample = malloc(sizeof(*sample));
         if (!sample) {
-            err(c, "malloc: %s\n", strerror(errno));
-            *status = -1;
+            *status = -trdb_nomem;
             goto fail;
         }
 
@@ -577,8 +573,7 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
     }
 
     if (ferror(fp)) {
-        err(c, "fscanf: %s\n", strerror(errno));
-        *status = -1;
+        *status = -trdb_scan_file;
         goto fail;
     }
 
@@ -591,6 +586,7 @@ fail:
     // TODO: it's maybe better to not free the whole list, but just the part
     // where failed
     trdb_free_instr_list(instrs);
+    // merge with return codes
     return 0;
 }
 
@@ -599,10 +595,16 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
                              struct tr_instr **samples, int *status)
 {
     *status = 0;
-    FILE *fp = fopen(path, "r");
+    FILE *fp = NULL;
+
+    if (!path || !samples) { // TODO: investigate !c
+        *status = -trdb_invalid;
+        goto fail;
+    }
+
+    fp = fopen(path, "r");
     if (!fp) {
-        err(c, "fopen: %s\n", strerror(errno));
-        *status = -1;
+        *status = -trdb_file_open;
         goto fail;
     }
     size_t scnt = 0;
@@ -621,7 +623,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
     size_t size = 128;
     *samples = malloc(size * sizeof(**samples));
     if (!*samples) {
-        *status = -1;
+        *status = -trdb_nomem;
         goto fail;
     }
 
@@ -641,8 +643,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
             size = 2 * size;
             struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
             if (!tmp) {
-                err(c, "realloc: %s\n", strerror(errno));
-                *status = -1;
+                *status = -trdb_nomem;
                 goto fail;
             }
             *samples = tmp;
@@ -663,8 +664,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
     memset((*samples) + scnt, 0, size - scnt);
 
     if (ferror(fp)) {
-        err(c, "fscanf: %s\n", strerror(errno));
-        *status = -1;
+        *status = -trdb_scan_file;
         goto fail;
     }
 
@@ -683,12 +683,17 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
                               struct list_head *instrs)
 {
     *status = 0;
+    FILE *fp = NULL;
+    if (!path || !instrs) { // TODO: investigate !c
+        *status = -trdb_invalid;
+        goto fail;
+    }
+
     struct tr_instr *sample = NULL;
 
-    FILE *fp = fopen(path, "r");
+    fp = fopen(path, "r");
     if (!fp) {
-        err(c, "fopen: %s\n", strerror(errno));
-        *status = -1;
+        *status = -trdb_file_open;
         goto fail;
     }
     size_t scnt = 0;
@@ -707,15 +712,13 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
     /* reading header line */
     if (getline(&line, &len, fp) == -1) {
-        err(c, "failed to parse header of cvs\n");
-        *status = -1;
+        *status = -trdb_bad_cvs_header;
         goto fail;
     }
 
     if (!strcmp(line, "VALID,ADDRESS,INSN,PRIVILEGE,"
                       "EXCEPTION,ECAUSE,TVAL,INTERRUPT")) {
-        err(c, "cvs header does not match expected value\n");
-        *status = -1;
+        *status = -trdb_bad_cvs_header;
         goto fail;
     }
 
@@ -724,8 +727,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
         sample = malloc(sizeof(*sample));
         if (!sample) {
-            err(c, "malloc: %s\n", strerror(errno));
-            *status = -1;
+            *status = -trdb_nomem;
             goto fail;
         }
         *sample = (struct tr_instr){0};
@@ -736,7 +738,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
             if (ele < 0) {
                 err(c, "reading too many tokens per line\n");
-                *status = -1;
+                *status = -trdb_scan_state_invalid;
                 goto fail;
             }
 
@@ -780,7 +782,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
         if (ele > 0) {
             err(c, "wrong number of tokens on line, still %d remaining\n", ele);
-            *status = -1;
+            *status = -trdb_scan_state_invalid;
             goto fail;
         }
 
@@ -792,8 +794,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
     free(line);
 
     if (ferror(fp)) {
-        err(c, "fscanf: %s\n", strerror(errno));
-        *status = -1;
+        *status = -trdb_scan_file;
         goto fail;
     }
 
