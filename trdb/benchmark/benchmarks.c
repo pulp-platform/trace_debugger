@@ -70,7 +70,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     }
     bool full_address = false;
     bool implicit_ret = true;
-    bool compress_bmap = false;
+    bool compress_bmap = true;
 
     trdb_set_dunit(ctx, &dunit);
     trdb_set_full_address(ctx, full_address);
@@ -146,13 +146,16 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     printf("ultra instructions: %zu, packets: %zu, payload bytes: %zu\n",
            comparison->instrcnt, comparison->packetcnt, comparison->payload);
     printf("pulp packet stats: diff: %zu (%2.2lf%%) / abs: %zu (%2.2lf%%) / "
-           "addr_only: %zu (%2.2lf%%) / bmap_full: %zu (%2.2lf%%) / "
-           "bmap_full_with_addr: %zu (%2.2lf%%)\n",
+           "addr_only: %zu (%2.2lf%%) \n    bmap_full: %zu (%2.2lf%%) / "
+           "bmap_full_with_addr: %zu (%2.2lf%%)\n    start: %zu (%2.2lf%%) / "
+           "exception: %zu (%2.2lf%%)\n",
            diff_packets, percent(diff_packets, packets), abs_packets,
            percent(abs_packets, packets), addr_only_packets,
            percent(addr_only_packets, packets), bmap_full_packets,
            percent(bmap_full_packets, packets), bmap_full_addr_packets,
-           percent(bmap_full_addr_packets, packets));
+           percent(bmap_full_addr_packets, packets), start_packets,
+           percent(start_packets, packets), exception_packets,
+           percent(exception_packets, packets));
     double bpi_noc_payload = noc_payloadbits / (double)noc_instrs;
     double bpi_payload = payloadbits / (double)instrs;
     double bpi_full = (payloadbits + packets * 6) / (double)instrs;
