@@ -80,6 +80,9 @@ struct tr_instr {
     struct list_head list;     /**< anchor for linked list in list.h */
 };
 
+/**
+ * All the possible trace packet types.
+ */
 enum tr_packet_format {
     F_BRANCH_FULL = 0,
     F_BRANCH_DIFF = 1,
@@ -87,8 +90,14 @@ enum tr_packet_format {
     F_SYNC = 3
 };
 
+/**
+ * Trace packet subformats for sync packets.
+ */
 enum tr_packet_subformat { SF_START = 0, SF_EXCEPTION = 1, SF_CONTEXT = 2 };
 
+/**
+ * All packet types
+ */
 enum tr_msg_type { W_EMPTY = 0, W_TIMER = 1, W_TRACE = 2, W_SOFTWARE = 3 };
 
 /**
@@ -167,7 +176,15 @@ enum trdb_error_code {
     trdb_scan_state_invalid
 };
 
+/**
+ * Return a human readable string.
+ */
 const char *trdb_errstr(enum trdb_error_code);
+
+/**
+ * Decode a function return value to an error code.
+ */
+enum trdb_error_code trdb_errcode(int status);
 
 /**
  * For type punning of packet data. It's pretty annoying to pack our packets
