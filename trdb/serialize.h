@@ -38,7 +38,9 @@
  * @param align alignment of packet bits in @p bin, larger or equal to zero and
  * smaller than eight.
  * @param bin the array where the packet bits will be written into
- * @return 0 on success, -1 on failure
+ * @return 0 on success, a negative error code otherwise.
+ * @return -trdb_invalid if @p align >= 8
+ * @return -trdb_bad_packet if packet is longer than 16 bytes or unknown
  */
 int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                size_t *bitcnt, uint8_t align, uint8_t bin[]);
@@ -50,7 +52,13 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
  * @param fp file to read from
  * @param packet filled out with read packet data
  * @param bytes the number of bytes of the packet (with header)
- * @return 0 on successful read, -1 on failure
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p fp or @p packet is NULL
+ * @return -trdb_bad_packet if only an incomplete packet could be read from @p
+ * fp or none at all
+ * @return -trdb_file_read if the contents of @fp could not be fully read
+ * @return -trdb_bad_config if the decoding assumptions don't hold because of
+ * contradictionary data in @p packet
  */
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
                                  struct tr_packet *packet, uint32_t *bytes);
@@ -63,7 +71,10 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
  * @param c trace debugger context
  * @param path file from which to read packet data
  * @param packet_list appened with read packets
- * @param 0 on succesfull read, -1 on failure
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p path or @p packet_list is NULL
+ * @return -trdb_file_open if file at @p path could not be found
+ * @return -trdb_nomem if out of memory
  */
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
                                struct list_head *packet_list);
@@ -73,7 +84,10 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
  * @param c trace debugger context
  * @param packet data to serialize
  * @param fp file to write to
- * @return 0 on successfull write, -1 on failure
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p fp or @p packet is NULL
+ * @return -trdb_file_write if @p fp could not be fully written
+ * @return -trdb_bad_packet if @p packet is malformed
  */
 int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                   FILE *fp);
@@ -87,7 +101,10 @@ int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
  * @param c the context/state of the trace debugger
  * @param path where the file is located at
  * @param packet_list list of packets to write
- * @return -1 on failure and 0 on success
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p path or @p packet_list is NULL
+ * @return -trdb_file_open if file at @p path could not be full read
+ * @return -trdb_file_write if file at @p path could not be fully written
  */
 int trdb_write_packets(struct trdb_ctx *c, const char *path,
                        struct list_head *packet_list);
@@ -98,12 +115,16 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
  *
  * @param c the context/state of the trace debugger
  * @param path where the stimuli file is located at
- * @param status will be written with -1 on failure, 0 on success
  * @param instrs list anchor where to append the tr_instr to
- * @return number of read tr_instr
+ * @param count written with the number of produced tr_instr.
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p path or @p instrs is NULL
+ * @return -trdb_file_open if file at @p path could not be opened
+ * @return -trdb_nomem if out of memory
+ * @return -trdb_scan_file if parsing the file at @p failed
  */
-size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
-                                  int *status, struct list_head *instrs);
+int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
+                               struct list_head *instrs, size_t *count);
 
 /**
  * Read a stimuli file at @p path into an array of tr_instr.
@@ -111,11 +132,15 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
  * @param c the context/state of the trace debugger
  * @param path where the stimuli file is located at
  * @param samples where to write the read array of tr_instr
- * @param status will be written with -1 on failure, 0 on success
- * @return number of read tr_instr
+ * @param count written with the number of produced tr_instr
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p path or @p instrs is NULL
+ * @return -trdb_file_open if file at @p path could not be opened
+ * @return -trdb_nomem if out of memory
+ * @return -trdb_scan_file if parsing the file at @p failed
  */
-size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
-                             struct tr_instr **samples, int *status);
+int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
+                          struct tr_instr **samples, size_t *count);
 
 /**
  * Load cvs file, where each line represents an input vector to the trace
@@ -123,9 +148,16 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
  *
  * @param c the context/state of the trace debugger
  * @param path where the cvs file is located at
- * @param status will be written with -1 on failure, 0 on success
  * @param instrs list anchor where to append the tr_instr to
- * @return number of read tr_instr
+ * @param count written with the number of produced tr_instr
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_error_code.trdb_invalid if @p path or @p instrs is NULL
+ * @return -trdb_file_open if file at @p path could not be opened
+ * @return -trdb_bad_cvs_header if first line of file at @p path does not match
+ * expected value
+ * @return -trdb_nomem if out of memory
+ * @return -trdb_scan_state_invalid if scanning comma seperated values fails
+ * @return -trdb_scan_file if parsing the file at @p failed
  */
-size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
-                              struct list_head *instrs);
+int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
+                           struct list_head *instrs, size_t *count);

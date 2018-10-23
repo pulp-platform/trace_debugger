@@ -444,8 +444,9 @@ static int test_stimuli_to_tr_instr(const char *path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    trdb_stimuli_to_trace(c, path, samples, &status);
-    if (status != 0) {
+    size_t samplecnt;
+    status = trdb_stimuli_to_trace(c, path, samples, &samplecnt);
+    if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
@@ -461,15 +462,17 @@ static int test_stimuli_to_trace_list(const char *path)
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
     int status = 0;
-    size_t sizea = trdb_stimuli_to_trace(c, path, samples, &status);
-    if (status != 0) {
+    size_t sizea = 0;
+    status = trdb_stimuli_to_trace(c, path, samples, &sizea);
+    if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
 
     LIST_HEAD(instr_list);
-    size_t sizel = trdb_stimuli_to_trace_list(c, path, &status, &instr_list);
-    if (status != 0) {
+    size_t sizel = 0;
+    status = trdb_stimuli_to_trace_list(c, path, &instr_list, &sizel);
+    if (status < 0) {
         LOG_ERRT("failed to parse stimuli\n");
         goto fail;
     }
@@ -519,8 +522,9 @@ static int test_stimuli_to_packet_dump(const char *path)
         goto fail;
     }
 
+    size_t samplecnt = 0;
     status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(c, path, samples, &status);
+    status = trdb_stimuli_to_trace(c, path, samples, &samplecnt);
     if (status != 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         status = TRDB_FAIL;
@@ -555,9 +559,10 @@ static int test_disassemble_trace(const char *bin_path, const char *trace_path)
     struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(c, trace_path, samples, &status);
-    if (status != 0) {
+    status = trdb_stimuli_to_trace(c, trace_path, samples, &samplecnt);
+    if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
@@ -598,9 +603,10 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
     struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(c, trace_path, samples, &status);
-    if (status != 0) {
+    status = trdb_stimuli_to_trace(c, trace_path, samples, &samplecnt);
+    if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
@@ -642,9 +648,10 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
 
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(ctx, trace_path, samples, &status);
-    if (status != 0) {
+    status = trdb_stimuli_to_trace(ctx, trace_path, samples, &samplecnt);
+    if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
@@ -762,10 +769,10 @@ int test_compress_cvs_trace(const char *trace_path)
     ctx->config.pulp_vector_table_packet = false;
     ctx->config.implicit_ret = true;
     /* ctx->config.compress_full_branch_map = true; */
+    size_t instrcnt = 0;
 
-    size_t instrcnt =
-        trdb_cvs_to_trace_list(ctx, trace_path, &status, &instr_list);
-    if (status != 0) {
+    status = trdb_cvs_to_trace_list(ctx, trace_path, &instr_list, &instrcnt);
+    if (status < 0) {
         LOG_ERRT("CVS to tr_instr failed\n");
         status = TRDB_FAIL;
         goto fail;
@@ -823,9 +830,10 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
 
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(ctx, trace_path, samples, &status);
-    if (status != 0) {
+    status = trdb_stimuli_to_trace(ctx, trace_path, samples, &samplecnt);
+    if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         status = TRDB_FAIL;
         goto fail;
@@ -919,9 +927,10 @@ int test_decompress_trace_differential(const char *bin_path,
 
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
     int status = 0;
-    size_t samplecnt = trdb_stimuli_to_trace(ctx, trace_path, samples, &status);
-    if (status != 0) {
+    status = trdb_stimuli_to_trace(ctx, trace_path, samples, &samplecnt);
+    if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         status = TRDB_FAIL;
         goto fail;

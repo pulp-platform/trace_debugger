@@ -277,7 +277,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
 {
     uint8_t header = 0;
     union trdb_pack payload = {0};
-    if (!c || !fp || !packet || !bytes)
+    if (!c || !fp || !packet)
         return -trdb_invalid;
 
     if (fread(&header, 1, 1, fp) != 1) {
@@ -407,6 +407,9 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
                                struct list_head *packet_list)
 {
+    if (!c || !path || !packet_list)
+        return -trdb_invalid;
+
     FILE *fp = fopen(path, "rb");
     if (!fp)
         return -trdb_file_open;
@@ -419,9 +422,8 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
     /* read the file and malloc entries into the given linked list head */
     while (trdb_pulp_read_single_packet(c, fp, &tmp, &bytes) == 0) {
         packet = malloc(sizeof(*packet));
-        if (!packet) {
+        if (!packet)
             return -trdb_nomem;
-        }
         *packet = tmp;
         total_bytes_read += bytes;
 
@@ -508,21 +510,23 @@ fail:
     return status;
 }
 
-size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
-                                  int *status, struct list_head *instrs)
+int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
+                               struct list_head *instrs, size_t *count)
 {
-    *status = 0;
+    int status = 0;
     FILE *fp = NULL;
 
+    *count = 0;
+
     if (!c || !path || !instrs) {
-        *status = -trdb_invalid;
+        status = -trdb_invalid;
         goto fail;
     }
     struct tr_instr *sample = NULL;
 
     fp = fopen(path, "r");
     if (!fp) {
-        *status = -trdb_file_open;
+        status = -trdb_file_open;
         goto fail;
     }
     size_t scnt = 0;
@@ -552,7 +556,7 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
         /* } */
         sample = malloc(sizeof(*sample));
         if (!sample) {
-            *status = -trdb_nomem;
+            status = -trdb_nomem;
             goto fail;
         }
 
@@ -573,38 +577,39 @@ size_t trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
     }
 
     if (ferror(fp)) {
-        *status = -trdb_scan_file;
+        status = -trdb_scan_file;
         goto fail;
     }
 
+    *count = scnt;
+out:
     if (fp)
         fclose(fp);
-    return scnt;
+
+    return status;
 fail:
-    if (fp)
-        fclose(fp);
     // TODO: it's maybe better to not free the whole list, but just the part
     // where failed
     trdb_free_instr_list(instrs);
-    // merge with return codes
-    return 0;
+    goto out;
 }
 
-/* TODO: this double pointer mess is a bit ugly. Maybe use the list.h anyway?*/
-size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
-                             struct tr_instr **samples, int *status)
+int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
+                          struct tr_instr **samples, size_t *count)
 {
-    *status = 0;
+    int status = 0;
     FILE *fp = NULL;
 
+    *count = 0;
+
     if (!path || !samples) { // TODO: investigate !c
-        *status = -trdb_invalid;
+        status = -trdb_invalid;
         goto fail;
     }
 
     fp = fopen(path, "r");
     if (!fp) {
-        *status = -trdb_file_open;
+        status = -trdb_file_open;
         goto fail;
     }
     size_t scnt = 0;
@@ -623,7 +628,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
     size_t size = 128;
     *samples = malloc(size * sizeof(**samples));
     if (!*samples) {
-        *status = -trdb_nomem;
+        status = -trdb_nomem;
         goto fail;
     }
 
@@ -643,7 +648,7 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
             size = 2 * size;
             struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
             if (!tmp) {
-                *status = -trdb_nomem;
+                status = -trdb_nomem;
                 goto fail;
             }
             *samples = tmp;
@@ -664,28 +669,32 @@ size_t trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
     memset((*samples) + scnt, 0, size - scnt);
 
     if (ferror(fp)) {
-        *status = -trdb_scan_file;
+        status = -trdb_scan_file;
         goto fail;
     }
 
+    *count = scnt;
+out:
     if (fp)
         fclose(fp);
-    return scnt;
+    return status;
 fail:
-    if (fp)
-        fclose(fp);
     free(*samples);
-    *samples = NULL;
-    return 0;
+    samples = NULL;
+    goto out;
 }
 
-size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
-                              struct list_head *instrs)
+int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
+                           struct list_head *instrs, size_t *count)
 {
-    *status = 0;
+
     FILE *fp = NULL;
+    int status = 0;
+
+    *count = 0;
+
     if (!path || !instrs) { // TODO: investigate !c
-        *status = -trdb_invalid;
+        status = -trdb_invalid;
         goto fail;
     }
 
@@ -693,7 +702,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
     fp = fopen(path, "r");
     if (!fp) {
-        *status = -trdb_file_open;
+        status = -trdb_file_open;
         goto fail;
     }
     size_t scnt = 0;
@@ -712,13 +721,13 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
     /* reading header line */
     if (getline(&line, &len, fp) == -1) {
-        *status = -trdb_bad_cvs_header;
+        status = -trdb_bad_cvs_header;
         goto fail;
     }
 
     if (!strcmp(line, "VALID,ADDRESS,INSN,PRIVILEGE,"
                       "EXCEPTION,ECAUSE,TVAL,INTERRUPT")) {
-        *status = -trdb_bad_cvs_header;
+        status = -trdb_bad_cvs_header;
         goto fail;
     }
 
@@ -727,7 +736,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
         sample = malloc(sizeof(*sample));
         if (!sample) {
-            *status = -trdb_nomem;
+            status = -trdb_nomem;
             goto fail;
         }
         *sample = (struct tr_instr){0};
@@ -738,7 +747,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
             if (ele < 0) {
                 err(c, "reading too many tokens per line\n");
-                *status = -trdb_scan_state_invalid;
+                status = -trdb_scan_state_invalid;
                 goto fail;
             }
 
@@ -782,7 +791,7 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
 
         if (ele > 0) {
             err(c, "wrong number of tokens on line, still %d remaining\n", ele);
-            *status = -trdb_scan_state_invalid;
+            status = -trdb_scan_state_invalid;
             goto fail;
         }
 
@@ -794,18 +803,19 @@ size_t trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path, int *status,
     free(line);
 
     if (ferror(fp)) {
-        *status = -trdb_scan_file;
+        status = -trdb_scan_file;
         goto fail;
     }
 
+    *count = scnt;
+
+out:
     if (fp)
         fclose(fp);
-    return scnt;
+    return status;
 fail:
-    if (fp)
-        fclose(fp);
     // TODO: it's maybe better to not free the whole list, but just the part
     // where failed
     trdb_free_instr_list(instrs);
-    return 0;
+    goto out;
 }

@@ -70,3 +70,8 @@ const char *trdb_errstr(enum trdb_error_code err)
 
     return "missing error string";
 }
+
+enum trdb_error_code trdb_errcode(int status)
+{
+    return status >= 0 ? trdb_ok : (enum trdb_error_code) - status;
+}

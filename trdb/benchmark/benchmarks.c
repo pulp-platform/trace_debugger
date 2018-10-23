@@ -78,9 +78,9 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     trdb_set_implicit_ret(ctx, implicit_ret);
     trdb_set_compress_branch_map(ctx, compress_bmap);
 
-    size_t instrcnt =
-        trdb_cvs_to_trace_list(ctx, trace_path, &status, &instr_list);
-    if (status != 0) {
+    size_t instrcnt = 0;
+    status = trdb_cvs_to_trace_list(ctx, trace_path, &instr_list, &instrcnt);
+    if (status < 0) {
         fprintf(stderr, "CVS to tr_instr failed\n");
         status = -1;
         goto fail;
@@ -109,7 +109,6 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     size_t abs_packets = stats.abs_packets;
     size_t bmap_full_packets = stats.bmap_full_packets;
     size_t bmap_full_addr_packets = stats.bmap_full_addr_packets;
-    size_t zo_addresses = 0;
 
     /* compare also against the version which doesn't use address and branchmap
      * compression

@@ -192,7 +192,7 @@ int main(int argc, char *argv[argc + 1])
     int status = EXIT_SUCCESS;
     struct arguments arguments;
     /* set default */
-    arguments = (struct arguments){0};
+    arguments = (struct arguments){{0}};
     arguments.silent = false;
     arguments.verbose = false;
     arguments.compress = false;
@@ -284,14 +284,14 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     int success = 0;
     size_t samplecnt = 0;
     if (arguments->cvs) {
-        samplecnt = trdb_cvs_to_trace_list(c, arguments->args[0], &success,
-                                           &instr_list);
+        success = trdb_cvs_to_trace_list(c, arguments->args[0], &instr_list,
+                                         &samplecnt);
     } else {
-        samplecnt =
-            trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
+        success =
+            trdb_stimuli_to_trace(c, arguments->args[0], samples, &samplecnt);
     }
 
-    if (success != 0) {
+    if (success < 0) {
         fprintf(stderr, "trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
@@ -416,10 +416,11 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     /* read stimuli file and convert to internal data structure */
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
     int success = 0;
-    size_t samplecnt =
-        trdb_stimuli_to_trace(c, arguments->args[0], samples, &success);
-    if (success != 0) {
+
+    success = trdb_stimuli_to_trace(c, arguments->args[0], samples, &samplecnt);
+    if (success < 0) {
         fprintf(stderr, "trdb_stimuli_to_trace failed\n");
         status = EXIT_FAILURE;
         goto fail;
