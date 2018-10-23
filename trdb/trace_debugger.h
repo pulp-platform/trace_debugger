@@ -173,7 +173,8 @@ enum trdb_error_code {
     trdb_file_read,
     trdb_file_write,
     trdb_scan_file,
-    trdb_scan_state_invalid
+    trdb_scan_state_invalid,
+    trdb_arch_support,
 };
 
 /**
@@ -212,7 +213,7 @@ struct trdb_ctx;
 
 /**
  * Reset the trace debugger context to a clean state, do this before calling a
- * sequence of trdb_compress_trace_step.
+ * sequence of trdb_compress_trace_step().
  *
  * @param ctx trace debugger context
  */
@@ -220,7 +221,7 @@ void trdb_reset_compression(struct trdb_ctx *ctx);
 
 /**
  * Reset the trace debugger context to a clean state, do this before calling a
- * trdb_decompress_trace.
+ * trdb_decompress_trace().
  *
  * @param ctx trace debugger context
  */
@@ -373,7 +374,7 @@ void trdb_set_compress_branch_map(struct trdb_ctx *ctx, bool compress);
 
 /**
  * Get the current number of bits of all the payloads which were produced
- * by calling trdb_compress_trace_step.
+ * by calling trdb_compress_trace_step().
  *
  * @param ctx a trace debugger context
  * @return number of bits of all payloads
@@ -382,9 +383,8 @@ size_t trdb_get_payloadbits(struct trdb_ctx *ctx);
 
 /**
  * Get the current number of bits of required to store all packets which were
- * produced by calling trdb_compress_trace_step. This includes all
- * overhead including quantization loss because pulp packets are always byte
- * aligned.
+ * produced by calling trdb_compress_trace_step(). This includes all overhead
+ * including quantization loss because pulp packets are always byte aligned.
  *
  * @param ctx a trace debugger context
  * @return number of bits of all pulp packets
@@ -393,7 +393,7 @@ size_t trdb_get_pulpbits(struct trdb_ctx *ctx);
 
 /**
  * Get the current number of emitted packets which were produced by calling
- * trdb_compress_trace_step.
+ * trdb_compress_trace_step().
  *
  * @param ctx a trace debugger context
  * @eturn number of emitted packets
@@ -402,7 +402,7 @@ size_t trdb_get_packetcnt(struct trdb_ctx *ctx);
 
 /**
  * Get the current number of instructions that went through
- * trdb_compress_trace_step.
+ * trdb_compress_trace_step().
  *
  * @param ctx a trace debugger context
  * @return number of instructions that were compressed
@@ -411,7 +411,7 @@ size_t trdb_get_instrcnt(struct trdb_ctx *ctx);
 
 /**
  * Get the current number of instruction bits that went through
- * trdb_compress_trace_step. This considers RVC instructions.
+ * trdb_compress_trace_step(). This considers RVC instructions.
  *
  * @param ctx a trace debugger context
  * @return number of instruction bits
@@ -419,7 +419,7 @@ size_t trdb_get_instrcnt(struct trdb_ctx *ctx);
 size_t trdb_get_instrbits(struct trdb_ctx *ctx);
 
 /**
- * Get packet generation statistics of trdb_compress_trace_step through a
+ * Get packet generation statistics of trdb_compress_trace_step() through a
  * trdb_packet_stats struct:
  *
  * @param ctx a trace debugger context
@@ -442,8 +442,12 @@ void trdb_get_packet_stats(struct trdb_ctx *ctx,
  *
  * @param ctx trace debugger context/state
  * @param packet_list list to which packets will be appended
- * @param instrs[len]
- * @return the provided @packet_list
+ * @param instr the next instruction in the sequence
+ * @return 0 or a positive number of generated packets on success, a negative
+ * error code otherwise
+ * @return -trdb_bad_instr if an unsupported instruction was passed through @p
+ * instr
+ * @return -trdb_unimplemented if an unimplemented variable generated a packet
  */
 int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct list_head *packet_list,

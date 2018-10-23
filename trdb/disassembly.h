@@ -199,7 +199,7 @@ void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
  * Initialize disassembler_unit with settings for the PULP platform.
  * @param dunit filled with information for PULP
  * @param options configure the formatting behaviour or NULL
- * @return -1 on failure 0 on success
+ * @return 0 on success, -1 otherwise
  */
 int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
                                     char *options);
@@ -239,7 +239,10 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
  * @param c the trace debugger context containing settings
  * @param abfd the bfd representing the binary
  * @param dunit filled with information from @p abfd
- * @return 0 on success, any other value on failure
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p abfd or @p dunit is NULL
+ * @return -trdb_nomem if out of memory
+ * @return -trdb_arch_support if architecture is not supported
  */
 int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                               struct disassembler_unit *dunit);
@@ -270,9 +273,11 @@ void trdb_set_disassembly_conf(struct disassembler_unit *dunit,
  * and'ing the returned value with e.g. TRDB_SOURCE_CODE.
  *
  * @param dunit the disassembler whose settings should be read
- * @return the settings flags
+ * @param conf written with the disassembly configuration if successfull
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if trdb_disasm_aux in @p dunit is NULL
  */
-uint32_t trdb_get_disassembly_conf(struct disassembler_unit *dunit);
+int trdb_get_disassembly_conf(struct disassembler_unit *dunit, uint32_t *conf);
 
 /**
  * A #print_address_func used in disassemble_info, set by

@@ -768,15 +768,16 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
     char *machine = NULL;
     enum bfd_endian endian = BFD_ENDIAN_UNKNOWN;
     char *disassembler_options = NULL; /* TODO: take from context */
-
     int status = 0;
+
+    if (!c || !abfd || !dunit)
+        return -trdb_invalid;
 
     struct disassemble_info *dinfo = dunit->dinfo;
     struct trdb_disasm_aux *aux = malloc(sizeof(*aux));
-    if (!aux) {
-        err(c, "malloc: %s\n", strerror(errno));
-        return -ENOMEM;
-    }
+    if (!aux)
+        return -trdb_nomem;
+
     /* make sure we properly initialize aux */
     *aux = (struct trdb_disasm_aux){0};
 
@@ -802,8 +803,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
     sorted_symcount = symcount ? symcount : dynsymcount;
     sorted_syms = malloc((sorted_symcount + synthcount) * sizeof(asymbol *));
     if (!sorted_syms) {
-        err(c, "malloc:%s\n", strerror(errno));
-        status = -ENOMEM;
+        status = -trdb_nomem;
         goto fail;
     }
     memcpy(sorted_syms, symcount ? syms : dynsyms,
@@ -847,7 +847,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
         if (inf == NULL) {
             err(c, "can't use supplied machine %s\n", machine);
-            status = -1;
+            status = -trdb_arch_support;
             goto fail;
         }
 
@@ -858,8 +858,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
         xvec = malloc(sizeof(struct bfd_target));
         if (!xvec) {
-            err(c, "malloc: %s\n", strerror(errno));
-            status = -ENOMEM;
+            status = -trdb_nomem;
             goto fail;
         }
         memcpy(xvec, abfd->xvec, sizeof(struct bfd_target));
@@ -872,7 +871,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
     if (!dunit->disassemble_fn) {
         err(c, "can't disassemble for architecture %s\n",
             bfd_printable_arch_mach(bfd_get_arch(abfd), 0));
-        status = -1;
+        status = -trdb_arch_support;
         goto fail;
     }
 
@@ -893,15 +892,15 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
         if (relsize > 0) {
             aux->dynrelbuf = malloc(relsize);
             if (!aux->dynrelbuf) {
-                err(c, "malloc: %s\n", strerror(errno));
-                return -ENOMEM;
+                status = -trdb_nomem;
+                goto fail;
             }
 
             aux->dynrelcount =
                 bfd_canonicalize_dynamic_reloc(abfd, aux->dynrelbuf, dynsyms);
             if (aux->dynrelcount < 0) {
-                err(c, "reloc: %s\n", (bfd_get_filename(abfd)));
-                return -ENOMEM;
+                status = -trdb_nomem;
+                goto fail;
             }
 
             /* Sort the relocs by address.  */
@@ -966,12 +965,13 @@ void trdb_set_disassembly_conf(struct disassembler_unit *dunit,
     aux->unwind_inlines = settings & TRDB_INLINES;
 }
 
-uint32_t trdb_get_disassembly_conf(struct disassembler_unit *dunit)
+int trdb_get_disassembly_conf(struct disassembler_unit *dunit, uint32_t *conf)
 {
     struct trdb_disasm_aux *aux = dunit->dinfo->application_data;
     if (!aux)
-        return 0;
-    return aux->config;
+        return -trdb_invalid;
+    *conf = aux->config;
+    return 0;
 }
 
 /* The number of preceding context lines to show when we start
@@ -1336,7 +1336,6 @@ static int ATTRIBUTE_PRINTF_2 objdump_sprintf(SFILE *f, const char *format, ...)
 }
 
 /* Disassemble some data in memory between given values.  */
-
 static void trdb_disassemble_bytes(struct disassemble_info *inf,
                                    disassembler_ftype disassemble_fn,
                                    bfd_boolean insns, bfd_byte *data,

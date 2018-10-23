@@ -66,7 +66,11 @@ const char *trdb_errstr(enum trdb_error_code err)
 
     case trdb_scan_state_invalid:
         return "scan state invalid, bad number of tokens";
+
+    case trdb_arch_support:
+	return "architecture not supported";
     }
+
 
     return "missing error string";
 }

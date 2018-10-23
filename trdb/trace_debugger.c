@@ -1053,7 +1053,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * subformat 2
          */
         err(ctx, "context_change not supported\n");
-        status = -trdb_internal;
+        status = -trdb_unimplemented;
         goto fail;
         /* ALLOC_INIT_PACKET(tr); */
         /* tr->format = F_SYNC; */
@@ -1089,7 +1089,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
             uint8_t bin[16] = {0};
             size_t bitcnt = 0;
             if (trdb_pulp_serialize_packet(ctx, tr, &bitcnt, 0, bin)) {
-                err(ctx, "failed to count bits of pulp packet\n");
+                dbg(ctx, "failed to count bits of pulp packet\n");
             }
             /* we have to round up to the next full byte */
             ctx->stats.pulpbits += ((bitcnt / 8) + (bitcnt % 8 != 0)) * 8;
@@ -1268,10 +1268,8 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
                      struct tr_instr *instr)
 {
     struct tr_instr *add = malloc(sizeof(*add));
-    if (!add) {
-        err(c, "malloc: %s\n", strerror(errno));
+    if (!add)
         return -1;
-    }
 
     memcpy(add, instr, sizeof(*add));
     list_add(&add->list, instr_list);
@@ -1891,8 +1889,15 @@ void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list)
 
 void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
 {
-    switch (packet->msg_type) {
+    if (!c)
+        return;
 
+    if (!packet) {
+        dbg(c, "error printing packet\n");
+        return;
+    }
+
+    switch (packet->msg_type) {
     case W_TRACE:
         switch (packet->format) {
         case F_BRANCH_FULL:
@@ -1955,6 +1960,14 @@ void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
 
 void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
 {
+    if (!stream)
+        return;
+
+    if (!packet) {
+        fprintf(stream, "error printing packet\n");
+        return;
+    }
+
     switch (packet->msg_type) {
     case W_TRACE:
         switch (packet->format) {
@@ -2018,6 +2031,14 @@ void trdb_print_packet(FILE *stream, const struct tr_packet *packet)
 
 void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *instr)
 {
+    if (!c)
+        return;
+
+    if (!instr) {
+        dbg(c, "error logging instruction\n");
+        return;
+    }
+
     dbg(c, "INSTR\n");
     dbg(c, "    iaddr     : 0x%08" PRIx32 "\n", instr->iaddr);
     dbg(c, "    instr     : 0x%08" PRIx32 "\n", instr->instr);
@@ -2031,8 +2052,15 @@ void trdb_log_instr(struct trdb_ctx *c, const struct tr_instr *instr)
 
 void trdb_print_instr(FILE *stream, const struct tr_instr *instr)
 {
-    fprintf(stream, "INSTR\n");
+    if (!stream)
+        return;
 
+    if (!instr) {
+        fprintf(stream, "error printing instruction\n");
+        return;
+    }
+
+    fprintf(stream, "INSTR\n");
     fprintf(stream, "    iaddr     : 0x%08" PRIx32 "\n", instr->iaddr);
     fprintf(stream, "    instr     : 0x%08" PRIx32 "\n", instr->instr);
     fprintf(stream, "    priv      : 0x%" PRIx32 "\n", instr->priv);
