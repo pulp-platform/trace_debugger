@@ -175,6 +175,8 @@ enum trdb_error_code {
     trdb_scan_file,
     trdb_scan_state_invalid,
     trdb_arch_support,
+    trdb_section_empty,
+    trdb_bad_vma
 };
 
 /**
@@ -462,7 +464,17 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
  * @param packet_list the compressed instruction trace
  * @param instr_list list to which the reconstruction instructions will be
  * appended
- * @return 0 on success, -1 on failure
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p c, @p abfd, @p packet_list or @p instr_list is
+ * NULL
+ * @return -trdb_bad_vma if the vma does not point to any section
+ * @return -trdb_nomem if out of memory
+ * @return -trdb_section_empty if section contents could not be be loaded
+ * @return -trdb_bad_instr if an instruction was encountered that could not be
+ * decoded
+ * @return -trdb_bad_config if the decoding assumptions do not hold because of
+ * contradictionary data, e.g. assuming full_address=true when encountering a
+ * F_BRANCH_DIFF packet
  */
 int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                           struct list_head *packet_list,

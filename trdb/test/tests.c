@@ -37,6 +37,7 @@
 #include "../utils.c"
 #include "../serialize.h"
 #include "../serialize.c"
+#include "../error.c"
 
 #define TRDB_SUCCESS 0
 #define TRDB_FAIL -1
@@ -865,7 +866,12 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
 
-    trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
+    status = trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
+    if (status < 0) {
+        LOG_ERRT("Decompression failed: %s\n",
+                 trdb_errstr(trdb_errcode(status)));
+        goto fail;
+    }
 
     if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
@@ -974,7 +980,13 @@ int test_decompress_trace_differential(const char *bin_path,
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
 
-    trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
+    status = trdb_decompress_trace(ctx, abfd, &packet1_head, &instr1_head);
+    if (status < 0) {
+        LOG_ERRT("Decompression failed: %s\n",
+                 trdb_errstr(trdb_errcode(status)));
+        status = TRDB_FAIL;
+        goto fail;
+    }
 
     if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");

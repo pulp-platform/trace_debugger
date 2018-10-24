@@ -121,7 +121,7 @@ int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
 {
     struct disassemble_info *dinfo = dunit->dinfo;
     if (!dinfo)
-        return -1;
+        return -trdb_invalid;
     init_disassemble_info_for_pulp(dinfo);
     dinfo->disassembler_options = options;
     dunit->disassemble_fn = print_insn_riscv;
@@ -148,16 +148,14 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
 {
     /* initialize libopcodes disassembler */
     struct disassemble_info *dinfo = dunit->dinfo;
-    if (!dinfo) {
-        LOG_ERRT("disassemble_info is null\n");
-        return -1;
-    }
+    if (!dinfo)
+        return -trdb_invalid;
+
     init_disassemble_info_from_bfd(dinfo, abfd, options);
     dunit->disassemble_fn = disassembler(abfd);
-    if (!dunit->disassemble_fn) {
-        LOG_ERRT("No suitable disassembler found\n");
-        return -1;
-    }
+    if (!dunit->disassemble_fn)
+        return -trdb_arch_support;
+
     return 0;
 }
 
@@ -1831,7 +1829,7 @@ void dump_section_header(bfd *abfd, asection *section, void *ignored)
 
 void dump_bin_info(bfd *abfd)
 {
-    printf("Information about binary:\n");
+    printf("information about binary:\n");
     printf("flavour: %u\n", bfd_get_flavour(abfd));
     printf("name   : %s\n", bfd_printable_name(abfd));
     printf("size   : %d\n", bfd_get_arch_size(abfd));
@@ -1841,7 +1839,7 @@ void dump_bin_info(bfd *abfd)
 
 void dump_target_list()
 {
-    printf("Available target list:\n");
+    printf("available target list:\n");
     const char **list = bfd_target_list();
     for (unsigned int i = 0; list[i]; i++) {
         printf("%s\n", list[i]);
@@ -1874,14 +1872,14 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
     }
     struct disassembler_unit *dunit = inf;
     if (!dunit) {
-        LOG_ERRT("disassembler_unit is NULL\n");
+        fprintf(stderr, "disassembler_unit is NULL\n");
         return;
     }
 
     struct disassemble_info *dinfo = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
-        LOG_ERRT("Unitialized member of disassembler_unit");
+        fprintf(stderr, "unitialized member of disassembler_unit");
         return;
     }
 
@@ -1916,7 +1914,7 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
     if (aux)
         aux->sec = section;
 
-    printf("Disassembly of section %s:\n", section->name);
+    printf("disassembly of section %s:\n", section->name);
     while (addr_offset < stop_offset) {
         /* print instr address */
         (*dinfo->fprintf_func)(dinfo->stream, "0x%016jx  ",
@@ -1925,7 +1923,8 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
         addr_offset += size;
         (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
-            LOG_ERRT("Encountered instruction with %d bytes, stopping", size);
+            fprintf(stderr, "encountered instruction with %d bytes, stopping",
+                    size);
             break;
         }
     }
@@ -1937,15 +1936,14 @@ void disassemble_block(size_t len, bfd_byte data[len],
                        struct disassembler_unit *dunit)
 {
     if (!dunit) {
-
-        LOG_ERRT("disassembler_unit is NULL\n");
+        fprintf(stderr, "disassembler_unit is NULL\n");
         return;
     }
 
     struct disassemble_info *dinfo = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
-        LOG_ERRT("Unitialized member of disassembler_unit");
+        fprintf(stderr, "unitialized member of disassembler_unit");
         return;
     }
 
@@ -1959,7 +1957,8 @@ void disassemble_block(size_t len, bfd_byte data[len],
         pc += size;
         (*dinfo->fprintf_func)(dinfo->stream, "\n");
         if (size <= 0) {
-            LOG_ERRT("Encountered instruction with %d bytes, stopping", size);
+            fprintf(stderr, "encountered instruction with %d bytes, stopping",
+                    size);
             break;
         }
     }
@@ -1969,14 +1968,14 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
                                     struct disassembler_unit *dunit)
 {
     if (!dunit) {
-        LOG_ERRT("disassembler_unit is NULL\n");
+        fprintf(stderr, "disassembler_unit is NULL\n");
         return;
     }
 
     struct disassemble_info *dinfo = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
-        LOG_ERRT("Unitialized member of disassembler_unit\n");
+        fprintf(stderr, "unitialized member of disassembler_unit\n");
         return;
     }
 
@@ -2007,7 +2006,8 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
     int size = (*disassemble_fn)(addr, dinfo);
     (*dinfo->fprintf_func)(dinfo->stream, "\n");
     if (size <= 0) {
-        LOG_ERRT("Encountered instruction with %d bytes, stopping", size);
+        fprintf(stderr, "encountered instruction with %d bytes, stopping",
+                size);
     }
 
     free(data);

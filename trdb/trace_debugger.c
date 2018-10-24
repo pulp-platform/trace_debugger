@@ -1152,6 +1152,12 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
                              struct disassembler_unit *dunit, int *status)
 {
     *status = 0;
+
+    if (!c || !instr || !dunit) {
+        *status = -trdb_invalid;
+        return 0;
+    }
+
     /* make sure start froma a clean slate */
     *instr = (struct tr_instr){0};
 
@@ -1169,19 +1175,19 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
     int instr_size = (*dunit->disassemble_fn)(pc, dinfo);
     (*dinfo->fprintf_func)(c, "\n");
     if (instr_size <= 0) {
-        err(c, "Encountered instruction with %d bytes, stopping\n", instr_size);
-        *status = -1;
+        err(c, "encountered instruction with %d bytes, stopping\n", instr_size);
+        *status = -trdb_bad_instr;
         return 0;
     }
     if (!dinfo->insn_info_valid) {
-        err(c, "Encountered invalid instruction info\n");
-        *status = -1;
+        err(c, "encountered invalid instruction info\n");
+        *status = -trdb_bad_instr;
         return 0;
     }
     uint64_t instr_bits = 0;
     if (read_memory_at_pc(pc, &instr_bits, 0, dinfo)) {
-        err(c, "Reading instr at pc failed\n");
-        *status = -1;
+        err(c, "reading instr at pc failed\n");
+        *status = -trdb_bad_instr;
         return 0;
     }
 
@@ -1211,12 +1217,7 @@ static int build_instr_fprintf(void *stream, const char *format, ...)
         err(c, "Encountered an error in vsnprintf\n");
     }
     va_end(args);
-    /* if (strlen(instr->str) + rv + 1 > INSTR_STR_LEN) { */
-    /*     err(c, "Can't append to buffer, truncating string\n"); */
-    /*     strncat(instr->str, tmp, INSTR_STR_LEN - 1 - strlen(instr->str)); */
-    /* } else { */
-    /*     strncat(instr->str, tmp, rv); */
-    /* } */
+
     dbg(c, tmp);
 
     return rv;
@@ -1236,25 +1237,20 @@ static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
                                        asection *section,
                                        struct disassemble_info *dinfo)
 {
-    if (!dinfo || !section) {
-        err(c, "disassemble_info or asection is NULL\n");
-        return -1;
-    }
+    if (!dinfo || !section)
+        return -trdb_invalid;
 
     bfd_size_type section_size = bfd_get_section_size(section);
 
     bfd_byte *section_data = malloc(section_size);
-
-    if (!section_data) {
-        err(c, "malloc: %s\n", strerror(errno));
-        return -1;
-    }
+    if (!section_data)
+        return -trdb_nomem;
 
     if (!bfd_get_section_contents(abfd, section, section_data, 0,
                                   section_size)) {
         err(c, "bfd_get_section_contents: %s\n", bfd_errmsg(bfd_get_error()));
         free(section_data);
-        return -1;
+        return -trdb_section_empty;
     }
 
     dinfo->buffer = section_data;
@@ -1269,7 +1265,7 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
 {
     struct tr_instr *add = malloc(sizeof(*add));
     if (!add)
-        return -1;
+        return -trdb_nomem;
 
     memcpy(add, instr, sizeof(*add));
     list_add(&add->list, instr_list);
@@ -1281,6 +1277,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                           struct list_head *packet_list,
                           struct list_head *instr_list)
 {
+    int status = 0;
+    if (!c || !abfd || !packet_list || !instr_list)
+        return -trdb_invalid;
+
     /* We assume our hw block in the pulp generated little endian
      * addresses, thus we should make sure that before we interact
      * with bfd addresses to convert this foreign format to the local
@@ -1296,6 +1296,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     asection *section = get_section_for_vma(abfd, start_address);
     if (!section) {
         err(c, "VMA not pointing to any section\n");
+        status = -trdb_bad_vma;
         goto fail;
     }
     info(c, "Section of start_address:%s\n", section->name);
@@ -1315,10 +1316,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     /* Alloc and config section data for disassembler */
     bfd_vma stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
 
-    if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
-        err(c, "Failed alloc_section_for_debugging\n");
+    if ((status = alloc_section_for_debugging(c, abfd, section, &dinfo)) < 0)
         goto fail;
-    }
+
     bfd_vma pc = start_address; /* TODO: well we get a sync packet anyway... */
 
     /* we need to be able to look at two packets to make the right
@@ -1347,8 +1347,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         }
 
         /* we ignore unknown or unused packets (TIMER, SW) */
-        if (packet->msg_type != W_TRACE)
+        if (packet->msg_type != W_TRACE) {
+            info(c, "skipped a packet\n");
             continue;
+        }
 
         /* Sometimes we leave the current section (e.g. changing from
          * the .start to the .text section), so let's load the
@@ -1358,16 +1360,17 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             section = get_section_for_vma(abfd, pc);
             if (!section) {
                 err(c, "VMA (PC) not pointing to any section\n");
+                status = -trdb_bad_vma;
                 goto fail;
             }
             stop_offset = bfd_get_section_size(section) / dinfo.octets_per_byte;
 
             free_section_for_debugging(&dinfo);
-            if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
-                err(c, "Failed alloc_section_for_debugging\n");
+            if ((status =
+                     alloc_section_for_debugging(c, abfd, section, &dinfo)) < 0)
                 goto fail;
-            }
-            info(c, "Switched to section:%s\n", section->name);
+
+            info(c, "switched to section:%s\n", section->name);
         }
 
         switch (packet->format) {
@@ -1383,13 +1386,12 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         case F_ADDR_ONLY:
             break;
         default:
-            err(c, "Unimplemented\n");
+            /* impossible */
+            status = -trdb_bad_packet;
             goto fail;
         }
 
-        if (trdb_get_log_priority(c) == LOG_DEBUG) {
-            trdb_log_packet(c, packet);
-        }
+        trdb_log_packet(c, packet);
 
         if (packet->format == F_BRANCH_FULL) {
             bool hit_address = false; /* TODO: for now we don't allow
@@ -1421,10 +1423,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             while (!(dec_ctx.branch_map.cnt == 0 &&
                      (hit_discontinuity || hit_address))) {
 
-                int status = 0;
                 int size =
                     disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
-                if (status != 0)
+                if (status < 0)
                     goto fail;
 
                 /* TODO: test if packet addr valid first */
@@ -1432,7 +1433,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     hit_address = true;
 
                 dis_instr.priv = dec_ctx.privilege;
-                add_trace(c, instr_list, &dis_instr);
+                if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+                    goto fail;
 
                 /* advance pc */
                 pc += size;
@@ -1447,7 +1449,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                                                  implicit_ret)) {
                         break;
                     }
-                    info(c, "Detected mret, uret or sret\n");
+                    info(c, "detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
@@ -1459,13 +1461,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                      */
                     if (dec_ctx.branch_map.cnt > 1 && dinfo.target == 0)
                         err(c,
-                            "Can't predict the jump target, never happens\n");
+                            "can't predict the jump target, never happens\n");
 
                     if (dec_ctx.branch_map.cnt == 1 && dinfo.target == 0) {
                         if (!dec_ctx.branch_map.full) {
                             info(
                                 c,
-                                "We hit the not-full branch_map + address edge case, "
+                                "we hit the not-full branch_map + address edge case, "
                                 "(branch following discontinuity is included in this "
                                 "packet)\n");
                             /* TODO: should I poison addr? */
@@ -1473,7 +1475,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         } else {
                             info(
                                 c,
-                                "We hit the full branch_map + address edge case\n");
+                                "we hit the full branch_map + address edge case\n");
                             pc = absolute_addr;
                         }
                         hit_discontinuity = true;
@@ -1489,7 +1491,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                          */
                         pc = absolute_addr;
                         hit_discontinuity = true;
-                        info(c, "Found the discontinuity\n");
+                        info(c, "found discontinuity\n");
                     }
                     break;
 
@@ -1502,7 +1504,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         dec_ctx.branch_map.cnt--;
                         if (dinfo.target == 0)
                             err(c,
-                                "Can't predict the jump target, never happens\n");
+                                "can't predict the jump target, never happens\n");
                         if (branch_taken)
                             pc = dinfo.target;
                         break;
@@ -1514,7 +1516,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 case dis_dref2:
                 case dis_condjsr:
                 case dis_noninsn:
-                    err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
+                    err(c, "invalid insn_type: %d\n", dinfo.insn_type);
+                    status = -trdb_bad_instr;
                     goto fail;
                 }
             }
@@ -1522,6 +1525,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (full_address) {
                 err(c,
                     "F_BRANCH_DIFF shouldn't happen, decoder configured with full_address\n");
+                status = -trdb_bad_config;
                 goto fail;
             }
 
@@ -1563,14 +1567,15 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 int status = 0;
                 int size =
                     disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
-                if (status != 0)
+                if (status < 0)
                     goto fail;
 
                 if (dec_ctx.branch_map.cnt == 0 && pc == absolute_addr)
                     hit_address = true;
 
                 dis_instr.priv = dec_ctx.privilege;
-                add_trace(c, instr_list, &dis_instr);
+                if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+                    goto fail;
 
                 /* advance pc */
                 pc += size;
@@ -1585,7 +1590,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                                                  implicit_ret)) {
                         break;
                     }
-                    info(c, "Detected mret, uret or sret\n");
+                    info(c, "detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
@@ -1597,13 +1602,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                      */
                     if (dec_ctx.branch_map.cnt > 1 && dinfo.target == 0)
                         err(c,
-                            "Can't predict the jump target, never happens\n");
+                            "can't predict the jump target, never happens\n");
 
                     if (dec_ctx.branch_map.cnt == 1 && dinfo.target == 0) {
                         if (!dec_ctx.branch_map.full) {
                             info(
                                 c,
-                                "We hit the not-full branch_map + address edge case, "
+                                "we hit the not-full branch_map + address edge case, "
                                 "(branch following discontinuity is included in this "
                                 "packet)\n");
                             /* TODO: should I poison addr? */
@@ -1611,7 +1616,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         } else {
                             info(
                                 c,
-                                "We hit the full branch_map + address edge case\n");
+                                "we hit the full branch_map + address edge case\n");
                             pc = absolute_addr;
                         }
                         hit_discontinuity = true;
@@ -1625,7 +1630,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                          */
                         pc = absolute_addr;
                         hit_discontinuity = true;
-                        info(c, "Found the discontinuity\n");
+                        info(c, "found discontinuity\n");
                     }
                     break;
 
@@ -1638,7 +1643,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         dec_ctx.branch_map.cnt--;
                         if (dinfo.target == 0)
                             err(c,
-                                "Can't predict the jump target, never happens\n");
+                                "can't predict the jump target, never happens\n");
                         if (branch_taken)
                             pc = dinfo.target;
                         break;
@@ -1650,7 +1655,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 case dis_dref2:
                 case dis_condjsr:
                 case dis_noninsn:
-                    err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
+                    err(c, "invalid insn_type: %d\n", dinfo.insn_type);
+                    status = -trdb_bad_instr;
                     goto fail;
                 }
             }
@@ -1673,26 +1679,28 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 section = get_section_for_vma(abfd, pc);
                 if (!section) {
                     err(c, "VMA (PC) not pointing to any section\n");
+                    status = -trdb_bad_vma;
                     goto fail;
                 }
                 stop_offset =
                     bfd_get_section_size(section) / dinfo.octets_per_byte;
 
                 free_section_for_debugging(&dinfo);
-                if (alloc_section_for_debugging(c, abfd, section, &dinfo)) {
-                    err(c, "Failed alloc_section_for_debugging\n");
+                if ((status = alloc_section_for_debugging(c, abfd, section,
+                                                          &dinfo)) < 0)
                     goto fail;
-                }
-                info(c, "Switched to section:%s\n", section->name);
+
+                info(c, "switched to section:%s\n", section->name);
             }
 
             int status = 0;
             int size = disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
-            if (status != 0)
+            if (status < 0)
                 goto fail;
 
             dis_instr.priv = dec_ctx.privilege;
-            add_trace(c, instr_list, &dis_instr);
+            if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+                goto fail;
 
             pc += size;
 
@@ -1704,19 +1712,19 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 if (!is_unpred_discontinuity(dis_instr.instr, implicit_ret)) {
                     break;
                 }
-                info(c, "Detected mret, uret or sret\n");
+                info(c, "detected mret, uret or sret\n");
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
                 if (dinfo.target == 0)
-                    err(c, "Can't predict the jump target, never happens\n");
+                    err(c, "can't predict the jump target, never happens\n");
                 pc = dinfo.target;
                 break;
 
             case dis_condbranch:
                 if (dinfo.target == 0)
-                    err(c, "Can't predict the jump target, never happens\n");
+                    err(c, "can't predict the jump target, never happens\n");
                 if (packet->branch == 0) {
-                    err(c, "Doing a branch from a F_SYNC packet\n");
+                    err(c, "doing a branch from a F_SYNC packet\n");
                     pc = dinfo.target;
                 }
                 break;
@@ -1725,7 +1733,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             case dis_dref2:
             case dis_condjsr:
             case dis_noninsn:
-                err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
+                err(c, "invalid insn_type: %d\n", dinfo.insn_type);
+                status = -trdb_bad_instr;
                 goto fail;
             }
         } else if (packet->format == F_ADDR_ONLY) {
@@ -1775,14 +1784,15 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 int status = 0;
                 int size =
                     disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
-                if (status != 0)
+                if (status < 0)
                     goto fail;
 
                 if (pc == absolute_addr)
                     hit_address = true;
 
                 dis_instr.priv = dec_ctx.privilege;
-                add_trace(c, instr_list, &dis_instr);
+                if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+                    goto fail;
 
                 /* advance pc */
                 pc += size;
@@ -1796,13 +1806,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                                                  implicit_ret)) {
                         break;
                     }
-                    info(c, "Detected mret, uret or sret\n");
+                    info(c, "detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     if (dinfo.target) {
                         pc = dinfo.target;
                     } else {
-                        info(c, "Found the discontinuity\n");
+                        info(c, "found the discontinuity\n");
                         pc = absolute_addr;
                         hit_discontinuity = true;
                     }
@@ -1810,7 +1820,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
                 case dis_condbranch:
                     err(c,
-                        "We shouldn't hit conditional branches with F_ADDRESS_ONLY\n");
+                        "we shouldn't hit conditional branches with F_ADDRESS_ONLY\n");
                     break;
 
                 case dis_dref: /* TODO: is this useful? */
@@ -1818,17 +1828,18 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 case dis_dref2:
                 case dis_condjsr:
                 case dis_noninsn:
-                    err(c, "Invalid insn_type: %d\n", dinfo.insn_type);
+                    err(c, "invalid insn_type: %d\n", dinfo.insn_type);
+                    status = -trdb_bad_instr;
                     goto fail;
                 }
             }
         }
     }
-    return 0;
+    return status;
 
 fail:
     free_section_for_debugging(&dinfo);
-    return -1;
+    return status;
 }
 
 void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],

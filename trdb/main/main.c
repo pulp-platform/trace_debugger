@@ -215,6 +215,7 @@ int main(int argc, char *argv[argc + 1])
     struct trdb_ctx *ctx = trdb_new();
 
     if (!ctx) {
+        fprintf(stderr, "creating trdb library context failed\n");
         status = EXIT_FAILURE;
         goto fail;
     }
@@ -229,7 +230,7 @@ int main(int argc, char *argv[argc + 1])
     if (arguments.output_file[0] != '-') {
         output_fp = fopen(arguments.output_file, "w");
         if (!output_fp) {
-            perror("fopen");
+            fprintf(stderr, "fopen: %s", strerror(errno));
             status = EXIT_FAILURE;
             goto fail;
         }
@@ -292,7 +293,8 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     }
 
     if (success < 0) {
-        fprintf(stderr, "trdb_stimuli_to_trace failed\n");
+        fprintf(stderr, "reading stimuli file failed: %s\n",
+                trdb_errstr(trdb_errcode(success)));
         status = EXIT_FAILURE;
         goto fail;
     }
@@ -304,7 +306,8 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
         list_for_each_entry_reverse (instr, &instr_list, list) {
             int step = trdb_compress_trace_step(c, &packet_list, instr);
             if (step < 0) {
-                fprintf(stderr, "compress trace failed (cvs)\n");
+                fprintf(stderr, "compress trace failed: %s\n",
+                        trdb_errstr(trdb_errcode(status)));
                 status = EXIT_FAILURE;
                 goto fail;
             }
@@ -314,7 +317,8 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
             int step =
                 trdb_compress_trace_step(c, &packet_list, &(*samples)[i]);
             if (step < 0) {
-                fprintf(stderr, "compress trace failed\n");
+                fprintf(stderr, "compress trace failed: %s\n",
+                        trdb_errstr(trdb_errcode(status)));
                 status = EXIT_FAILURE;
                 goto fail;
             }
@@ -324,8 +328,10 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     if (arguments->binary_output) {
         struct tr_packet *packet;
         list_for_each_entry_reverse (packet, &packet_list, list) {
-            if (trdb_pulp_write_single_packet(c, packet, output_fp)) {
-                fprintf(stderr, "failed to serialize packets\n");
+            status = trdb_pulp_write_single_packet(c, packet, output_fp);
+            if (status < 0) {
+                fprintf(stderr, "failed to serialize packets: %s\n",
+                        trdb_errstr(trdb_errcode(status)));
                 status = EXIT_FAILURE;
                 goto fail;
             }
@@ -354,22 +360,26 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     LIST_HEAD(instr_list);
 
     if (!abfd) {
-        fprintf(stderr, "need to provide a binary for decompression\n");
+        fprintf(stderr, "need to provide a binary (--bfd) for decompression\n");
         status = EXIT_FAILURE;
         goto fail;
     }
 
     /* by default we parse assuming data is generated from PULP */
-    if (trdb_pulp_read_all_packets(c, path, &packet_list)) {
-        fprintf(stderr, "failed to parse packets\n");
+    if ((status = trdb_pulp_read_all_packets(c, path, &packet_list)) < 0) {
+        fprintf(stderr, "failed to parse packets: %s\n",
+                trdb_errstr(trdb_errcode(status)));
         status = EXIT_FAILURE;
         goto fail;
     }
 
     /* reconstruct the original instruction sequence */
-    if (trdb_decompress_trace(c, abfd, &packet_list, &instr_list)) {
-        fprintf(stderr, "failed to decompress packets due to either corrupt "
-                        "packets or wrong bfd, continuing anyway...\n");
+    status = trdb_decompress_trace(c, abfd, &packet_list, &instr_list);
+    if (status < 0) {
+        fprintf(stderr, "decompressing trace failed: %s\n",
+                trdb_errstr(trdb_errcode(status)));
+        fprintf(stderr, "possible causes: corrupt packets or wrong bfd\n");
+        fprintf(stderr, "continuing anyway...\n");
         status = EXIT_FAILURE;
     }
 
@@ -378,8 +388,10 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     dunit = (struct disassembler_unit){0};
 
     dunit.dinfo = &dinfo;
-    if (trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
-        fprintf(stderr, "failed to configure bfd\n");
+    status = trdb_alloc_dinfo_with_bfd(c, abfd, &dunit);
+    if (status < 0) {
+        fprintf(stderr, "failed to configure bfd: %s\n",
+                trdb_errstr(trdb_errcode(status)));
         status = EXIT_FAILURE;
         goto fail;
     }
@@ -421,7 +433,8 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
 
     success = trdb_stimuli_to_trace(c, arguments->args[0], samples, &samplecnt);
     if (success < 0) {
-        fprintf(stderr, "trdb_stimuli_to_trace failed\n");
+        fprintf(stderr, "reading stimuli file failed: %s\n",
+                trdb_errstr(trdb_errcode(status)));
         status = EXIT_FAILURE;
         goto fail;
     }
@@ -433,7 +446,8 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     /* setup the disassembler to consider data from the bfd */
     if (abfd) {
         if (trdb_alloc_dinfo_with_bfd(c, abfd, &dunit)) {
-            fprintf(stderr, "failed to configure bfd\n");
+            fprintf(stderr, "failed to configure bfd: %s\n",
+                    trdb_errstr(trdb_errcode(status)));
             status = EXIT_FAILURE;
             goto fail;
         }
@@ -473,15 +487,17 @@ static int dump_trace_or_packets(struct trdb_ctx *c, FILE *output_fp,
     LIST_HEAD(packet_list);
 
     if (!strcmp(arguments->binary_format, "pulp")) {
-        if (trdb_pulp_read_all_packets(c, path, &packet_list)) {
-            fprintf(stderr, "failed to parse packets\n");
+        if ((status = trdb_pulp_read_all_packets(c, path, &packet_list)) < 0) {
+            fprintf(stderr, "failed to parse packets: %s\n",
+                    trdb_errstr(trdb_errcode(status)));
             status = EXIT_FAILURE;
             goto fail;
         }
         trdb_dump_packet_list(output_fp, &packet_list);
 
     } else {
-        fprintf(stderr, "format not supported\n");
+        fprintf(stderr, "binary format %s not supported/recognized\n",
+                arguments->binary_format);
         status = EXIT_FAILURE;
         goto fail;
     }

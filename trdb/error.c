@@ -68,14 +68,19 @@ const char *trdb_errstr(enum trdb_error_code err)
         return "scan state invalid, bad number of tokens";
 
     case trdb_arch_support:
-	return "architecture not supported";
-    }
+        return "architecture not supported";
 
+    case trdb_section_empty:
+        return "section is empty";
+
+    case trdb_bad_vma:
+        return "vma is pointing to no section";
+    }
 
     return "missing error string";
 }
 
 enum trdb_error_code trdb_errcode(int status)
 {
-    return status >= 0 ? trdb_ok : (enum trdb_error_code) - status;
+    return status >= 0 ? trdb_ok : (enum trdb_error_code)(-status);
 }
