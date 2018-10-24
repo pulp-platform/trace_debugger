@@ -66,6 +66,10 @@ SRCS		= $(wildcard *.c)
 OBJS		= $(SRCS:.c=.o)
 INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
 
+HEADERS		= $(wildcard *.h)
+HEADERS		+= $(wildcard lib/bfd/*.h)
+HEADERS		+= $(wildcard lib/include/*.h)
+
 BIN		= trdb
 TEST_BIN	= tests
 BENCHMARK_BIN   = benchmarks
@@ -110,6 +114,9 @@ static-lib: ALL_CFLAGS += -fPIC
 static-lib: $(STATIC_LIB).a
 
 # all install targets
+install-headers: $(HEADERS)
+	$(INSTALL_DATA) $(HEADERS) $(DESTDIR)$(includedir)
+
 install-static-lib: static-lib
 	$(INSTALL_DATA) $(STATIC_LIB).a $(DESTDIR)$(libdir)/$(STATIC_LIB).a
 
@@ -128,6 +135,7 @@ uninstall:
 	rm $(DESTDIR)$(bindir)/$(BIN)
 	rm $(DESTDIR)$(libdir)/$(LIB).so
 	rm $(DESTDIR)$(libdir)/$(STATIC_LIB).a
+	rm $(DESTDIR)$(includedir)/$(HEADERS)
 
 # compilation boilerplate
 $(BIN): $(OBJS) $(MAIN_OBJS)
