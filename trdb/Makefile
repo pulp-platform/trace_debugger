@@ -19,16 +19,14 @@
 # Author: Robert Balas (balasr@student.ethz.ch)
 # Description: Build the C model and decompression tools for the trace debugger
 
-CC		= gcc
-CPPFLAGS	=
-CFLAGS		+= -std=gnu11 -Wall -O2 -march=native -fno-strict-aliasing \
-			-Wno-unused-function -DENABLE_LOGGING -DNDEBUG
-CFLAGS_DEBUG	+= -std=gnu11 -Wall -g -fno-strict-aliasing \
+CFLAGS		= -Wall -O2 -g -march=native -Wno-unused-function \
+			-DENABLE_LOGGING -DNDEBUG
+# we need gnu11 and no-strict-aliasing
+ALL_CFLAGS	= -std=gnu11 -fno-strict-aliasing $(CFLAGS)
+ALL_CFLAGS_DBG	= -std=gnu11 -Wall -O0 -g -fno-strict-aliasing \
 			-Wno-unused-function -fsanitize=address \
 			-DENABLE_LOGGING -DENABLE_DEBUG
 
-PREFIX		= $(DESTDIR)/usr/local
-BINDIR		= $(PREFIX)/bin
 
 QUESTASIM_PATH	= /usr/pack/modelsim-10.5c-kgf/questasim
 
@@ -50,7 +48,7 @@ INCLUDE_PATHS   = $(PULP_BINUTILS_PATH)/include \
 MORE_TAG_PATHS  = $(PULP_BINUTILS_PATH)/bfd
 
 LDFLAGS		= $(addprefix -L, $(LIB_PATHS))
-LDLIBS		= -l:libbfd.a -l:libopcodes.a -l:libiberty.a -l:libz.a -ldl
+LDLIBS		?= -l:libbfd.a -l:libopcodes.a -l:libiberty.a -l:libz.a -ldl
 
 MAIN_SRCS	= $(wildcard main/*.c)
 MAIN_OBJS	= $(MAIN_SRCS:.c=.o)
@@ -71,8 +69,22 @@ INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
 BIN		= trdb
 TEST_BIN	= tests
 BENCHMARK_BIN   = benchmarks
+
+# GNU recommendations
+prefix          = /usr/local
+exec_prefix     = $(prefix)
+bindir          = $(exec_prefix)/bin
+libdir          = $(exec_prefix)/lib
+includedir      = $(prefix)/include
+
+INSTALL         = install
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA    = ${INSTALL} -m 644
+
 # golden model lib for simulator
-GMLIB		= libtrdb
+SV_LIB		= libtrdbsv
+LIB		= libtrdb
+STATIC_LIB      = libtrdb
 
 
 CTAGS		= ctags
@@ -82,47 +94,72 @@ VALGRIND	= valgrind
 DOC		= doxygen
 
 
+# compilation targets
 all: $(BIN) $(TEST_BIN) $(BENCHMARK_BIN)
 
-debug: CFLAGS = $(CFLAGS_DEBUG)
+debug: ALL_CFLAGS = $(ALL_CFLAGS_DEBUG)
 debug: all
 
-lib: CFLAGS += -fPIC
-lib: $(GMLIB).so
+sv-lib: ALL_CFLAGS += -fPIC
+sv-lib: $(SV_LIB).so
 
-.PHONY: install
-install: all
-	install -D $(BIN) $(BINDIR)/$(BIN)
+lib: ALL_CFLAGS += -fPIC
+lib: $(LIB).so
 
-.PHONY: install-strip
-install-strip: all
-	install -D -s $(BIN) $(BINDIR)/$(BIN)
+static-lib: ALL_CFLAGS += -fPIC
+static-lib: $(STATIC_LIB).a
+
+# all install targets
+install-static-lib: static-lib
+	$(INSTALL_DATA) $(STATIC_LIB).a $(DESTDIR)$(libdir)/$(STATIC_LIB).a
+
+install-lib: lib
+	$(INSTALL_DATA) $(LIB).so $(DESTDIR)$(libdir)/$(LIB).so
+
+install-trdb: $(BIN)
+	$(INSTALL_PROGRAM) $(BIN) $(DESTDIR)$(bindir)/$(BIN)
+
+install: install-static-lib install-lib install-trdb
+
+install-strip:
+	$(MAKE) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
 
 uninstall:
-	-rm $(BINDIR)/$(BIN)
+	rm $(DESTDIR)$(bindir)/$(BIN)
+	rm $(DESTDIR)$(libdir)/$(LIB).so
+	rm $(DESTDIR)$(libdir)/$(STATIC_LIB).a
 
-
+# compilation boilerplate
 $(BIN): $(OBJS) $(MAIN_OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(MAIN_OBJS) $(OBJS) \
+	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(MAIN_OBJS) $(OBJS) \
 		$(LDLIBS)
 
 $(TEST_BIN): $(OBJS) $(TEST_OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)
+	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(LDLIBS)
 
 $(BENCHMARK_BIN): $(OBJS) $(BENCHMARK_OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(BENCHMARK_OBJS) $(OBJS) \
-		$(LDLIBS)
+	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(BENCHMARK_OBJS) \
+		$(OBJS) $(LDLIBS)
 
-$(GMLIB).so: $(OBJS) $(DPI_OBJS)
-#	gcc -o $(GMLIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)
-	ld -shared -E --exclude-libs ALL -o $(GMLIB).so -lc $(LDFLAGS) \
+$(SV_LIB).so: $(OBJS) $(DPI_OBJS)
+#	gcc -o $(SV_LIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)
+	ld -shared -E --exclude-libs ALL -o $(SV_LIB).so -lc $(LDFLAGS) \
 		$(OBJS) $(DPI_OBJS) $(LDLIBS)
+
+$(LIB).so: $(OBJS) $(DPI_OBJS)
+	ld -shared -E --exclude-libs ALL -o $(LIB).so -lc $(LDFLAGS) \
+		$(OBJS) $(LDLIBS)
+
+$(STATIC_LIB).a: $(OBJS)
+	$(AR) -rs $@ $(OBJS)
 
 # $@ = name of target
 # $< = first dependency
 %.o: %.c
-	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -c $< -o $@ $(LDLIBS)
+	$(CC) $(ALL_CFLAGS) $(INCLUDES) $(LDFLAGS) \
+		-c $(CPPFLAGS) $< -o $@ $(LDLIBS)
 
+# run targets
 .PHONY: run
 run:
 	./$(BIN)
@@ -146,18 +183,22 @@ valgrind-test:
 valgrind-main:
 	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BIN)
 
+# emacs tag generation
 .PHONY: TAGS
 TAGS:
 	$(CTAGS) -R -e -h=".c.h" --tag-relative=always . $(LIB_PATHS) \
 		$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
 
+# documentation
 docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
 	$(DOC) doxyfile
 
+# cleanup
 .PHONY: clean
 clean:
-	rm -rf $(BIN) $(TEST_BIN) $(BENCHMARK_BIN) $(GMLIB).so $(OBJS) \
-		$(MAIN_OBJS) $(TEST_OBJS) $(BENCHMARK_OBJS) $(DPI_OBJS)
+	rm -rf $(BIN) $(TEST_BIN) $(BENCHMARK_BIN) $(SV_LIB).so \
+	$(STATIC_LIB).a $(LIB).so $(OBJS) $(MAIN_OBJS) $(TEST_OBJS) \
+	$(BENCHMARK_OBJS) $(DPI_OBJS)
 
 .PHONY: distclean
 distclean: clean
