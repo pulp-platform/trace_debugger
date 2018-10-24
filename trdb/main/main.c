@@ -458,7 +458,7 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     } else {
         /* if we can't use a bfd assume its pulp riscv */
         init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
-        init_disassemble_info_for_pulp(&dinfo);
+        trdb_init_disassemble_info_for_pulp(&dinfo);
         dunit.disassemble_fn = print_insn_riscv;
     }
 

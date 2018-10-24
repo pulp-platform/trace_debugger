@@ -103,11 +103,11 @@ static int dump_reloc_info = 0;
 static bool disassemble_all;
 static int wide_output;
 
-void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
+void trdb_init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
 {
     init_disassemble_info(dinfo, stdout, (fprintf_ftype)fprintf);
     dinfo->fprintf_func = (fprintf_ftype)fprintf;
-    dinfo->print_address_func = riscv32_print_address;
+    dinfo->print_address_func = trdb_riscv32_print_address;
 
     dinfo->flavour = bfd_target_elf_flavour;
     dinfo->arch = bfd_arch_riscv;
@@ -116,24 +116,24 @@ void init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
     disassemble_init_for_target(dinfo);
 }
 
-int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
-                                    char *options)
+int trdb_init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
+                                         char *options)
 {
     struct disassemble_info *dinfo = dunit->dinfo;
     if (!dinfo)
         return -trdb_invalid;
-    init_disassemble_info_for_pulp(dinfo);
+    trdb_init_disassemble_info_for_pulp(dinfo);
     dinfo->disassembler_options = options;
     dunit->disassemble_fn = print_insn_riscv;
     return 0;
 }
 
-void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
-                                    char *options)
+void trdb_init_disassemble_info_from_bfd(struct disassemble_info *dinfo,
+                                         bfd *abfd, char *options)
 {
     init_disassemble_info(dinfo, stdout, (fprintf_ftype)fprintf);
     dinfo->fprintf_func = (fprintf_ftype)fprintf;
-    dinfo->print_address_func = riscv32_print_address;
+    dinfo->print_address_func = trdb_riscv32_print_address;
 
     dinfo->flavour = bfd_get_flavour(abfd);
     dinfo->arch = bfd_get_arch(abfd);
@@ -143,8 +143,8 @@ void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
     disassemble_init_for_target(dinfo);
 }
 
-int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
-                           char *options)
+int trdb_init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
+                                char *options)
 {
     /* initialize libopcodes disassembler */
     if (!dunit)
@@ -154,7 +154,7 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
     if (!dinfo)
         return -trdb_invalid;
 
-    init_disassemble_info_from_bfd(dinfo, abfd, options);
+    trdb_init_disassemble_info_from_bfd(dinfo, abfd, options);
     dunit->disassemble_fn = disassembler(abfd);
     if (!dunit->disassemble_fn)
         return -trdb_arch_support;
@@ -162,7 +162,7 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
     return 0;
 }
 
-void riscv32_print_address(bfd_vma addr, struct disassemble_info *dinfo)
+void trdb_riscv32_print_address(bfd_vma addr, struct disassemble_info *dinfo)
 {
     (*dinfo->fprintf_func)(dinfo->stream, "0x%08jx", (uintmax_t)addr);
 }
@@ -1614,7 +1614,7 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
     bool with_function_context = paux->with_function_context;
 
     /* get section section which vma points to, if any */
-    asection *section = get_section_for_vma(abfd, addr);
+    asection *section = trdb_get_section_for_vma(abfd, addr);
     if (!section) {
         err(c, "no section for vma found\n");
         return;
@@ -1819,18 +1819,18 @@ fail:
         free(pinfo->buffer);
 }
 
-void dump_section_names(bfd *abfd)
+void trdb_dump_section_names(bfd *abfd)
 {
-    bfd_map_over_sections(abfd, dump_section_header, NULL);
+    bfd_map_over_sections(abfd, trdb_dump_section_header, NULL);
 }
 
-void dump_section_header(bfd *abfd, asection *section, void *ignored)
+void trdb_dump_section_header(bfd *abfd, asection *section, void *ignored)
 {
     bfd_printf_vma(abfd, bfd_get_section_vma(abfd, section));
     printf("%s\n", bfd_get_section_name(abfd, section));
 }
 
-void dump_bin_info(bfd *abfd)
+void trdb_dump_bin_info(bfd *abfd)
 {
     printf("information about binary:\n");
     printf("flavour: %u\n", bfd_get_flavour(abfd));
@@ -1840,7 +1840,7 @@ void dump_bin_info(bfd *abfd)
     printf("endian : %d\n", abfd->xvec->byteorder);
 }
 
-void dump_target_list()
+void trdb_dump_target_list()
 {
     printf("available target list:\n");
     const char **list = bfd_target_list();
@@ -1849,24 +1849,24 @@ void dump_target_list()
     }
 }
 
-bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma)
+bool trdb_vma_in_section(bfd *abfd, asection *section, bfd_vma vma)
 {
     return (vma >= section->vma &&
             vma < (section->vma + bfd_section_size(abfd, section)));
 }
 
-asection *get_section_for_vma(bfd *abfd, bfd_vma vma)
+asection *trdb_get_section_for_vma(bfd *abfd, bfd_vma vma)
 {
     asection *p;
     for (p = abfd->sections; p != NULL; p = p->next) {
-        if (vma_in_section(abfd, p, vma)) {
+        if (trdb_vma_in_section(abfd, p, vma)) {
             return p;
         }
     }
     return NULL;
 }
 
-void disassemble_section(bfd *abfd, asection *section, void *inf)
+void trdb_disassemble_section(bfd *abfd, asection *section, void *inf)
 {
     /* Do not disassemble sections without machine code*/
     if ((section->flags & (SEC_CODE | SEC_HAS_CONTENTS)) !=
@@ -1935,8 +1935,8 @@ void disassemble_section(bfd *abfd, asection *section, void *inf)
     free(data);
 }
 
-void disassemble_block(size_t len, bfd_byte data[len],
-                       struct disassembler_unit *dunit)
+void trdb_disassemble_block(size_t len, bfd_byte data[len],
+                            struct disassembler_unit *dunit)
 {
     if (!dunit) {
         fprintf(stderr, "disassembler_unit is NULL\n");
@@ -1967,8 +1967,8 @@ void disassemble_block(size_t len, bfd_byte data[len],
     }
 }
 
-void disassemble_single_instruction(uint32_t instr, uint32_t addr,
-                                    struct disassembler_unit *dunit)
+void trdb_disassemble_single_instruction(uint32_t instr, uint32_t addr,
+                                         struct disassembler_unit *dunit)
 {
     if (!dunit) {
         fprintf(stderr, "disassembler_unit is NULL\n");
@@ -2016,13 +2016,13 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
     free(data);
 }
 
-void disassemble_single_instruction_slow(uint32_t instr, uint32_t addr)
+void trdb_disassemble_single_instruction_slow(uint32_t instr, uint32_t addr)
 {
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
     dunit.dinfo = &dinfo;
 
-    init_disassembler_unit_for_pulp(&dunit, NULL);
+    trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 
-    disassemble_single_instruction(instr, addr, &dunit);
+    trdb_disassemble_single_instruction(instr, addr, &dunit);
 }

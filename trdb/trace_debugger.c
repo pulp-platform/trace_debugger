@@ -1293,7 +1293,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     /* find section belonging to start_address */
     bfd_vma start_address = abfd->start_address;
-    asection *section = get_section_for_vma(abfd, start_address);
+    asection *section = trdb_get_section_for_vma(abfd, start_address);
     if (!section) {
         err(c, "VMA not pointing to any section\n");
         status = -trdb_bad_vma;
@@ -1308,7 +1308,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     struct tr_instr dis_instr = {0};
 
     dunit.dinfo = &dinfo;
-    init_disassembler_unit(&dunit, abfd, no_aliases ? "no-aliases" : NULL);
+    trdb_init_disassembler_unit(&dunit, abfd, no_aliases ? "no-aliases" : NULL);
     /* advanced fprintf output handling */
     dunit.dinfo->fprintf_func = build_instr_fprintf;
     /* dunit.dinfo->stream = &instr; */
@@ -1357,7 +1357,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
          * appropriate section and remove the old one
          */
         if (pc >= section->vma + stop_offset || pc < section->vma) {
-            section = get_section_for_vma(abfd, pc);
+            section = trdb_get_section_for_vma(abfd, pc);
             if (!section) {
                 err(c, "VMA (PC) not pointing to any section\n");
                 status = -trdb_bad_vma;
@@ -1676,7 +1676,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * TODO: fix
              */
             if (pc >= section->vma + stop_offset || pc < section->vma) {
-                section = get_section_for_vma(abfd, pc);
+                section = trdb_get_section_for_vma(abfd, pc);
                 if (!section) {
                     err(c, "VMA (PC) not pointing to any section\n");
                     status = -trdb_bad_vma;
@@ -1853,7 +1853,8 @@ void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
                                (uintmax_t)trace[i].instr);
         (*dinfo->fprintf_func)(dinfo->stream, "%s",
                                trace[i].exception ? "TRAP!  " : "");
-        disassemble_single_instruction(trace[i].instr, trace[i].iaddr, dunit);
+        trdb_disassemble_single_instruction(trace[i].instr, trace[i].iaddr,
+                                            dunit);
     }
 }
 
@@ -1878,7 +1879,7 @@ void trdb_disassemble_instr(struct tr_instr *instr,
     (*dinfo->fprintf_func)(dinfo->stream, "%s",
                            instr->exception ? "TRAP!  " : "");
 
-    disassemble_single_instruction(instr->instr, instr->iaddr, dunit);
+    trdb_disassemble_single_instruction(instr->instr, instr->iaddr, dunit);
 }
 
 void trdb_disassemble_instr_with_bfd(struct trdb_ctx *c, struct tr_instr *instr,

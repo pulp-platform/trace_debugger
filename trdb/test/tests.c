@@ -93,7 +93,7 @@ static int test_disasm_bfd()
     /* Override the stream the disassembler outputs to */
     init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
     dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.print_address_func = riscv32_print_address;
+    dinfo.print_address_func = trdb_riscv32_print_address;
 
     dinfo.flavour = bfd_get_flavour(abfd);
     dinfo.arch = bfd_get_arch(abfd);
@@ -103,8 +103,8 @@ static int test_disasm_bfd()
 
     /* Tests for disassembly functions */
     if (TRDB_VERBOSE_TESTS) {
-        dump_target_list();
-        dump_bin_info(abfd);
+        trdb_dump_target_list();
+        trdb_dump_bin_info(abfd);
     }
 
     /* set up disassembly context */
@@ -117,11 +117,11 @@ static int test_disasm_bfd()
     }
     /* TODO: use this path also in relase mode, but less noisy */
     if (TRDB_VERBOSE_TESTS) {
-        dump_section_names(abfd);
+        trdb_dump_section_names(abfd);
 
         LOG_INFOT("num_sections: %d\n", bfd_count_sections(abfd));
-        disassemble_single_instruction(0x10, 0, &dunit);
-        bfd_map_over_sections(abfd, disassemble_section, &dunit);
+        trdb_disassemble_single_instruction(0x10, 0, &dunit);
+        bfd_map_over_sections(abfd, trdb_disassemble_section, &dunit);
     }
     bfd_close(abfd);
     return TRDB_SUCCESS;
@@ -146,7 +146,7 @@ static int test_trdb_dinfo_init(char *path)
         goto fail;
     }
     if (TRDB_VERBOSE_TESTS)
-        bfd_map_over_sections(abfd, disassemble_section, &dunit);
+        bfd_map_over_sections(abfd, trdb_disassemble_section, &dunit);
 
 fail:
     trdb_free_dinfo_with_bfd(c, abfd, &dunit);
@@ -582,7 +582,7 @@ static int test_disassemble_trace(const char *bin_path, const char *trace_path)
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
     dunit.dinfo = &dinfo;
-    init_disassembler_unit(&dunit, abfd, NULL);
+    trdb_init_disassembler_unit(&dunit, abfd, NULL);
 
     if (TRDB_VERBOSE_TESTS)
         trdb_disassemble_trace(samplecnt, *samples, &dunit);
@@ -755,7 +755,7 @@ int test_compress_cvs_trace(const char *trace_path)
     struct disassemble_info dinfo = {0};
     dunit.dinfo = &dinfo;
 
-    init_disassembler_unit_for_pulp(&dunit, NULL);
+    trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 
     LIST_HEAD(instr_list);
     LIST_HEAD(packet_list);

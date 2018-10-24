@@ -59,7 +59,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     struct disassemble_info dinfo = {0};
     dunit.dinfo = &dinfo;
 
-    init_disassembler_unit_for_pulp(&dunit, NULL);
+    trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 
     LIST_HEAD(instr_list);
     LIST_HEAD(packet_list);

@@ -193,7 +193,7 @@ static inline unsigned int riscv_instr_len(uint64_t instr)
  * PULP platform.
  * @param dinfo filled with information of the PULP platform
  */
-void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
+void trdb_init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
 
 /**
  * Initialize disassembler_unit with settings for the PULP platform.
@@ -201,8 +201,8 @@ void init_disassemble_info_for_pulp(struct disassemble_info *dinfo);
  * @param options configure the formatting behaviour or NULL
  * @return 0 on success, -1 otherwise
  */
-int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
-                                    char *options);
+int trdb_init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
+                                         char *options);
 
 /**
  * Initialize disassemble_info from libopcodes by grabbing data out of @p abfd.
@@ -215,8 +215,8 @@ int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
  * @param abfd the bfd representing the binary
  * @param options disassembly options passed to libopcodes
  */
-void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
-                                    char *options);
+void trdb_init_disassemble_info_from_bfd(struct disassemble_info *dinfo,
+                                         bfd *abfd, char *options);
 
 /**
  * Initialize disassembler_unit.
@@ -232,8 +232,8 @@ void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
  * dunit is NULL
  * @return -trdb_arch_support if architecture is not supported
  */
-int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
-                           char *options);
+int trdb_init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
+                                char *options);
 
 /**
  * Initialize disassembler_unit and its containing disassemble_info from
@@ -320,26 +320,26 @@ int trdb_symbol_at_address(bfd_vma vma, struct disassemble_info *inf);
  * @param section which section to print
  * @param ignored is ignored and only for compatiblity
  */
-void dump_section_header(bfd *abfd, asection *section, void *ignored);
+void trdb_dump_section_header(bfd *abfd, asection *section, void *ignored);
 
 /**
  * Print bfd architecuture information to stdout.
  *
  * @param abfd the bfd representing the binary
  */
-void dump_bin_info(bfd *abfd);
+void trdb_dump_bin_info(bfd *abfd);
 
 /**
  * Print all section names of bfd to stdout.
  *
  * @param abfd the bfd representing the binary
  */
-void dump_section_names(bfd *abfd);
+void trdb_dump_section_names(bfd *abfd);
 
 /**
  * Print all supported targets of the used libopcodes to stdout.
  */
-void dump_target_list();
+void trdb_dump_target_list();
 
 /**
  * Default #print_address_func used in disassemble_info, set by
@@ -351,7 +351,7 @@ void dump_target_list();
  * @param vma the virtual memory address where this instruction is located at
  * @param dinfo context of disassembly
  */
-void riscv32_print_address(bfd_vma vma, struct disassemble_info *dinfo);
+void trdb_riscv32_print_address(bfd_vma vma, struct disassemble_info *dinfo);
 
 /**
  * Return if vma is contained in the given section of abfd.
@@ -361,7 +361,7 @@ void riscv32_print_address(bfd_vma vma, struct disassemble_info *dinfo);
  * @param vma the virtual memory address to test for
  * @return whether @p vma is in contained in @p section
  */
-bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma);
+bool trdb_vma_in_section(bfd *abfd, asection *section, bfd_vma vma);
 
 /**
  * Return the section of @p abfd that contains the given @p vma or @c NULL.
@@ -370,7 +370,7 @@ bool vma_in_section(bfd *abfd, asection *section, bfd_vma vma);
  * @param vma the virtual memory address to
  * @return the section which contains @p vma or @c NULL
  */
-asection *get_section_for_vma(bfd *abfd, bfd_vma vma);
+asection *trdb_get_section_for_vma(bfd *abfd, bfd_vma vma);
 
 /**
  * Disassemble the given asection and print it calling fprintf_func.
@@ -380,7 +380,7 @@ asection *get_section_for_vma(bfd *abfd, bfd_vma vma);
  * @param abfd the bfd representing the binary
  * @param section the section to disassemble
  */
-void disassemble_section(bfd *abfd, asection *section, void *inf);
+void trdb_disassemble_section(bfd *abfd, asection *section, void *inf);
 
 /**
  * Disassemble @p len bytes of data pointed to by @p data with the given
@@ -390,8 +390,8 @@ void disassemble_section(bfd *abfd, asection *section, void *inf);
  * @param data raw data block to disassemble
  * @param dunit disassembly context
  */
-void disassemble_block(size_t len, bfd_byte data[len],
-                       struct disassembler_unit *dunit);
+void trdb_disassemble_block(size_t len, bfd_byte data[len],
+                            struct disassembler_unit *dunit);
 
 /**
  * Disassemble the given instr with the pretended address and disassembler_unit
@@ -401,8 +401,8 @@ void disassemble_block(size_t len, bfd_byte data[len],
  * @param addr the address where the instruction is located at
  * @param dunit disassembly context
  */
-void disassemble_single_instruction(uint32_t instr, uint32_t addr,
-                                    struct disassembler_unit *dunit);
+void trdb_disassemble_single_instruction(uint32_t instr, uint32_t addr,
+                                         struct disassembler_unit *dunit);
 
 /**
  * Disassemble the given instr with the pretended address and print it calling
@@ -413,7 +413,7 @@ void disassemble_single_instruction(uint32_t instr, uint32_t addr,
  * @param instr the raw instruction value up to 32 bits
  * @param addr the address where the instruction is located at
  */
-void disassemble_single_instruction_slow(uint32_t instr, uint32_t addr);
+void trdb_disassemble_single_instruction_slow(uint32_t instr, uint32_t addr);
 
 /**
  * Disassemble the given instruction, indicated by its address @p addr and the
