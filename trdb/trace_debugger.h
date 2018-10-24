@@ -27,6 +27,10 @@
 #ifndef __TRACE_DEBUGGER_H__
 #define __TRACE_DEBUGGER_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define PACKAGE "foo" /* quick hack for bfd if not using autotools */
 #include <stdbool.h>
 #include <inttypes.h>
@@ -484,10 +488,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
  * Outputs disassembled trace using fprintf_func in #disassembler_unit.dinfo.
  *
  * @param len length of trace
- * @param trace[len] an array of instructions, only #iaddr and #instr are needed
+ * @param trace an array of instructions, only #iaddr and #instr are needed
  * @param dunit the configured disassembler
  */
-void trdb_disassemble_trace(size_t len, struct tr_instr trace[len],
+void trdb_disassemble_trace(size_t len, struct tr_instr *trace,
                             struct disassembler_unit *dunit);
 
 /**
@@ -619,5 +623,9 @@ void trdb_free_instr_list(struct list_head *instr_list);
  *
  * 2 + 2 + 3 + 1 + 32 + 5 + 1 = 46
  */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
