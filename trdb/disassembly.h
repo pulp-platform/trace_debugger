@@ -210,6 +210,7 @@ int init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
  * The options string can be non-@c NULL to pass disassembler specific settings
  * to libopcodes. Currently supported is "no-aliases", which disassembles common
  * abbreviations for certain instructions.
+ *
  * @param dinfo filled with information from @p abfd
  * @param abfd the bfd representing the binary
  * @param options disassembly options passed to libopcodes
@@ -220,11 +221,16 @@ void init_disassemble_info_from_bfd(struct disassemble_info *dinfo, bfd *abfd,
 /**
  * Initialize disassembler_unit.
  *
- * A side from calling init_disassembler_info_from_bfd(), it also sets
- * #disassemble_fn to the architecture matching @p abfd.
+ * A side from calling init_disassemble_info_from_bfd(), it also sets
+ * #disassembler_unit.disassemble_fn to the architecture matching @p abfd.
+ *
  * @param dunit filled with information from @p abfd
  * @param abfd the bfd representing the binary
  * @param options disassembly options passed to libopcodes
+ * @return 0 on success, a negative error code otherwise
+ * @return -trdb_invalid if @p dunit or #disassembler_unit.dinfo in @p
+ * dunit is NULL
+ * @return -trdb_arch_support if architecture is not supported
  */
 int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
                            char *options);
@@ -232,9 +238,9 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
 /**
  * Initialize disassembler_unit and its containing disassemble_info from
  * libopcodes by grabbing meta data out of @p abfd. Furthermore it allocates
- * internal structures to allow #disassemble_fn in @p dunit to resolve addresses
- * to nearest symbols. TODO: trdb_ctx sets demangle, disassembly options and
- * more.
+ * internal structures to allow #disassembler_unit.disassemble_fn in @p
+ * dunit to resolve addresses to nearest symbols. TODO: trdb_ctx sets demangle,
+ * disassembly options and more.
  *
  * @param c the trace debugger context containing settings
  * @param abfd the bfd representing the binary
@@ -248,7 +254,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                               struct disassembler_unit *dunit);
 /**
  * Free the memory allocated to @p abfd and @p dunit by a call to
- * trdb_alloc_dinfo_with_bfd.
+ * trdb_alloc_dinfo_with_bfd().
  *
  * @param c the trace debugger context containing settings
  * @param abfd the bfd representing the binary
@@ -281,9 +287,9 @@ int trdb_get_disassembly_conf(struct disassembler_unit *dunit, uint32_t *conf);
 
 /**
  * A #print_address_func used in disassemble_info, set by
- * trdb_alloc_dinfo_with_bfd, which resolve addresses to symbols. This callback
- * is only well defined if its disassemble_info struct was initialized using
- * trdb_alloc_dinfo_with_bfd.
+ * trdb_alloc_dinfo_with_bfd(), which resolve addresses to symbols. This
+ * callback is only well defined if its disassemble_info struct was initialized
+ * using trdb_alloc_dinfo_with_bfd().
  *
  * This is a callback function, if registered, called by libopcodes to custom
  * format addresses. It can also be abused to print other information.
@@ -295,7 +301,7 @@ void trdb_print_address(bfd_vma vma, struct disassemble_info *inf);
 
 /**
  * A #symbol_at_address function used in disassemble_info, set by
- * trdb_alloc_dinfo_with_bfd.
+ * trdb_alloc_dinfo_with_bfd().
  *
  * This is a callback function, which gives libopcodes information about
  * specific addresses. Determines if the given address has a symbol associated

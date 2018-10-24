@@ -147,6 +147,9 @@ int init_disassembler_unit(struct disassembler_unit *dunit, bfd *abfd,
                            char *options)
 {
     /* initialize libopcodes disassembler */
+    if (!dunit)
+        return -trdb_invalid;
+
     struct disassemble_info *dinfo = dunit->dinfo;
     if (!dinfo)
         return -trdb_invalid;
