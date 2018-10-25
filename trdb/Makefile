@@ -47,8 +47,9 @@ INCLUDE_PATHS   = $(PULP_BINUTILS_PATH)/include \
 
 MORE_TAG_PATHS  = $(PULP_BINUTILS_PATH)/bfd
 
+LIBS            = libbfd.a libopcodes.a libiberty.a libz.a
 LDFLAGS		= $(addprefix -L, $(LIB_PATHS))
-LDLIBS		?= -l:libbfd.a -l:libopcodes.a -l:libiberty.a -l:libz.a -ldl
+LDLIBS		= $(addprefix -l:, $(LIBS)) -ldl -lc
 
 MAIN_SRCS	= $(wildcard main/*.c)
 MAIN_OBJS	= $(MAIN_SRCS:.c=.o)
@@ -67,8 +68,6 @@ OBJS		= $(SRCS:.c=.o)
 INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
 
 HEADERS		= $(wildcard *.h)
-HEADERS		+= $(wildcard lib/bfd/*.h)
-HEADERS		+= $(wildcard lib/include/*.h)
 
 BIN		= trdb
 TEST_BIN	= tests
@@ -151,11 +150,11 @@ $(BENCHMARK_BIN): $(OBJS) $(BENCHMARK_OBJS)
 
 $(SV_LIB).so: $(OBJS) $(DPI_OBJS)
 #	gcc -o $(SV_LIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)
-	ld -shared -E --exclude-libs ALL -o $(SV_LIB).so -lc $(LDFLAGS) \
+	ld -shared -E --exclude-libs ALL -o $(SV_LIB).so $(LDFLAGS) \
 		$(OBJS) $(DPI_OBJS) $(LDLIBS)
 
 $(LIB).so: $(OBJS) $(DPI_OBJS)
-	ld -shared -E --exclude-libs ALL -o $(LIB).so -lc $(LDFLAGS) \
+	ld -shared -E --exclude-libs ALL -o $(LIB).so $(LDFLAGS) \
 		$(OBJS) $(LDLIBS)
 
 $(STATIC_LIB).a: $(OBJS)
@@ -190,6 +189,10 @@ valgrind-test:
 .PHONY: valgrind-main
 valgrind-main:
 	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BIN)
+
+.PHONY: valgrind-benchmark
+valgrind-benchmark:
+	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BENCHMARK_BIN)
 
 # emacs tag generation
 .PHONY: TAGS
