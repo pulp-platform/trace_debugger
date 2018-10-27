@@ -31,11 +31,11 @@
 #include <string.h>
 #include <stdint.h>
 #include "bfd.h"
-#include "../utils.h"
-#include "../list.h"
-#include "../trace_debugger.h"
-#include "../disassembly.h"
-#include "../serialize.h"
+#include "utils.h"
+#include "list.h"
+#include "trace_debugger.h"
+#include "disassembly.h"
+#include "serialize.h"
 
 #define TRDB_NUM_ARGS 1
 

@@ -28,16 +28,16 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include "../list.h"
-#include "../trace_debugger.h"
-#include "../trace_debugger.c"
-#include "../disassembly.h"
-#include "../disassembly.c"
-#include "../utils.h"
-#include "../utils.c"
-#include "../serialize.h"
-#include "../serialize.c"
-#include "../error.c"
+#include "list.h"
+#include "trace_debugger.h"
+#include "trace_debugger.c"
+#include "disassembly.h"
+#include "disassembly.c"
+#include "utils.h"
+#include "utils.c"
+#include "serialize.h"
+#include "serialize.c"
+#include "error.c"
 
 #define TRDB_SUCCESS 0
 #define TRDB_FAIL -1

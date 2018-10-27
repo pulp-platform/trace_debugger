@@ -28,10 +28,10 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../utils.h"
-#include "../trace_debugger.h"
-#include "../disassembly.h"
-#include "../serialize.h"
+#include "utils.h"
+#include "trace_debugger.h"
+#include "disassembly.h"
+#include "serialize.h"
 
 struct result {
     char *name;
