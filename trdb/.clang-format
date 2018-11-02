@@ -17,7 +17,7 @@ SpaceAfterCStyleCast: false
 MaxEmptyLinesToKeep: 2
 BreakBeforeBinaryOperators: NonAssignment
 BreakStringLiterals: false
-SortIncludes:    false
+SortIncludes: false
 ContinuationIndentWidth: 4
 ColumnLimit: 80
 IndentPPDirectives: AfterHash
@@ -33,3 +33,4 @@ MaxEmptyLinesToKeep: 1
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
+...
