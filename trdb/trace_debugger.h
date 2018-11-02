@@ -451,6 +451,7 @@ void trdb_get_packet_stats(struct trdb_ctx *ctx,
  * @param instr the next instruction in the sequence
  * @return 0 or a positive number of generated packets on success, a negative
  * error code otherwise
+ * @return -trdb_invalid if @p ctx, @p packet_list or @p instr is NULL
  * @return -trdb_bad_instr if an unsupported instruction was passed through @p
  * instr
  * @return -trdb_unimplemented if an unimplemented variable generated a packet

@@ -405,14 +405,15 @@ size_t trdb_get_instrbits(struct trdb_ctx *ctx)
 void trdb_get_packet_stats(struct trdb_ctx *ctx,
                            struct trdb_packet_stats *stats)
 {
-    stats->packets = ctx->stats.packets;
-    stats->addr_only_packets = ctx->stats.addr_only_packets;
-    stats->exception_packets = ctx->stats.exception_packets;
-    stats->start_packets = ctx->stats.start_packets;
-    stats->diff_packets = ctx->stats.diff_packets;
-    stats->abs_packets = ctx->stats.abs_packets;
-    stats->bmap_full_packets = ctx->stats.bmap_full_packets;
-    stats->bmap_full_addr_packets = ctx->stats.bmap_full_addr_packets;
+    struct trdb_stats *rstats = &ctx->stats;
+    stats->packets = rstats->packets;
+    stats->addr_only_packets = rstats->addr_only_packets;
+    stats->exception_packets = rstats->exception_packets;
+    stats->start_packets = rstats->start_packets;
+    stats->diff_packets = rstats->diff_packets;
+    stats->abs_packets = rstats->abs_packets;
+    stats->bmap_full_packets = rstats->bmap_full_packets;
+    stats->bmap_full_addr_packets = rstats->bmap_full_addr_packets;
 }
 
 static bool is_branch(uint32_t instr)
@@ -676,6 +677,8 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
     if (!ctx || !tr || !branch_map || !tc_instr)
         return -trdb_internal;
 
+    struct trdb_stats *stats = &ctx->stats;
+
     if (branch_map->cnt == 0) {
         tr->format = F_ADDR_ONLY;
         tr->branches = branch_map->cnt;
@@ -696,11 +699,11 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             tr->address = diff;
             tr->length = FORMATLEN + keep;
             /* record distribution */
-            ctx->stats.sext_bits[keep - 1]++;
+            stats->sext_bits[keep - 1]++;
             if (tr->address == 0 || tr->address == -1)
-                ctx->stats.zo_addresses++;
+                stats->zo_addresses++;
         }
-        ctx->stats.addr_only_packets++;
+        stats->addr_only_packets++;
         assert(branch_map->bits == 0);
     } else {
         if (branch_map->full && is_u_discontinuity)
@@ -716,7 +719,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (branch_map->full) {
                 if (is_u_discontinuity) {
                     tr->length += XLEN;
-                    ctx->stats.bmap_full_addr_packets++;
+                    stats->bmap_full_addr_packets++;
                 } else {
                     /* we don't need to record the address, indicate by settings
                      * branchcnt to 0
@@ -724,10 +727,10 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                     tr->length += 0;
                     tr->branches = 0;
                 }
-                ctx->stats.bmap_full_packets++;
+                stats->bmap_full_packets++;
             } else {
                 tr->length += XLEN;
-                ctx->stats.abs_packets++;
+                stats->abs_packets++;
             }
         } else {
             /* In this mode we try to compress the instruction address by taking
@@ -749,18 +752,18 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                 /* this should only be relevant for serialization */
                 /* tr->address = MASK_FROM(keep) & diff; */
                 tr->address = diff;
-                ctx->stats.sext_bits[keep - 1]++;
+                stats->sext_bits[keep - 1]++;
             } else {
                 keep = XLEN - lead + 1;
                 tr->format = F_BRANCH_FULL;
                 /* this should only be relevant for serialization */
                 /* tr->address = MASK_FROM(keep) & full; */
                 tr->address = full;
-                ctx->stats.sext_bits[keep - 1]++;
+                stats->sext_bits[keep - 1]++;
             }
 
             if (tr->address == 0 || tr->address == -1)
-                ctx->stats.zo_addresses++;
+                stats->zo_addresses++;
             uint32_t sext = sign_extendable_bits64(
                 ((uint64_t)tr->address << XLEN) |
                 ((uint64_t)branch_map->bits
@@ -776,21 +779,21 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             if (branch_map->full) {
                 if (is_u_discontinuity) {
                     tr->length += keep;
-                    ctx->stats.bmap_full_addr_packets++;
+                    stats->bmap_full_addr_packets++;
                 } else {
                     /* we don't need to record the address, indicate by settings
                      * branchcnt to 0
                      */
                     tr->length += 0;
                     tr->branches = 0;
-                    ctx->stats.bmap_full_packets++;
+                    stats->bmap_full_packets++;
                 }
             } else {
                 tr->length += keep;
                 if (use_differential)
-                    ctx->stats.diff_packets++;
+                    stats->diff_packets++;
                 else
-                    ctx->stats.abs_packets++;
+                    stats->abs_packets++;
             }
         }
         tr->branch_map = branch_map->bits;
@@ -835,10 +838,16 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
                              struct tr_instr *instr)
 {
     int status = 0;
+    if (!ctx || !packet_list || !instr)
+        return -trdb_invalid;
+
+    struct trdb_stats *stats = &ctx->stats;
+    struct trdb_config *config = &ctx->config;
+
     int generated_packet = 0;
-    bool full_address = ctx->config.full_address;
-    bool pulp_vector_table_packet = ctx->config.pulp_vector_table_packet;
-    bool implicit_ret = ctx->config.implicit_ret;
+    bool full_address = config->full_address;
+    bool pulp_vector_table_packet = config->pulp_vector_table_packet;
+    bool implicit_ret = config->implicit_ret;
 
     /* for each cycle */
     // TODO: fix this hack by doing unqualified instead
@@ -899,7 +908,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         goto fail;
     }
 
-    if (filter->resync_cnt++ == ctx->config.resync_max) {
+    if (filter->resync_cnt++ == config->resync_max) {
         filter->resync_pend = true;
         filter->resync_cnt = 0;
     }
@@ -1077,14 +1086,14 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     *thisc = *nextc;
 
     /* TODO: no 64 bit instr support */
-    ctx->stats.instrbits += instr->compressed ? 16 : 32;
-    ctx->stats.instrs++;
+    stats->instrbits += instr->compressed ? 16 : 32;
+    stats->instrs++;
     if (generated_packet) {
         *branch_map = (struct branch_map_state){0};
-        ctx->stats.payloadbits += (tr->length);
-        ctx->stats.packets++;
+        stats->payloadbits += (tr->length);
+        stats->packets++;
 
-        if (ctx->config.full_statistics) {
+        if (config->full_statistics) {
             /* figure out pulp payload by serializing and couting bits */
             uint8_t bin[16] = {0};
             size_t bitcnt = 0;
@@ -1092,7 +1101,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
                 dbg(ctx, "failed to count bits of pulp packet\n");
             }
             /* we have to round up to the next full byte */
-            ctx->stats.pulpbits += ((bitcnt / 8) + (bitcnt % 8 != 0)) * 8;
+            stats->pulpbits += ((bitcnt / 8) + (bitcnt % 8 != 0)) * 8;
         }
     }
 
@@ -1287,9 +1296,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
      * host format
      */
     /* TODO: supports only statically linked elf executables */
-    bool full_address = c->config.full_address;
-    bool implicit_ret = c->config.implicit_ret;
-    bool no_aliases = c->config.no_aliases;
+    struct trdb_config *config = &c->config;
+    bool full_address = config->full_address;
+    bool implicit_ret = config->implicit_ret;
+    bool no_aliases = config->no_aliases;
 
     /* find section belonging to start_address */
     bfd_vma start_address = abfd->start_address;
