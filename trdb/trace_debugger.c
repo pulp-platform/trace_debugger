@@ -31,6 +31,7 @@
 #include "disassembly.h"
 #include "serialize.h"
 #include "list.h"
+#include "kvec.h"
 #include "utils.h"
 
 struct disassembler_unit;
@@ -127,6 +128,15 @@ struct filter_state {
     /* uint32_t resync_nh = 0;  */
 };
 
+struct trdb_compress {
+    struct trdb_state lastc;
+    struct trdb_state thisc;
+    struct trdb_state nextc;
+    struct branch_map_state branch_map;
+    struct filter_state filter;
+    uint32_t last_iaddr; /* TODO: make this work with 64 bit */
+};
+
 /* Current state of the cpu during decompression. Allows one to
  * precisely emit a sequence  tr_instr. Handles the exception stack
  * (well here we assume that programs actually do nested exception
@@ -137,18 +147,10 @@ struct filter_state {
  * the interrupt how many instructions of the loop are executed to
  * figure out in which loop number we got interrupted
  */
-struct trdb_dec_state {
-    /* absolute loop addresses */
-    /* uint32_t lp_start0; */
-    /* uint32_t lp_end0; */
-    /* uint32_t lp_cnt0; */
-    /* uint32_t lp_start1; */
-    /* uint32_t lp_end1; */
-    /* uint32_t lp_cnt1; */
-    /* nested interrupt stacks for each privilege mode*/
-    /* uint32_t m_exc_stack; */
-    /* uint32_t s_exc_stack; */
-    /* uint32_t u_exc_stack; */
+struct trdb_decompress {
+    /* TODO: loop addresses handling*/
+    /* TODO: nested interrupt stacks for each privilege mode*/
+    kvec_t(uint32_t) call_stack;
     /* record current privilege level */
     uint32_t privilege : PRIVLEN;
     uint32_t last_packet_addr;
@@ -181,13 +183,10 @@ struct trdb_stats {
 struct trdb_ctx {
     /* specific settings for compression/decompression */
     struct trdb_config config;
-    /* state used for the compression/decompression */
-    struct trdb_state lastc;
-    struct trdb_state thisc;
-    struct trdb_state nextc;
-    struct branch_map_state branch_map;
-    struct filter_state filter;
-    uint32_t last_iaddr; /* TODO: make this work with 64 bit */
+    /* state used for compression */
+    struct trdb_compress *cmp;
+    /* state used for decompression */
+    struct trdb_decompress *dec;
     /* state used for disassembling */
     struct tr_instr *dis_instr;
     struct disassembler_unit *dunit;
@@ -242,12 +241,12 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
                                        .pulp_vector_table_packet = true,
                                        .full_statistics = true};
 
-    ctx->lastc = (struct trdb_state){.privilege = 7};
-    ctx->thisc = (struct trdb_state){.privilege = 7};
-    ctx->nextc = (struct trdb_state){.privilege = 7};
-    ctx->branch_map = (struct branch_map_state){0};
-    ctx->filter = (struct filter_state){0};
-    ctx->last_iaddr = 0;
+    ctx->cmp->lastc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->thisc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->nextc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->branch_map = (struct branch_map_state){0};
+    ctx->cmp->filter = (struct filter_state){0};
+    ctx->cmp->last_iaddr = 0;
     ctx->stats = (struct trdb_stats){0};
 }
 
@@ -259,8 +258,9 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
                                        .pulp_vector_table_packet = true,
                                        .full_statistics = true};
 
-    ctx->branch_map = (struct branch_map_state){0};
-    ctx->filter = (struct filter_state){0};
+    *ctx->dec = (struct trdb_decompress){0};
+    ctx->dec->branch_map = (struct branch_map_state){0};
+    ctx->cmp->filter = (struct filter_state){0};
     ctx->stats = (struct trdb_stats){0};
 }
 
@@ -276,13 +276,27 @@ struct trdb_ctx *trdb_new()
                                        .no_aliases = true,
                                        .pulp_vector_table_packet = true,
                                        .full_statistics = true};
+    ctx->cmp = malloc(sizeof(*ctx->cmp));
+    if (!ctx->cmp) {
+        free(ctx);
+        return NULL;
+    }
+    ctx->cmp->lastc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->thisc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->nextc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->branch_map = (struct branch_map_state){0};
+    ctx->cmp->filter = (struct filter_state){0};
+    ctx->cmp->last_iaddr = 0;
 
-    ctx->lastc = (struct trdb_state){.privilege = 7};
-    ctx->thisc = (struct trdb_state){.privilege = 7};
-    ctx->nextc = (struct trdb_state){.privilege = 7};
-    ctx->branch_map = (struct branch_map_state){0};
-    ctx->filter = (struct filter_state){0};
-    ctx->last_iaddr = 0;
+    ctx->dec = malloc(sizeof(*ctx->dec));
+    if (!ctx->dec) {
+        free(ctx->cmp);
+        free(ctx);
+        return NULL;
+    }
+    *ctx->dec = (struct trdb_decompress){0};
+    kv_init(ctx->dec->call_stack);
+
     ctx->stats = (struct trdb_stats){0};
 
     ctx->log_fn = log_stderr;
@@ -304,6 +318,10 @@ void trdb_free(struct trdb_ctx *ctx)
     if (!ctx)
         return;
     info(ctx, "context %p released\n", ctx);
+    free(ctx->cmp);
+    if (!ctx->dec)
+        kv_destroy(ctx->dec->call_stack);
+    free(ctx->dec);
     free(ctx);
 }
 
@@ -851,18 +869,18 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 
     /* for each cycle */
     // TODO: fix this hack by doing unqualified instead
-    struct trdb_state *lastc = &ctx->lastc;
-    struct trdb_state *thisc = &ctx->thisc;
-    struct trdb_state *nextc = &ctx->nextc;
+    struct trdb_state *lastc = &ctx->cmp->lastc;
+    struct trdb_state *thisc = &ctx->cmp->thisc;
+    struct trdb_state *nextc = &ctx->cmp->nextc;
 
     nextc->instr = *instr;
 
-    struct tr_instr *nc_instr = &ctx->nextc.instr;
-    struct tr_instr *tc_instr = &ctx->thisc.instr;
-    struct tr_instr *lc_instr = &ctx->lastc.instr;
+    struct tr_instr *nc_instr = &ctx->cmp->nextc.instr;
+    struct tr_instr *tc_instr = &ctx->cmp->thisc.instr;
+    struct tr_instr *lc_instr = &ctx->cmp->lastc.instr;
 
-    struct branch_map_state *branch_map = &ctx->branch_map;
-    struct filter_state *filter = &ctx->filter;
+    struct branch_map_state *branch_map = &ctx->cmp->branch_map;
+    struct filter_state *filter = &ctx->cmp->filter;
 
     thisc->halt = false;
     /* test for qualification by filtering */
@@ -878,7 +896,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     /* last address we emitted in packet, needed to compute differential
      * addresses
      */
-    uint32_t *last_iaddr = &ctx->last_iaddr;
+    uint32_t *last_iaddr = &ctx->cmp->last_iaddr;
 
     /* TODO: clean this up, proper initial state per round required */
     thisc->emitted_exception_sync = false;
@@ -1314,7 +1332,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
     /*TODO: move this into trdb_ctx so that we can continuously decode pieces?*/
-    struct trdb_dec_state dec_ctx = {.privilege = 7};
+    struct trdb_decompress dec_ctx = {.privilege = 7};
     struct tr_instr dis_instr = {0};
 
     dunit.dinfo = &dinfo;
