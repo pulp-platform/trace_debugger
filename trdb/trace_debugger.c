@@ -624,6 +624,7 @@ static bool pulp_differential_addr(int *lead, uint32_t absolute,
     return diff > abs; /* on tie we prefer absolute */
 }
 
+/* Set @p tr to contain an exception packet. */
 static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
                                   struct tr_instr *lc_instr,
                                   struct tr_instr *tc_instr,
@@ -634,6 +635,10 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
     tr->context = 0;              /* TODO: what comes here? */
     tr->privilege = tc_instr->priv;
 
+    /* if we happen to generate a packet when when the pc points to a branch, we
+     * have to record this in the branch field, since this branch won't be in
+     * any preceding or following packet that contains a branch map
+     */
     if (is_branch(tc_instr->instr) &&
         !branch_taken(tc_instr->compressed, tc_instr->iaddr, nc_instr->iaddr))
         tr->branch = 1;
@@ -653,6 +658,7 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
     c->stats.exception_packets++;
 }
 
+/* Set @p tr to contain a start packet. */
 static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
                               struct tr_instr *tc_instr,
                               struct tr_instr *nc_instr)
@@ -661,6 +667,9 @@ static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
     tr->subformat = SF_START; /* start */
     tr->context = 0;          /* TODO: what comes here? */
     tr->privilege = tc_instr->priv;
+    /* again, this information won't be in any preceding or following branch map
+     * so we have to put in here. See emit_exception_packet() for details.
+     */
     if (is_branch(tc_instr->instr) &&
         !branch_taken(tc_instr->compressed, tc_instr->iaddr, nc_instr->iaddr))
         tr->branch = 1;
@@ -671,6 +680,7 @@ static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
     c->stats.start_packets++;
 }
 
+/* Sign extend a value @p val with @p bits to 32 bits. */
 static uint32_t sext32(uint32_t val, uint32_t bit)
 {
     if (bit == 0)
@@ -685,6 +695,12 @@ static uint32_t sext32(uint32_t val, uint32_t bit)
     return (val ^ m) - m;
 }
 
+/* Set @p tr to contain a packet that records the instruction flow until @p
+ * tc_instr. That means we have to remember all taken/not taken branches (if
+ * any) and the current pc. For the pc we try to figure out if we want to keep
+ * the difference to the last packet's address or the current absolute address,
+ * depending on which one needs less bits to represent.
+ */
 static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                                         struct tr_packet *tr,
                                         struct branch_map_state *branch_map,
@@ -697,6 +713,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 
     struct trdb_stats *stats = &ctx->stats;
 
+    /* we don't have any branches to keep track of */
     if (branch_map->cnt == 0) {
         tr->format = F_ADDR_ONLY;
         tr->branches = branch_map->cnt;
@@ -821,6 +838,11 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
     return 0;
 }
 
+/* Set @p tr to contain a packet with a full branch map. This packet is special
+ * since we don't need to remember the current pc, because this function call is
+ * not initiated due to hitting some discontinuity or anything else that
+ * requires to "flush" out the current instruction flow.
+ */
 static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
                                  struct branch_map_state *branch_map)
 {
@@ -1146,6 +1168,9 @@ fail_malloc:
         return status;
 }
 
+/* Try to read instruction at @p pc into @p instr. It uses read_memory_func()
+ * which is set using libopcodes.
+ */
 static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
                              struct disassemble_info *dinfo)
 {
@@ -1170,9 +1195,9 @@ static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
     return status;
 }
 
-/* The decoding algorithm tries to recover as much information as possible from
- * the packets. Additionaly it also disassembles the instruction bits given the
- * context (address, binary).
+/* Use libopcodes to disassemble @p instr at address @p pc. Any potential error
+ * is signaled in @p status. The decoding algorithm tries to recover as much
+ * information as possible from the packets.
  */
 static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
                              struct tr_instr *instr,
@@ -1226,7 +1251,7 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
     return instr_size;
 }
 
-/* libopcodes only knows how to call a fprintf based callback function. We abuse
+/* Libopcodes only knows how to call a fprintf based callback function. We abuse
  * it by passing through the void pointer our custom data (instead of a stream).
  * This ugly hack doesn't seem to be used by just me.
  */
@@ -1250,6 +1275,7 @@ static int build_instr_fprintf(void *stream, const char *format, ...)
     return rv;
 }
 
+/* Free up any resources we allocated for disassembling */
 static void free_section_for_debugging(struct disassemble_info *dinfo)
 {
     if (!dinfo)
@@ -1260,6 +1286,7 @@ static void free_section_for_debugging(struct disassemble_info *dinfo)
     dinfo->section = NULL;
 }
 
+/* Load the section given by @p section from @p abfd into @p dinfo. */
 static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
                                        asection *section,
                                        struct disassemble_info *dinfo)
@@ -1287,6 +1314,7 @@ static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
     return 0;
 }
 
+/* Allocate memory and the new instruction @p instr to @p instr_list. */
 static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
                      struct tr_instr *instr)
 {
