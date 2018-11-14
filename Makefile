@@ -49,7 +49,7 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
 DPINAME			= trdb/dpi/autogen_trdb_sv.h
 DPISRC			= $(RTLSRC_TB_PKG)
-GMLIB			= trdb/libtrdb
+SV_LIB			= trdb/libtrdbsv
 
 # rtl related targets
 .PHONY: lint
@@ -91,6 +91,10 @@ c-all:
 c-lib:
 	$(MAKE) -C trdb lib
 
+.PHONY: c-sv-lib
+c-sv-lib:
+	$(MAKE) -C trdb sv-lib
+
 .PHONY: c-run
 c-run:
 	$(MAKE) -C trdb run
@@ -123,13 +127,13 @@ dpiheader: tb-all
 # run tb and exit
 .PHONY: tb-run
 tb-run:
-	$(VSIM) -work $(VWORK) -sv_lib $(GMLIB) $(VSIM_FLAGS) \
+	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do 'source $(VSIM_SCRIPT); exit -f'
 
 # run tb and drop into interactive shell
 .PHONY: tb-run-sh
 tb-run-sh:
-	$(VSIM) -work $(VWORK) -sv_lib $(GMLIB) $(VSIM_FLAGS) \
+	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do $(VSIM_SCRIPT)
 
 # run tb with simulator gui
