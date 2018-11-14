@@ -183,156 +183,156 @@ fail:
     return status;
 }
 
-static int test_trdb_serialize_packet(uint32_t shift)
-{
-    int status = TRDB_SUCCESS;
-    struct trdb_ctx *c = trdb_new();
-    struct tr_packet packet = {0};
+/* static int test_trdb_serialize_packet(uint32_t shift) */
+/* { */
+/*     int status = TRDB_SUCCESS; */
+/*     struct trdb_ctx *c = trdb_new(); */
+/*     struct tr_packet packet = {0}; */
 
-    /* Testing F_BRANCH_FULL packet with full branch map */
-    packet = (struct tr_packet){.msg_type = 2,
-                                .format = F_BRANCH_FULL,
-                                .branches = 31,
-                                .branch_map = 0x7fffffff,
-                                .address = 0xaadeadbe};
-    /*                    0xf2,7 + 1, 31-7-8, 31-7-8-8, 31-7-8-8-8*/
-    uint8_t expected0[] = {0xf2, 0xff, 0xff, 0xff, 0xff,
-                           0xbe, 0xad, 0xde, 0xaa, 0x00};
-    shiftl_array(expected0, TRDB_ARRAY_SIZE(expected0), shift);
+/*     /\* Testing F_BRANCH_FULL packet with full branch map *\/ */
+/*     packet = (struct tr_packet){.msg_type = 2, */
+/*                                 .format = F_BRANCH_FULL, */
+/*                                 .branches = 31, */
+/*                                 .branch_map = 0x7fffffff, */
+/*                                 .address = 0xaadeadbe}; */
+/*     /\*                    0xf2,7 + 1, 31-7-8, 31-7-8-8, 31-7-8-8-8*\/ */
+/*     uint8_t expected0[] = {0xf2, 0xff, 0xff, 0xff, 0xff, */
+/*                            0xbe, 0xad, 0xde, 0xaa, 0x00}; */
+/*     shiftl_array(expected0, TRDB_ARRAY_SIZE(expected0), shift); */
 
-    /* this is surely enough space */
-    uint8_t *bin = malloc(sizeof(struct tr_packet));
-    memset(bin, 0, sizeof(struct tr_packet));
+/*     /\* this is surely enough space *\/ */
+/*     uint8_t *bin = malloc(sizeof(struct tr_packet)); */
+/*     memset(bin, 0, sizeof(struct tr_packet)); */
 
-    if (!bin) {
-        perror("malloc");
-        status = TRDB_FAIL;
-        goto fail;
-    }
+/*     if (!bin) { */
+/*         perror("malloc"); */
+/*         status = TRDB_FAIL; */
+/*         goto fail; */
+/*     } */
 
-    size_t bitcnt = 0;
-    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, shift, bin)) {
-        LOG_ERRT("Packet conversion failed\n");
-        status = TRDB_FAIL;
-    }
-    if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
-        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
-        status = TRDB_FAIL;
-    }
-    if (memcmp(bin, expected0, TRDB_ARRAY_SIZE(expected0))) {
-        LOG_ERRT("Packet bits don't match\n");
-        status = TRDB_FAIL;
-    }
+/*     size_t bitcnt = 0; */
+/*     if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, shift, bin)) { */
+/*         LOG_ERRT("Packet conversion failed\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) { */
+/*         LOG_ERRT("Wrong bit count value: %zu\n", bitcnt); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (memcmp(bin, expected0, TRDB_ARRAY_SIZE(expected0))) { */
+/*         LOG_ERRT("Packet bits don't match\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
 
-    /* Testing F_BRANCH_FULL packet with non-full branch map */
-    packet = (struct tr_packet){.msg_type = 2,
-                                .format = F_BRANCH_FULL,
-                                .branches = 25,
-                                .branch_map = 0x1ffffff,
-                                .address = 0xaadeadbe};
+/*     /\* Testing F_BRANCH_FULL packet with non-full branch map *\/ */
+/*     packet = (struct tr_packet){.msg_type = 2, */
+/*                                 .format = F_BRANCH_FULL, */
+/*                                 .branches = 25, */
+/*                                 .branch_map = 0x1ffffff, */
+/*                                 .address = 0xaadeadbe}; */
 
-    /*                           7     8     8      2 */
-    uint8_t expected1[] = {0x92, 0xff, 0xff, 0xff, 0xfb,
-                           0xb6, 0x7a, 0xab, 0x2,  0x00};
-    memset(bin, 0, sizeof(struct tr_packet));
-    bitcnt = 0;
+/*     /\*                           7     8     8      2 *\/ */
+/*     uint8_t expected1[] = {0x92, 0xff, 0xff, 0xff, 0xfb, */
+/*                            0xb6, 0x7a, 0xab, 0x2,  0x00}; */
+/*     memset(bin, 0, sizeof(struct tr_packet)); */
+/*     bitcnt = 0; */
 
-    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
-        LOG_ERRT("Packet conversion failed\n");
-        status = TRDB_FAIL;
-    }
-    if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) {
-        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
-        status = TRDB_FAIL;
-    }
-    if (memcmp(bin, expected1, TRDB_ARRAY_SIZE(expected1))) {
-        LOG_ERRT("Packet bits don't match\n");
-        status = TRDB_FAIL;
-    }
+/*     if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) { */
+/*         LOG_ERRT("Packet conversion failed\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (bitcnt != (2 + 2 + 5 + branch_map_len(packet.branches) + XLEN)) { */
+/*         LOG_ERRT("Wrong bit count value: %zu\n", bitcnt); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (memcmp(bin, expected1, TRDB_ARRAY_SIZE(expected1))) { */
+/*         LOG_ERRT("Packet bits don't match\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
 
-    /* Testing F_ADDR_ONLY packet */
-    packet = (struct tr_packet){
-        .msg_type = 2, .format = F_ADDR_ONLY, .address = 0xdeadbeef};
+/*     /\* Testing F_ADDR_ONLY packet *\/ */
+/*     packet = (struct tr_packet){ */
+/*         .msg_type = 2, .format = F_ADDR_ONLY, .address = 0xdeadbeef}; */
 
-    /*                           7     8     8      2 */
-    uint8_t expected2[] = {0xfa, 0xee, 0xdb, 0xea, 0x0d, 0x00};
-    memset(bin, 0, sizeof(struct tr_packet));
-    bitcnt = 0;
+/*     /\*                           7     8     8      2 *\/ */
+/*     uint8_t expected2[] = {0xfa, 0xee, 0xdb, 0xea, 0x0d, 0x00}; */
+/*     memset(bin, 0, sizeof(struct tr_packet)); */
+/*     bitcnt = 0; */
 
-    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
-        LOG_ERRT("Packet conversion failed\n");
-        status = TRDB_FAIL;
-    }
-    if (bitcnt != (2 + 2 + XLEN)) {
-        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
-        status = TRDB_FAIL;
-    }
-    if (memcmp(bin, expected2, TRDB_ARRAY_SIZE(expected2))) {
-        LOG_ERRT("Packet bits don't match\n");
-        status = TRDB_FAIL;
-    }
+/*     if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) { */
+/*         LOG_ERRT("Packet conversion failed\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (bitcnt != (2 + 2 + XLEN)) { */
+/*         LOG_ERRT("Wrong bit count value: %zu\n", bitcnt); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (memcmp(bin, expected2, TRDB_ARRAY_SIZE(expected2))) { */
+/*         LOG_ERRT("Packet bits don't match\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
 
-    /* Testing F_SYNC start packet */
-    packet = (struct tr_packet){.msg_type = 2,
-                                .format = F_SYNC,
-                                .subformat = SF_START,
-                                .privilege = 3,
-                                .branch = 1,
-                                .address = 0xdeadbeef};
+/*     /\* Testing F_SYNC start packet *\/ */
+/*     packet = (struct tr_packet){.msg_type = 2, */
+/*                                 .format = F_SYNC, */
+/*                                 .subformat = SF_START, */
+/*                                 .privilege = 3, */
+/*                                 .branch = 1, */
+/*                                 .address = 0xdeadbeef}; */
 
-    /*                           7     8     8      2 */
-    uint8_t expected3[] = {0xce, 0xf8, 0xee, 0xdb, 0xea, 0x0d, 0x00};
-    memset(bin, 0, sizeof(struct tr_packet));
-    bitcnt = 0;
+/*     /\*                           7     8     8      2 *\/ */
+/*     uint8_t expected3[] = {0xce, 0xf8, 0xee, 0xdb, 0xea, 0x0d, 0x00}; */
+/*     memset(bin, 0, sizeof(struct tr_packet)); */
+/*     bitcnt = 0; */
 
-    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
-        LOG_ERRT("Packet conversion failed\n");
-        status = TRDB_FAIL;
-    }
-    if (bitcnt != (6 + PRIVLEN + 1 + XLEN)) {
-        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
-        status = TRDB_FAIL;
-    }
-    if (memcmp(bin, expected3, TRDB_ARRAY_SIZE(expected3))) {
-        LOG_ERRT("Packet bits don't match\n");
-        status = TRDB_FAIL;
-    }
+/*     if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) { */
+/*         LOG_ERRT("Packet conversion failed\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (bitcnt != (6 + PRIVLEN + 1 + XLEN)) { */
+/*         LOG_ERRT("Wrong bit count value: %zu\n", bitcnt); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (memcmp(bin, expected3, TRDB_ARRAY_SIZE(expected3))) { */
+/*         LOG_ERRT("Packet bits don't match\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
 
-    /* Testing F_SYNC exception packet */
-    packet = (struct tr_packet){.msg_type = 2,
-                                .format = F_SYNC,
-                                .subformat = SF_EXCEPTION,
-                                .privilege = 3,
-                                .branch = 1,
-                                .address = 0xdeadbeef,
-                                .ecause = 0x1a,
-                                .interrupt = 1,
-                                .tval = 0xfeebdeed};
+/*     /\* Testing F_SYNC exception packet *\/ */
+/*     packet = (struct tr_packet){.msg_type = 2, */
+/*                                 .format = F_SYNC, */
+/*                                 .subformat = SF_EXCEPTION, */
+/*                                 .privilege = 3, */
+/*                                 .branch = 1, */
+/*                                 .address = 0xdeadbeef, */
+/*                                 .ecause = 0x1a, */
+/*                                 .interrupt = 1, */
+/*                                 .tval = 0xfeebdeed}; */
 
-    /* 0x3fbaf7bb7adeadbeef8de */
-    uint8_t expected4[] = {0xde, 0xf8, 0xee, 0xdb, 0xea, 0xad,
-                           0xb7, 0x7b, 0xaf, 0xfb, 0x3,  0x00};
-    memset(bin, 0, sizeof(struct tr_packet));
-    bitcnt = 0;
+/*     /\* 0x3fbaf7bb7adeadbeef8de *\/ */
+/*     uint8_t expected4[] = {0xde, 0xf8, 0xee, 0xdb, 0xea, 0xad, */
+/*                            0xb7, 0x7b, 0xaf, 0xfb, 0x3,  0x00}; */
+/*     memset(bin, 0, sizeof(struct tr_packet)); */
+/*     bitcnt = 0; */
 
-    if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) {
-        LOG_ERRT("Packet conversion failed\n");
-        status = TRDB_FAIL;
-    }
-    if (bitcnt != (6 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN)) {
-        LOG_ERRT("Wrong bit count value: %zu\n", bitcnt);
-        status = TRDB_FAIL;
-    }
-    if (memcmp(bin, expected4, TRDB_ARRAY_SIZE(expected4))) {
-        LOG_ERRT("Packet bits don't match\n");
-        status = TRDB_FAIL;
-    }
+/*     if (trdb_pulp_serialize_packet(c, &packet, &bitcnt, 0, bin)) { */
+/*         LOG_ERRT("Packet conversion failed\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (bitcnt != (6 + PRIVLEN + 1 + XLEN + CAUSELEN + 1 + XLEN)) { */
+/*         LOG_ERRT("Wrong bit count value: %zu\n", bitcnt); */
+/*         status = TRDB_FAIL; */
+/*     } */
+/*     if (memcmp(bin, expected4, TRDB_ARRAY_SIZE(expected4))) { */
+/*         LOG_ERRT("Packet bits don't match\n"); */
+/*         status = TRDB_FAIL; */
+/*     } */
 
-fail:
-    trdb_free(c);
-    free(bin);
-    return status;
-}
+/* fail: */
+/*     trdb_free(c); */
+/*     free(bin); */
+/*     return status; */
+/* } */
 
 static int test_parse_stimuli_line()
 {
