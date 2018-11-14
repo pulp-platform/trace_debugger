@@ -40,6 +40,8 @@ const char *trdb_errstr(enum trdb_error_code err)
     case trdb_bad_config:
         return "bad configuration";
 
+    case trdb_bad_ras:
+        return "bad internal return address stack";
     case trdb_bad_cvs_header:
         return "bad cvs header";
 

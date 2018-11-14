@@ -169,6 +169,7 @@ enum trdb_error_code {
     trdb_bad_instr,
     trdb_bad_packet,
     trdb_bad_config,
+    trdb_bad_ras,
     trdb_bad_cvs_header,
     trdb_unimplemented,
     trdb_nomem,

@@ -93,6 +93,75 @@ static bool is_ret_instr(long instr)
            (MATCH_JALR | (X_RA << OP_SH_RS1));
 }
 
+enum trdb_ras { none = 0, ret = 1, call = 2, coret = 3 };
+
+static enum trdb_ras is_jalr_funcall(uint32_t instr)
+{
+    /* According the the calling convention outlined in the risc-v spec we are
+     * dealing with a function call if instr == jalr and rd=x1/x5=link.
+     * Furthermore the following hints for the RAS (return address stack) are
+     * encoded using rs and rd:
+     *
+     *(rd=!link && rs=link             pop aka ret)
+     * rd=link && rs!=link             push
+     * rd=link && rs=link && rd!=rs    push and pop, used for coroutines
+     * rd=link && rs=link && rd==rs    push
+     */
+    bool is_jalr = is_jalr_instr(instr);
+    uint32_t rd = (instr & MASK_RD) >> OP_SH_RD;
+    uint32_t rs = (instr & MASK_RS1) >> OP_SH_RS1;
+    bool is_rd_link = (rd == X_RA) || (rd == X_T0);
+    bool is_rs_link = (rs == X_RA) || (rs == X_T0);
+    bool is_eq_link = is_rd_link && is_rs_link && rd == rs;
+
+    if (is_jalr && !is_rd_link && is_rs_link)
+        return ret;
+    else if (is_jalr && is_rd_link && !is_rs_link)
+        return call;
+    else if (is_jalr && is_rd_link && is_rs_link && !is_eq_link)
+        return coret;
+    else if (is_jalr && is_rd_link && is_rs_link && is_eq_link)
+        return ret;
+    else
+        return none;
+}
+
+static enum trdb_ras is_c_jalr_funcall(uint32_t instr)
+{
+    /* C.JALR expands to jalr x1, rs1, 0 */
+    bool is_c_jalr = is_really_c_jalr_instr(instr);
+    uint32_t rs = (instr & MASK_RS1) >> OP_SH_RS1;
+    bool is_rs_link = (rs == X_RA) || (rs == X_T0);
+    if (is_c_jalr && is_rs_link && (X_RA != rs))
+        return coret;
+    else if (is_c_jalr && is_rs_link && (X_RA == rs))
+        return ret;
+    else
+        return none;
+}
+
+static enum trdb_ras is_jal_funcall(uint32_t instr)
+{
+    /* if jal with rd=x1/x5 then we know it's a function call */
+    bool is_jal = is_jal_instr(instr);
+    bool is_rd_link = (instr & MASK_RD) == (X_RA << OP_SH_RD) ||
+                      (instr & MASK_RD) == (X_T0 << OP_SH_RD);
+    if (is_jal && is_rd_link)
+        return call;
+    else
+        return none;
+}
+
+static enum trdb_ras is_c_jal_funcall(uint32_t instr)
+{
+    /* C.JAL expands to jal x1, offset[11:1] */
+    bool is_c_jal = is_c_jal_instr(instr);
+    if (is_c_jal)
+        return call;
+    else
+        return none;
+}
+
 /**
  * Used to capture all information and functions needed to disassemble.
  */

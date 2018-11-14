@@ -147,10 +147,14 @@ struct trdb_compress {
  * the interrupt how many instructions of the loop are executed to
  * figure out in which loop number we got interrupted
  */
+
+/* declare stack vector */
+kvec_nt(trdb_stack, uint32_t);
+
 struct trdb_decompress {
     /* TODO: loop addresses handling*/
     /* TODO: nested interrupt stacks for each privilege mode*/
-    kvec_t(uint32_t) call_stack;
+    struct trdb_stack call_stack;
     /* record current privilege level */
     uint32_t privilege : PRIVLEN;
     uint32_t last_packet_addr;
@@ -258,7 +262,7 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
                                        .pulp_vector_table_packet = true,
                                        .full_statistics = true};
 
-    *ctx->dec = (struct trdb_decompress){0};
+    *ctx->dec = (struct trdb_decompress){{0}};
     ctx->dec->branch_map = (struct branch_map_state){0};
     ctx->cmp->filter = (struct filter_state){0};
     ctx->stats = (struct trdb_stats){0};
@@ -294,7 +298,7 @@ struct trdb_ctx *trdb_new()
         free(ctx);
         return NULL;
     }
-    *ctx->dec = (struct trdb_decompress){0};
+    *ctx->dec = (struct trdb_decompress){{0}};
     kv_init(ctx->dec->call_stack);
 
     ctx->stats = (struct trdb_stats){0};
@@ -1166,6 +1170,57 @@ fail_malloc:
         return generated_packet;
     } else
         return status;
+}
+
+/* try to update the return address stack */
+static int maybe_handle_ras(uint32_t instr, uint32_t addr,
+                            struct trdb_stack *stack, uint32_t *ret_addr)
+{
+    if (!stack)
+        return -trdb_invalid;
+
+    bool compressed = (instr & 0x3) != 0x3;
+    enum trdb_ras ras = none;
+    if (is_jalr_instr(instr)) {
+        ras = is_jalr_funcall(instr);
+    } else if (is_jal_instr(instr)) {
+        ras = is_jal_funcall(instr);
+    } else if (is_c_jalr_instr(instr)) {
+        ras = is_c_jalr_funcall(instr);
+    } else if (is_c_jal_instr(instr)) {
+        ras = is_c_jal_funcall(instr);
+    } else {
+        ras = none;
+    }
+
+    if (compressed) {
+        switch (ras) {
+        case none:
+            break;
+        case ret:
+            return -trdb_bad_instr;
+        case coret:
+            if (kv_size(*stack) == 0)
+                return -trdb_bad_ras;
+            *ret_addr = kv_pop(*stack);
+            break;
+        case call:
+            break;
+        }
+    } else {
+    }
+}
+
+static int pop_ras(struct trdb_stack *stack, uint32_t *ret_addr)
+{
+    if (!stack)
+        return -trdb_invalid;
+    /* stack underflow */
+    if (kv_size(*stack) == 0)
+        return -trdb_bad_ras;
+
+    *ret_addr = kv_pop(*stack);
+    return 0;
 }
 
 /* Try to read instruction at @p pc into @p instr. It uses read_memory_func()

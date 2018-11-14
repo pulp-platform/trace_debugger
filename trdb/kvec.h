@@ -54,6 +54,12 @@ int main() {
     (--(x), (x) |= (x) >> 1, (x) |= (x) >> 2, (x) |= (x) >> 4,                 \
      (x) |= (x) >> 8, (x) |= (x) >> 16, ++(x))
 
+#define kvec_nt(name, type)                                                    \
+    struct name {                                                              \
+        size_t n, m;                                                           \
+        type *a;                                                               \
+    }
+
 #define kvec_t(type)                                                           \
     struct {                                                                   \
         size_t n, m;                                                           \
