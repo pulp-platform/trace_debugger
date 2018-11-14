@@ -869,21 +869,12 @@ static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
     ctx->stats.bmap_full_packets++;
 }
 
-/* helper macro to reduce boilerplate in trdb_compress_trace_step */
-#define ALLOC_PACKET(name)                                                     \
-    name = malloc(sizeof(*name));                                              \
-    if (!name) {                                                               \
-        status = -trdb_nomem;                                                  \
-        goto fail_malloc;                                                      \
-    }                                                                          \
-    *name = (struct tr_packet){.msg_type = W_TRACE};
-
-int trdb_compress_trace_step(struct trdb_ctx *ctx,
-                             struct list_head *packet_list,
+int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
                              struct tr_instr *instr)
 {
+
     int status = 0;
-    if (!ctx || !packet_list || !instr)
+    if (!ctx || !packet || !instr)
         return -trdb_invalid;
 
     struct trdb_stats *stats = &ctx->stats;
@@ -969,7 +960,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         }
     }
 
-    struct tr_packet *tr = NULL;
+    /* initialize packet */
+    *packet = (struct tr_packet){.msg_type = W_TRACE};
 
     /* We trace the packet before the trapped instruction and the
      * first one of the exception handler
@@ -980,11 +972,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * subformat 1 (exception -> all fields present)
          * resync_pend = 0
          */
-        ALLOC_PACKET(tr);
-        emit_exception_packet(ctx, tr, lc_instr, tc_instr, nc_instr);
+        emit_exception_packet(ctx, packet, lc_instr, tc_instr, nc_instr);
         *last_iaddr = tc_instr->iaddr;
-
-        list_add(&tr->list, packet_list);
 
         thisc->emitted_exception_sync = true;
         filter->resync_pend = false; /* TODO: how to handle this */
@@ -1006,11 +995,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * subformat 0 (start, no ecause, interrupt and tval)
          * resync_pend = 0
          */
-        ALLOC_PACKET(tr);
-        emit_start_packet(ctx, tr, tc_instr, nc_instr);
+        emit_start_packet(ctx, packet, tc_instr, nc_instr);
         *last_iaddr = tc_instr->iaddr;
-
-        list_add(&tr->list, packet_list);
 
         filter->resync_pend = false;
         generated_packet = 1;
@@ -1024,11 +1010,8 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * subformat 0 (start, no ecause, interrupt and tval)
          * resync_pend = 0
          */
-        ALLOC_PACKET(tr);
-        emit_start_packet(ctx, tr, tc_instr, nc_instr);
+        emit_start_packet(ctx, packet, tc_instr, nc_instr);
         *last_iaddr = tc_instr->iaddr;
-
-        list_add(&tr->list, packet_list);
 
         filter->resync_pend = false;
         generated_packet = 1;
@@ -1037,8 +1020,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* Send te_inst:
          * format 0/1/2
          */
-        ALLOC_PACKET(tr);
-        status = emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+        status = emit_branch_map_flush_packet(ctx, packet, branch_map, tc_instr,
                                               *last_iaddr, full_address, true);
         if (status < 0) {
             generated_packet = 0;
@@ -1046,9 +1028,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         }
 
         *last_iaddr = tc_instr->iaddr;
-
-        list_add(&tr->list, packet_list);
-
         generated_packet = 1;
 
     } else if (filter->resync_pend && branch_map->cnt > 0) {
@@ -1056,8 +1035,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* Send te_inst:
          * format 0/1/2
          */
-        ALLOC_PACKET(tr);
-        status = emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+        status = emit_branch_map_flush_packet(ctx, packet, branch_map, tc_instr,
                                               *last_iaddr, full_address, false);
         if (status < 0) {
             generated_packet = 0;
@@ -1065,8 +1043,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         }
 
         *last_iaddr = tc_instr->iaddr;
-
-        list_add(&tr->list, packet_list);
 
         generated_packet = 1;
 
@@ -1075,8 +1051,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         /* Send te_inst:
          * format 0/1/2
          */
-        ALLOC_PACKET(tr);
-        status = emit_branch_map_flush_packet(ctx, tr, branch_map, tc_instr,
+        status = emit_branch_map_flush_packet(ctx, packet, branch_map, tc_instr,
                                               *last_iaddr, full_address, false);
         if (status < 0) {
             generated_packet = 0;
@@ -1085,8 +1060,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
 
         *last_iaddr = tc_instr->iaddr;
 
-        list_add(&tr->list, packet_list);
-
         generated_packet = 1;
 
     } else if (branch_map->full) {
@@ -1094,10 +1067,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
          * format 0
          * no address
          */
-        ALLOC_PACKET(tr);
-        emit_full_branch_map(ctx, tr, branch_map);
-
-        list_add(&tr->list, packet_list);
+        emit_full_branch_map(ctx, packet, branch_map);
 
         generated_packet = 1;
 
@@ -1109,7 +1079,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
         err(ctx, "context_change not supported\n");
         status = -trdb_unimplemented;
         goto fail;
-        /* ALLOC_INIT_PACKET(tr); */
         /* tr->format = F_SYNC; */
         /* tr->subformat = SF_CONTEXT; */
         /* tr->context = 0; /\* TODO: what comes here? *\/ */
@@ -1135,14 +1104,14 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     stats->instrs++;
     if (generated_packet) {
         *branch_map = (struct branch_map_state){0};
-        stats->payloadbits += (tr->length);
+        stats->payloadbits += (packet->length);
         stats->packets++;
 
         if (config->full_statistics) {
             /* figure out pulp payload by serializing and couting bits */
             uint8_t bin[16] = {0};
             size_t bitcnt = 0;
-            if (trdb_pulp_serialize_packet(ctx, tr, &bitcnt, 0, bin)) {
+            if (trdb_pulp_serialize_packet(ctx, packet, &bitcnt, 0, bin)) {
                 dbg(ctx, "failed to count bits of pulp packet\n");
             }
             /* we have to round up to the next full byte */
@@ -1151,8 +1120,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     }
 
     if (generated_packet) {
-        trdb_log_packet(
-            ctx, list_entry(packet_list->next, typeof(struct tr_packet), list));
+        trdb_log_packet(ctx, packet);
     }
 
     if (ctx->dunit) {
@@ -1166,11 +1134,32 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx,
     }
 
 fail:
-fail_malloc:
     if (status == trdb_ok) {
         return generated_packet;
     } else
         return status;
+}
+
+int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
+                                 struct list_head *packet_list,
+                                 struct tr_instr *instr)
+{
+    if (!packet_list || !instr)
+        return -trdb_invalid;
+
+    struct tr_packet *packet = malloc(sizeof(*packet));
+    if (!packet)
+        return -trdb_nomem;
+
+    int status = trdb_compress_trace_step(ctx, packet, instr);
+    if (status < 0) {
+        free(packet);
+        return status;
+    }
+
+    if (status == 1)
+        list_add(&packet->list, packet_list);
+    return status;
 }
 
 /* try to update the return address stack */

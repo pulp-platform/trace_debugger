@@ -88,7 +88,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
 
     struct tr_instr *instr;
     list_for_each_entry_reverse (instr, &instr_list, list) {
-        int step = trdb_compress_trace_step(ctx, &packet_list, instr);
+        int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
         if (step == -1) {
             fprintf(stderr, "Compress trace failed\n");
             status = -1;
@@ -121,7 +121,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     trdb_set_compress_branch_map(ctx, false);
 
     list_for_each_entry_reverse (instr, &instr_list, list) {
-        int step = trdb_compress_trace_step(ctx, &packet_list, instr);
+        int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
         if (step == -1) {
             fprintf(stderr, "Compress trace failed\n");
             status = -1;

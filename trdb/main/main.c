@@ -304,7 +304,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     /* step by step compression */
     if (arguments->cvs) {
         list_for_each_entry_reverse (instr, &instr_list, list) {
-            int step = trdb_compress_trace_step(c, &packet_list, instr);
+            int step = trdb_compress_trace_step_add(c, &packet_list, instr);
             if (step < 0) {
                 fprintf(stderr, "compress trace failed: %s\n",
                         trdb_errstr(trdb_errcode(status)));
@@ -315,7 +315,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     } else {
         for (size_t i = 0; i < samplecnt; i++) {
             int step =
-                trdb_compress_trace_step(c, &packet_list, &(*samples)[i]);
+                trdb_compress_trace_step_add(c, &packet_list, &(*samples)[i]);
             if (step < 0) {
                 fprintf(stderr, "compress trace failed: %s\n",
                         trdb_errstr(trdb_errcode(status)));

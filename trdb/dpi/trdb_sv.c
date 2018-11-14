@@ -111,7 +111,7 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
     svLogicVecVal tmp = {0};
     struct tr_packet *latest_packet = NULL;
 
-    int p = trdb_compress_trace_step(ctx, &packets, &tr_instr);
+    int p = trdb_compress_trace_step_add(ctx, &packets, &tr_instr);
 
     if (!list_empty(&packets)) {
         latest_packet = list_entry(packets.next, struct tr_packet, list);

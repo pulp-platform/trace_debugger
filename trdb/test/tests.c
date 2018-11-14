@@ -465,7 +465,7 @@ static int test_stimuli_to_packet_dump(const char *path)
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step(c, &head, &(*samples)[i]);
+        int step = trdb_compress_trace_step_add(c, &head, &(*samples)[i]);
         if (step == -1) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
@@ -598,7 +598,7 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step(ctx, &packet1_head, &(*samples)[i]);
+        int step = trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
         if (step == -1) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
@@ -713,7 +713,7 @@ int test_compress_cvs_trace(const char *trace_path)
     }
 
     list_for_each_entry_reverse (instr, &instr_list, list) {
-        int step = trdb_compress_trace_step(ctx, &packet_list, instr);
+        int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
         if (step == -1) {
             LOG_ERRT("Compress trace failed\n");
             status = TRDB_FAIL;
@@ -780,7 +780,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step(ctx, &packet1_head, &(*samples)[i]);
+        int step = trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
         if (step == -1) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
@@ -885,7 +885,7 @@ int test_decompress_trace_differential(const char *bin_path,
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step(ctx, &packet1_head, &(*samples)[i]);
+        int step = trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
         if (step == -1) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
