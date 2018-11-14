@@ -29,6 +29,7 @@
 #include <errno.h>
 #include "trace_debugger.h"
 #include "disassembly.h"
+#include "disassembly_private.h"
 #include "serialize.h"
 #include "list.h"
 #include "kvec.h"

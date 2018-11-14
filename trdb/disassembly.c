@@ -40,6 +40,7 @@
 #include <unistd.h>
 #include "filenames.h"
 #include "disassembly.h"
+#include "disassembly_private.h"
 #include "trace_debugger.h"
 #include "utils.h"
 #include "bfd.h"
