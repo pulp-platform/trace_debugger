@@ -28,7 +28,6 @@
 
 #include "svdpi.h"
 
-
 /**
  * Allocate trdb library context. Ideally the simulator should hold the library
  * context handle but that functionality is still missing and so currently the

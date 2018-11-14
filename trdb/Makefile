@@ -40,7 +40,9 @@ LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
 		$(PULP_BINUTILS_PATH)/libiberty \
 		$(PULP_BINUTILS_PATH)/zlib
 
-INCLUDE_PATHS   =. \
+INCLUDE_PATHS   = ./ \
+		./include \
+		./internal \
 		$(PULP_BINUTILS_PATH)/include \
 		$(PULP_BINUTILS_PATH)/bfd \
 		$(QUESTASIM_PATH)/include \
@@ -68,7 +70,7 @@ SRCS		= $(wildcard *.c)
 OBJS		= $(SRCS:.c=.o)
 INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
 
-HEADERS		= $(wildcard *.h)
+HEADERS		= $(wildcard include/*.h)
 
 BIN		= trdb
 TEST_BIN	= tests

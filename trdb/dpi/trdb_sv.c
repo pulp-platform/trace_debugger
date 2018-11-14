@@ -30,16 +30,15 @@
 #include <stdint.h>
 /* #include "autogen_trdb_sv.h" */
 #include "trdb_sv.h"
-#include "../utils.h"
-#include "../trace_debugger.h"
-#include "../serialize.h"
+#include "utils.h"
+#include "trace_debugger.h"
+#include "serialize.h"
 
 LIST_HEAD(packets);
 
 // TODO: send context to simulator per userdata methods
 struct trdb_ctx *ctx;
 int packetcnt = 0;
-
 
 /* We print even errors to stdout since the simulator doesn't interleave stderr
  * and stdout
@@ -52,7 +51,6 @@ static void log_stdout_dpi(struct trdb_ctx *ctx, int priority, const char *file,
     vfprintf(stdout, format, args);
 }
 
-
 void trdb_sv_alloc()
 {
     ctx = trdb_new();
@@ -63,25 +61,21 @@ void trdb_sv_alloc()
     trdb_set_log_fn(ctx, log_stdout_dpi);
 }
 
-
 void trdb_sv_free()
 {
     trdb_free_packet_list(&packets);
     free(ctx);
 }
 
-
 void trdb_sv_set_full_address(int full_address)
 {
     trdb_set_full_address(ctx, full_address);
 }
 
-
 void trdb_sv_set_implicit_ret(int implicit_ret)
 {
     trdb_set_implicit_ret(ctx, implicit_ret);
 }
-
 
 void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
                         const svLogicVecVal *cause, const svLogicVecVal *tval,
@@ -91,9 +85,9 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
                         svLogic *packet_valid)
 {
     // Test if we got x or z
-    if (ivalid > 1 || iexception > 1 || interrupt > 1 || cause->bval != 0
-        || tval->bval != 0 || priv->bval != 0 || iaddr->bval != 0
-        || instr->bval != 0 || compressed > 1) {
+    if (ivalid > 1 || iexception > 1 || interrupt > 1 || cause->bval != 0 ||
+        tval->bval != 0 || priv->bval != 0 || iaddr->bval != 0 ||
+        instr->bval != 0 || compressed > 1) {
         err(ctx,
             "some values are 'x or 'z, implicitly converting to binary and continuing... \n");
     }
