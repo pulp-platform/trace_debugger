@@ -103,7 +103,7 @@ DOC		= doxygen
 # compilation targets
 all: $(BIN) $(TEST_BIN) $(BENCHMARK_BIN)
 
-debug: ALL_CFLAGS = $(ALL_CFLAGS_DEBUG)
+debug: ALL_CFLAGS = $(ALL_CFLAGS_DBG)
 debug: all
 
 sv-lib: ALL_CFLAGS += -fPIC
