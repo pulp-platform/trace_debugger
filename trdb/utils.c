@@ -29,38 +29,3 @@
 void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...)
 {
 }
-
-uint8_t *file_to_char(FILE *fp, long *length)
-{
-    uint8_t *buf = NULL;
-    if (!fp) {
-        LOG_ERRT("FILE pointer is NULL\n");
-        return NULL;
-    }
-    if (fseek(fp, 0, SEEK_END)) {
-        perror("fseek");
-        goto fail;
-    }
-    long len = ftell(fp);
-    *length = len;
-    if (len == -1) {
-        perror("ftell");
-        goto fail;
-    }
-
-    buf = malloc(len);
-    if (!buf) {
-        perror("malloc");
-        goto fail;
-    }
-
-    rewind(fp);
-    if (fread(buf, 1, len, fp) != len) {
-        perror("fread");
-        goto fail;
-    }
-    return buf;
-fail:
-    free(buf);
-    return NULL;
-}

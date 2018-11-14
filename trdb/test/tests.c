@@ -30,14 +30,15 @@
 #include <unistd.h>
 #include "list.h"
 #include "trace_debugger.h"
-#include "trace_debugger.c"
+/* #include "trace_debugger.c" */
 #include "disassembly.h"
-#include "disassembly.c"
+/* #include "disassembly.c" */
 #include "utils.h"
-#include "utils.c"
+/* #include "utils.c" */
 #include "serialize.h"
-#include "serialize.c"
-#include "error.c"
+#include "workaround.h"
+/* #include "serialize.c" */
+/* #include "error.c" */
 
 #define TRDB_SUCCESS 0
 #define TRDB_FAIL -1
@@ -330,79 +331,6 @@ static int test_trdb_serialize_packet(uint32_t shift)
 fail:
     trdb_free(c);
     free(bin);
-    return status;
-}
-
-static int test_trdb_write_packets()
-{
-    int status = TRDB_SUCCESS;
-    struct trdb_ctx *c = trdb_new();
-
-    struct tr_packet packet0 = {0};
-    struct tr_packet packet1 = {0};
-    struct tr_packet packet2 = {0};
-
-    packet0 = (struct tr_packet){.msg_type = 2,
-                                 .format = F_BRANCH_FULL,
-                                 .branches = 31,
-                                 .branch_map = 0x7fffffff,
-                                 .address = 0xaadeadbe};
-
-    packet1 = (struct tr_packet){.msg_type = 2,
-                                 .format = F_SYNC,
-                                 .subformat = SF_START,
-                                 .privilege = 3,
-                                 .branch = 1,
-                                 .address = 0xdeadbeef};
-
-    packet2 = (struct tr_packet){.msg_type = 2,
-                                 .format = F_SYNC,
-                                 .subformat = SF_EXCEPTION,
-                                 .privilege = 3,
-                                 .branch = 1,
-                                 .address = 0xdeadbeef,
-                                 .ecause = 0x1a,
-                                 .interrupt = 1,
-                                 .tval = 0xfeebdeed};
-    LIST_HEAD(head);
-    list_add(&packet2.list, &head);
-    list_add(&packet1.list, &head);
-    list_add(&packet0.list, &head);
-
-    if (trdb_write_packets(c, "tmp0", &head)) {
-        LOG_ERRT("trdb_write_packets failed\n");
-        status = TRDB_FAIL;
-    }
-
-    /* Read back the file and compare to expected value */
-    uint8_t *buf = NULL;
-    FILE *fp = fopen("tmp0", "rb");
-    if (!fp) {
-        perror("fopen");
-        status = TRDB_FAIL;
-        goto fail;
-    }
-
-    long len = 0;
-    if (!(buf = file_to_char(fp, &len))) {
-        LOG_ERRT("file_to_char failed\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
-    /* compare values */
-    uint8_t expected[] = {0xf2, 0xff, 0xff, 0xff, 0xff, 0xbe, 0xad, 0xde, 0xaa,
-                          0xce, 0xf8, 0xee, 0xdb, 0xea, 0xed, 0x8d, 0xef, 0xbe,
-                          0xad, 0xde, 0x7a, 0xbb, 0xf7, 0xba, 0x3f};
-    if (memcmp(buf, expected, len)) {
-        LOG_ERRT("Binary data mismatch\n");
-        status = TRDB_FAIL;
-    }
-fail:
-    if (fp)
-        fclose(fp);
-    remove("tmp0");
-    trdb_free(c);
-    free(buf);
     return status;
 }
 
@@ -1075,7 +1003,6 @@ int main(int argc, char *argv[argc + 1])
     /*     RUN_TEST(test_trdb_serialize_packet, i); */
 
     /* RUN_TEST(test_disasm_bfd); */
-    /* RUN_TEST(test_trdb_write_packets); */
     RUN_TEST(test_parse_stimuli_line);
 
     RUN_TEST(test_parse_packets, "data/tx_spi");

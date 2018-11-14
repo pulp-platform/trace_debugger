@@ -151,14 +151,3 @@ void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
  * than 64.
  */
 #define MASK_FROM(len) ((1ull << len) - 1)
-
-/**
- * Load a file to a uint8_t array.
- *
- * The user is responsible to free the return pointer.
- *
- * @param fp the file to load
- * @param length written with the number of bytes of the file
- * @return pointer to the loaded file in memory
- */
-uint8_t *file_to_char(FILE *fp, long *length);
