@@ -101,7 +101,7 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
     sched_i = sched;
 
     /* TODO: really alloc enough events */
-    if (rt_event_alloc(sched_i, 10))
+    if (rt_event_alloc(sched_i, 4))
 	goto fail_event;
 
     rt_trace_dbg_t *tracer = rt_alloc(RT_ALLOC_FC_DATA, sizeof(rt_trace_dbg_t));
@@ -132,10 +132,9 @@ rt_trace_dbg_t *rt_trace_debugger_open(char *dev_name,
     rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0),
 		   (unsigned int)trace_buffs[0], buffer_size, 0,
 		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)0));
-    /* rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0), */
-    /* 		   (unsigned int)trace_buffs[1], buffer_size, 0, */
-    /* 		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)1));
-     */
+    rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0),
+		   (unsigned int)trace_buffs[1], buffer_size, 0,
+		   rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)1));
 
     /* This applies some desired intial settings */
     write_reg_l2(TRDB_REG_CTRL, conf->ctrl_reg);
@@ -182,17 +181,18 @@ int buffer_full[2] = {0};
 void __rt_trace_debugger_eot(void *arg)
 {
     int index = (int)arg;
+    int other = (index + 1) % 2;
 
     buffer_full[index] = 1;
     rt_spim_send_qspi(trdb_spi, trace_buffs[index], buffer_size * 8,
 		      RT_SPIM_CS_AUTO,
 		      rt_event_get(sched_i, __rt_spim_eot, (void *)index));
-    printf("trdb: buffer %d is %d\n", index, buffer_full[index]);
     /* queue for other buffer*/
-    rt_periph_copy(NULL, 2 * ARCHI_UDMA_TRACER_ID(0),
-		   (unsigned int)trace_buffs[(index + 1) % 2], buffer_size, 0,
-		   rt_event_get(sched_i, __rt_trace_debugger_eot,
-				(void *)((index + 1) % 2)));
+    rt_periph_copy(
+	NULL, 2 * ARCHI_UDMA_TRACER_ID(0), (unsigned int)trace_buffs[other],
+	buffer_size, 0,
+	rt_event_get(sched_i, __rt_trace_debugger_eot, (void *)other));
+    /* printf("trdb: buffer %d is %d\n", index, buffer_full[index]); */
 }
 
 void __rt_spim_eot(void *arg)
