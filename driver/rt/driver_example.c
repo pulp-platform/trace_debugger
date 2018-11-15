@@ -44,7 +44,8 @@ int main()
     rt_trace_dbg_conf_t trdb_conf;
     rt_trace_debugger_conf_init(&trdb_conf);
     /* trdb_conf.buffer_size = 4 * 32; */
-    trdb_conf.buffer_size = 4 * 32;
+    trdb_conf.buffer_size = 4 * 1024;
+
     trdb_conf.ctrl_reg =
 	TRDB_ENABLE | TRDB_TRACE_ACTIVATED; /* enable clock and tracer*/
 
@@ -65,10 +66,11 @@ int main()
     printf("Memory TRACER RX: %x\n", UDMA_TRACER_RX_ADDR(0));
     printf("Whoami: %d\n", (is_fc()));
 
-    rt_trace_debugger_ctrl(TRDB_REG_CTRL, trdb_conf.ctrl_reg | TRDB_FLUSH);
+    /* rt_trace_debugger_ctrl(TRDB_REG_CTRL, trdb_conf.ctrl_reg | TRDB_FLUSH);
+     */
     /* just loop for now */
     for (;;) {
-	rt_event_yield(NULL);
+	rt_event_execute(NULL, 0);
     }
     rt_trace_debugger_close(trdb, NULL);
 
