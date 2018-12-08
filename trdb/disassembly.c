@@ -1,7 +1,7 @@
 /*
  * trdb - Trace Debugger Software for the PULP platform
  *
- * Copyright (C) 2018 ETH Zurich and University of Bologna
+ * Copyright (C) 2018 Robert Balas
  * Copyright (C) 1990-2017 Free Software Foundation, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
