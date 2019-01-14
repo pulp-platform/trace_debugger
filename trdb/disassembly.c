@@ -1749,7 +1749,7 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     if (!prefix_addresses) {
         if (with_function_context && bfd_asymbol_value(sym) == addr) {
-            pinfo->fprintf_func(pinfo->stream, "\n");
+            pinfo->fprintf_func(pinfo->stream, "\n\n");
             trdb_print_addr_with_sym(abfd, section, sym, addr, pinfo, FALSE,
                                      do_demangle, display_file_offsets);
             pinfo->fprintf_func(pinfo->stream, ":\n");
