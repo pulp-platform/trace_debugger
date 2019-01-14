@@ -6,7 +6,7 @@
       "cs": 1,
       "config": {
         "tx_file": {
-          "path": "tx_spi",
+          "path": "tx_spi_dump.trdb",
           "qpi": "true"
         }
       }
