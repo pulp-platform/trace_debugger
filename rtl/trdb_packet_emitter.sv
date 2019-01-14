@@ -49,10 +49,6 @@ module trdb_packet_emitter
      // information for trdb_priority to decide what packet type we need
      output logic [XLEN-1:0]        diff_addr_o,
 
-     // packet fifo control and status
-     input logic                    clear_fifo_i,
-     output logic                   fifo_overflow_o,
-
      // software packet generation request (dumping a write to stream)
      input logic                    sw_valid_i,
      input logic [XLEN-1:0]         sw_word_i,
@@ -67,16 +63,12 @@ module trdb_packet_emitter
      // packet bits which were generated from request
      output logic [PACKET_LEN-1:0]  packet_bits_o, //TODO: adjust sizes
      output logic [6:0]             packet_len_o,
-     output logic                   packet_valid_o,
-     input logic                    packet_grant_i
-     );
+     output logic                   packet_valid_o);
 
     logic [PACKET_LEN-1:0]         packet_bits;
     logic [PACKET_HEADER_LEN-1:0]  packet_len;
     logic                          packet_gen_valid;
-    logic                          packet_fifo_not_full;
 
-    logic                          clear_fifo;
     // request to flush the branch map so that it is empty for the next packet
     logic                          branch_map_flush_q, branch_map_flush_d;
 
@@ -116,10 +108,6 @@ module trdb_packet_emitter
     (@(posedge clk_i) disable iff (~rst_ni) (branch_map_cnt_i < 32))
         else $error("[TRDB]    @%t: branch_map_cnt_i=%d is too large",
                     $time, branch_map_cnt_i);
-
-    packet_fifo_overflow: assert property
-    (@(posedge clk_i) disable iff (~rst_ni) (packet_fifo_not_full == 1'b1))
-            else $error("[TRDB]   @%t: Packet FIFO is overflowing.", $time);
 `endif
 
     assign diff_addr = last_addr_q - iaddr_i;
@@ -198,6 +186,10 @@ module trdb_packet_emitter
                     packet_bits[8:4] = branch_map_edge_case ?
                                        packet_bits[8:4] : 5'b0;
                     // don't remember any address since there is none
+
+                    // TODO: the spec says something about extending branch-map
+                    // to fill the address field when branches = 0. Does this
+                    // come into play here?
                     last_addr_d = branch_map_edge_case ? iaddr_i : last_addr_q;
                 end
             end
@@ -262,28 +254,9 @@ module trdb_packet_emitter
 
     end
 
-    //TODO: implement fifo nuking logic
-    //TODO: request resync logic on nuked fifo
-
-    assign clear_fifo = 1'b0;
-    assign fifo_overflow_o = ~packet_fifo_not_full;
-
-    // this buffers our generated packet, since packets can be generated every
-    // cycle, but we only read atmost 32 bit per cycle
-    generic_fifo_adv
-        #(.DATA_WIDTH(PACKET_LEN + PACKET_HEADER_LEN),
-          .DATA_DEPTH(PACKET_BUFFER_STAGES))
-    i_packet_fifo
-        (.clk(clk_i),
-         .rst_n(rst_ni),
-         .clear_i(clear_fifo), //nuke fifo if overflowing
-         .data_i({packet_bits, packet_len}),
-         .valid_i(packet_gen_valid),
-         .grant_o(packet_fifo_not_full),
-         .data_o({packet_bits_o, packet_len_o}),
-         .valid_o(packet_valid_o),
-         .grant_i(packet_grant_i),
-         .test_mode_i('0)); // TODO: what to do with this
+    assign packet_bits_o = packet_bits;
+    assign packet_len_o = packet_len;
+    assign packet_valid_o = packet_gen_valid;
 
 
     always_ff @(posedge clk_i, negedge rst_ni) begin

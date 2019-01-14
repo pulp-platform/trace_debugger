@@ -138,9 +138,15 @@ module trace_debugger
     logic [XLEN-1:0]            diff_addr;
 
     // generated packet
-    logic [PACKET_LEN-1:0]     packet_bits;
-    logic [6:0]                packet_len;
+    logic [PACKET_LEN-1:0]     packet_gen_bits;
+    logic [6:0]                packet_gen_len;
     logic                      packet_gen_valid;
+
+    // packet from fifo
+    logic [PACKET_LEN-1:0]     packet_fifo_bits;
+    logic [6:0]                packet_fifo_len;
+    logic                      packet_fifo_valid;
+    logic                      packet_fifo_not_full;
 
     // packet to word
     logic                      packet_is_read;
@@ -418,8 +424,6 @@ module trace_debugger
          .is_branch_i(tc_is_branch),
          .branch_map_flush_o(branch_map_flush),
          .diff_addr_o(diff_addr),
-         .clear_fifo_i(clear_fifo),
-         .fifo_overflow_o(fifo_overflow),
          .sw_valid_i(sw_valid),
          .sw_word_i(sw_word),
          .sw_grant_o(sw_grant),
@@ -427,17 +431,44 @@ module trace_debugger
          .tu_time_i(tu_time),
          .tu_fulltime_i(tu_fulltime),
          .tu_grant_o(tu_grant),
-         .packet_bits_o(packet_bits),
-         .packet_len_o(packet_len),
-         .packet_valid_o(packet_gen_valid),
-         .packet_grant_i(packet_is_read));
+         .packet_bits_o(packet_gen_bits),
+         .packet_len_o(packet_gen_len),
+         .packet_valid_o(packet_gen_valid));
+
+    //TODO: implement fifo clear logic
+    //TODO: request resync logic on nuked fifo
+    assign clear_fifo = 1'b0;
+    assign fifo_overflow = ~packet_fifo_not_full;
+
+    // this buffers our generated packet, since packets can be generated every
+    // cycle, but we only read atmost 32 bit per cycle
+    generic_fifo_adv
+        #(.DATA_WIDTH(PACKET_LEN + PACKET_HEADER_LEN),
+          .DATA_DEPTH(PACKET_BUFFER_STAGES))
+    i_packet_fifo
+        (.clk(clk_i),
+         .rst_n(rst_ni),
+         .clear_i(clear_fifo), //clear fifo if overflowing
+         .data_i({packet_gen_bits, packet_gen_len}),
+         .valid_i(packet_gen_valid),
+         .grant_o(packet_fifo_not_full),
+         .data_o({packet_fifo_bits, packet_fifo_len}),
+         .valid_o(packet_fifo_valid),
+         .grant_i(packet_is_read),
+         .test_mode_i('0)); // TODO: what to do with this
+
+`ifndef SYNTHESIS
+    packet_fifo_overflow: assert property
+    (@(posedge clk_i) disable iff (~rst_ni) (packet_fifo_not_full == 1'b1))
+            else $error("[TRDB]   @%t: Packet FIFO is overflowing.", $time);
+`endif
 
     trdb_stream_align8 i_trdb_stream_align
         (.clk_i(clk_gated),
          .rst_ni(rst_ni),
-         .packet_bits_i(packet_bits),
-         .packet_len_i(packet_len),
-         .valid_i(packet_gen_valid),
+         .packet_bits_i(packet_fifo_bits),
+         .packet_len_i(packet_fifo_len),
+         .valid_i(packet_fifo_valid),
          .grant_o(packet_is_read),
          .flush_stream_i(flush_stream),
          .flush_confirm_o(flush_confirm),
