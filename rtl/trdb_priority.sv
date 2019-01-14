@@ -17,45 +17,45 @@ import trdb_pkg::*;
 // TODO: add commented out signals
 module trdb_priority
     (input logic  clk_i,
-     input logic                     rst_ni,
+     input logic                   rst_ni,
 
-     input logic                     valid_i,
+     input logic                   valid_i,
 
-     input logic [XLEN-1:0]          full_addr_i,
-     input logic [XLEN-1:0]          diff_addr_i,
+     input logic [XLEN-1:0]        full_addr_i,
+     input logic [XLEN-1:0]        diff_addr_i,
 
-     input logic                     lc_exception_i,
-     input logic                     lc_exception_sync_i,
+     input logic                   lc_exception_i,
+     input logic                   lc_exception_sync_i,
 
-     input logic                     tc_first_qualified_i,
-     input logic                     nc_unqualified_i,
+     input logic                   tc_first_qualified_i,
+     input logic                   nc_unqualified_i,
      //input logic  tc_unhalted,
-     input logic                     tc_privchange_i,
+     input logic                   tc_privchange_i,
      //input logic resync & branch_map_cnt
 
-     input logic                     lc_u_discontinuity_i,
+     input logic                   lc_u_discontinuity_i,
 
      // input logic  resync
      // input logic  branch_map_nonempty,
 
      //input logic  nc_halt,
-     input logic                     nc_exception_i,
-     input logic                     nc_privchange_i,
+     input logic                   nc_exception_i,
+     input logic                   nc_privchange_i,
      //input logic  nc_qualified,
 
-     input logic                     branch_map_full_i,
+     input logic                   branch_map_full_i,
 
      //input logic  tc_context_change,
 
-     input logic                     branch_map_empty_i,
+     input logic                   branch_map_empty_i,
 
-     input logic                     use_full_addr_i,
+     input logic                   use_full_addr_i,
 
      // how many bits of the address are useful
      output logic [$clog2(XLEN):0] keep_bits_o,
-     output logic                    valid_o,
-     output                          trdb_format_t packet_format_o,
-     output                          trdb_subformat_t packet_subformat_o);
+     output logic                  valid_o,
+     output                        trdb_format_t packet_format_o,
+     output                        trdb_subformat_t packet_subformat_o);
 
     // to compress addresses we can, instead of always giving out the full
     // address, only give out the difference to the last emitted packet address

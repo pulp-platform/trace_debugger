@@ -12,7 +12,6 @@
 // Description: Records the sequence of taken and not taken branches
 
 module trdb_branch_map
-    // TODO: make branchmap parametrizable?
     (input logic         clk_i,
      input logic         rst_ni,
 
