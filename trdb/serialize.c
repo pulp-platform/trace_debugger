@@ -50,6 +50,8 @@ static uint32_t p_branch_map_len(uint32_t branches)
 
 static uint32_t p_sign_extendable_bits(uint32_t addr)
 {
+    if(addr == 0 || UINT32_MAX)
+	return 32;
     int clz = __builtin_clz(addr);
     int clo = __builtin_clz(~addr);
     return clz > clo ? clz : clo;

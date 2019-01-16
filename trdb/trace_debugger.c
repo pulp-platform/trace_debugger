@@ -512,6 +512,8 @@ static bool is_unsupported(uint32_t instr)
 
 static uint32_t sign_extendable_bits64(uint64_t addr)
 {
+    if(addr == 0 || addr == UINT64_MAX)
+	return 64;
     int clz = __builtin_clzll(addr);
     int clo = __builtin_clzll(~addr);
     return clz > clo ? clz : clo;
@@ -519,6 +521,8 @@ static uint32_t sign_extendable_bits64(uint64_t addr)
 
 static uint32_t sign_extendable_bits(uint32_t addr)
 {
+    if(addr == 0 || addr == UINT32_MAX)
+	return 32;
     int clz = __builtin_clz(addr);
     int clo = __builtin_clz(~addr);
     return clz > clo ? clz : clo;
