@@ -151,3 +151,12 @@ void trdb_log(struct trdb_ctx *ctx, int priority, const char *file, int line,
  * than 64.
  */
 #define MASK_FROM(len) ((1ull << len) - 1)
+
+/* bit manipulation utility functions */
+
+uint32_t sign_extendable_bits(uint32_t addr);
+uint32_t sign_extendable_bits64(uint64_t addr);
+uint32_t sign_extendable_bits128(__uint128_t addr);
+uint32_t sext32(uint32_t val, uint32_t bit);
+__uint128_t sext128(__uint128_t val, __uint128_t bit);
+int clz_u128(__uint128_t u);

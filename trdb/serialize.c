@@ -26,80 +26,8 @@
 #include "serialize.h"
 #include "list.h"
 #include "trace_debugger.h"
+#include "trdb_private.h"
 #include "utils.h"
-
-/* TODO: move those static functions into utils.h */
-
-static uint32_t p_branch_map_len(uint32_t branches)
-{
-    if (branches == 0) {
-        return 31;
-    } else if (branches <= 1) {
-        return 1;
-    } else if (branches <= 9) {
-        return 9;
-    } else if (branches <= 17) {
-        return 17;
-    } else if (branches <= 25) {
-        return 25;
-    } else if (branches <= 31) {
-        return 31;
-    }
-    return -1;
-}
-
-static uint32_t p_sign_extendable_bits(uint32_t addr)
-{
-    if(addr == 0 || UINT32_MAX)
-	return 32;
-    int clz = __builtin_clz(addr);
-    int clo = __builtin_clz(~addr);
-    return clz > clo ? clz : clo;
-}
-
-static __uint128_t p_sext128(__uint128_t val, __uint128_t bit)
-{
-    if (bit == 0)
-        return 0;
-
-    if (bit == 128)
-        return val;
-
-    __uint128_t m = (__uint128_t)1 << (bit - 1);
-
-    val = val & (((__uint128_t)1 << bit) - 1);
-    return (val ^ m) - m;
-}
-
-static uint32_t p_sext32(uint32_t val, uint32_t bit)
-{
-    if (bit == 0)
-        return 0;
-
-    if (bit == 32)
-        return val;
-
-    int m = 1U << (bit - 1);
-
-    val = val & ((1U << bit) - 1);
-    return (val ^ m) - m;
-}
-
-static int p_clz_u128(__uint128_t u)
-{
-    uint64_t hi = u >> 64;
-    uint64_t lo = u;
-    int retval[3] = {__builtin_clzll(hi), __builtin_clzll(lo) + 64, 128};
-    int idx = !hi + ((!lo) & (!hi));
-    return retval[idx];
-}
-
-static uint32_t p_sign_extendable_bits128(__uint128_t addr)
-{
-    int clz = p_clz_u128(addr);
-    int clo = p_clz_u128(~addr);
-    return clz > clo ? clz : clo;
-}
 
 /* pulp specific packet serialization */
 int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
@@ -124,7 +52,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
 
     switch (packet->format) {
     case F_BRANCH_FULL: {
-        uint32_t len = p_branch_map_len(packet->branches);
+        uint32_t len = branch_map_len(packet->branches);
 
         /* we need enough space to do the packing it in uint128 */
         assert(128 > PULPPKTLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
@@ -145,12 +73,12 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
             if (trdb_is_full_address(c))
                 *bitcnt += XLEN;
             else
-                *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
+                *bitcnt += (XLEN - sign_extendable_bits(packet->address) + 1);
         } else {
             /* no address, but compress full branch map*/
             if (trdb_get_compress_branch_map(c)) {
                 *bitcnt -= len;
-                uint32_t sext = p_sign_extendable_bits(packet->branch_map << 1);
+                uint32_t sext = sign_extendable_bits(packet->branch_map << 1);
                 if (sext > 31)
                     sext = 31;
                 *bitcnt += (31 - sext + 1);
@@ -168,7 +96,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
             err(c, "F_BRANCH_DIFF packet encountered but full_address set\n");
             return -trdb_bad_config;
         }
-        uint32_t len = p_branch_map_len(packet->branches);
+        uint32_t len = branch_map_len(packet->branches);
 
         /* we need enough space to do the packing it in uint128 */
         assert(128 > PULPPKTLEN + FORMATLEN + MSGTYPELEN + 5 + 31 + XLEN);
@@ -186,12 +114,12 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
             data.bits |=
                 ((__uint128_t)packet->address
                  << (PULPPKTLEN + MSGTYPELEN + FORMATLEN + BRANCHLEN + len));
-            *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
+            *bitcnt += (XLEN - sign_extendable_bits(packet->address) + 1);
         } else {
             /* no address, but compress full branch map*/
             if (trdb_get_compress_branch_map(c)) {
                 *bitcnt -= len;
-                uint32_t sext = p_sign_extendable_bits(packet->branch_map << 1);
+                uint32_t sext = sign_extendable_bits(packet->branch_map << 1);
                 if (sext > 31)
                     sext = 31;
                 *bitcnt += (31 - sext + 1);
@@ -215,7 +143,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
         if (trdb_is_full_address(c))
             *bitcnt += XLEN;
         else
-            *bitcnt += (XLEN - p_sign_extendable_bits(packet->address) + 1);
+            *bitcnt += (XLEN - sign_extendable_bits(packet->address) + 1);
 
         data.bits <<= align;
         /* this cuts off superfluous bits */
@@ -317,7 +245,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     packet->msg_type = (payload.bits >>= PULPPKTLEN) & MASK_FROM(MSGTYPELEN);
 
     /* implicit sign extension at packet length' bit */
-    payload.bits = p_sext128(payload.bits, packet->length);
+    payload.bits = sext128(payload.bits, packet->length);
 
     switch (packet->msg_type) {
     /* we are dealing with a regular trace packet */
@@ -331,7 +259,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
         switch (packet->format) {
         case F_BRANCH_FULL:
             packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
-            blen = p_branch_map_len(packet->branches);
+            blen = branch_map_len(packet->branches);
             packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(blen);
 
             lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN + blen;
@@ -341,7 +269,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
             } else {
                 packet->address = (payload.bits >>= blen) & MASK_FROM(XLEN);
                 packet->address =
-                    p_sext32(packet->address, packet->length - lower_boundary);
+                    sext32(packet->address, packet->length - lower_boundary);
             }
             return 0;
         case F_BRANCH_DIFF:
@@ -351,7 +279,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
                 return -trdb_bad_config;
             }
             packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
-            blen = p_branch_map_len(packet->branches);
+            blen = branch_map_len(packet->branches);
             packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(blen);
             lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN + blen;
 
@@ -360,7 +288,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
             } else {
                 packet->address = (payload.bits >>= blen) & MASK_FROM(XLEN);
                 packet->address =
-                    p_sext32(packet->address, packet->length - lower_boundary);
+                    sext32(packet->address, packet->length - lower_boundary);
             }
 
             return 0;
@@ -368,7 +296,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
             if (trdb_is_full_address(c)) {
                 packet->address = payload.bits & MASK_FROM(XLEN);
             } else {
-                packet->address = p_sext32(
+                packet->address = sext32(
                     payload.bits, packet->length - MSGTYPELEN - FORMATLEN);
             }
             return 0;

@@ -28,6 +28,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include "trace_debugger.h"
+#include "trdb_private.h"
 #include "disassembly.h"
 #include "disassembly_private.h"
 #include "serialize.h"
@@ -464,7 +465,7 @@ static bool branch_taken(bool before_compressed, uint32_t addr_before,
                              : !(addr_before + 4 == addr_after);
 }
 
-static uint32_t branch_map_len(uint32_t branches)
+uint32_t branch_map_len(uint32_t branches)
 {
     if (branches == 0) {
         return 31;
@@ -510,23 +511,6 @@ static bool is_unsupported(uint32_t instr)
            is_lp_starti_instr(instr) || is_lp_setupi_instr(instr);
 }
 
-static uint32_t sign_extendable_bits64(uint64_t addr)
-{
-    if(addr == 0 || addr == UINT64_MAX)
-	return 64;
-    int clz = __builtin_clzll(addr);
-    int clo = __builtin_clzll(~addr);
-    return clz > clo ? clz : clo;
-}
-
-static uint32_t sign_extendable_bits(uint32_t addr)
-{
-    if(addr == 0 || addr == UINT32_MAX)
-	return 32;
-    int clz = __builtin_clz(addr);
-    int clo = __builtin_clz(~addr);
-    return clz > clo ? clz : clo;
-}
 /* Sometimes we have to decide whether to put in the absolute or differential
  * address into the packet. We choose the one which has the least amount of
  * meaningfull bits, i.e. the bits that can't be inferred by sign-extension.
@@ -687,21 +671,6 @@ static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
     tr->address = tc_instr->iaddr;
     tr->length = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
     c->stats.start_packets++;
-}
-
-/* Sign extend a value @p val with @p bits to 32 bits. */
-static uint32_t sext32(uint32_t val, uint32_t bit)
-{
-    if (bit == 0)
-        return 0;
-
-    if (bit == 32)
-        return val;
-
-    int m = 1U << (bit - 1);
-
-    val = val & ((1U << bit) - 1);
-    return (val ^ m) - m;
 }
 
 /* Set @p tr to contain a packet that records the instruction flow until @p
