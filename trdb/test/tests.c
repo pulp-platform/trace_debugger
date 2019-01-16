@@ -598,7 +598,8 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
+        int step =
+            trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
         if (step == -1) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
@@ -721,23 +722,24 @@ int test_compress_cvs_trace(const char *trace_path)
         }
     }
     printf("%s\n", trace_path);
-    printf("instructions: %zu, packets: %zu, payload bytes: %zu "
-           "exceptions: %zu z/o: %zu\n",
-           instrcnt, ctx->stats.packets, ctx->stats.payloadbits / 8,
-           ctx->stats.exception_packets, ctx->stats.zo_addresses);
-    double bpi_payload = ctx->stats.payloadbits / (double)ctx->stats.instrs;
-    double bpi_full = (ctx->stats.payloadbits + ctx->stats.packets * 6) /
-                      (double)ctx->stats.instrs;
-    double bpi_pulp = (ctx->stats.pulpbits / (double)ctx->stats.instrs);
-    printf("(Compression) Bits per instruction (payload         ): %lf\n",
-           bpi_payload);
-    printf("(Compression) Bits per instruction (payload + header): %lf "
-           "(%+2.lf%%)\n",
-           bpi_full, bpi_full / bpi_payload * 100 - 100);
-    printf("(Compression) Bits per instruction (pulp            ): %lf "
-           "(%+2.lf%%)\n ",
-           bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
-
+    if (TRDB_VERBOSE_TESTS) {
+        printf("instructions: %zu, packets: %zu, payload bytes: %zu "
+               "exceptions: %zu z/o: %zu\n",
+               instrcnt, ctx->stats.packets, ctx->stats.payloadbits / 8,
+               ctx->stats.exception_packets, ctx->stats.zo_addresses);
+        double bpi_payload = ctx->stats.payloadbits / (double)ctx->stats.instrs;
+        double bpi_full = (ctx->stats.payloadbits + ctx->stats.packets * 6) /
+                          (double)ctx->stats.instrs;
+        double bpi_pulp = (ctx->stats.pulpbits / (double)ctx->stats.instrs);
+        printf("(Compression) Bits per instruction (payload         ): %lf\n",
+               bpi_payload);
+        printf("(Compression) Bits per instruction (payload + header): %lf "
+               "(%+2.lf%%)\n",
+               bpi_full, bpi_full / bpi_payload * 100 - 100);
+        printf("(Compression) Bits per instruction (pulp            ): %lf "
+               "(%+2.lf%%)\n ",
+               bpi_pulp, bpi_pulp / bpi_full * 100 - 100);
+    }
 fail:
     trdb_free_packet_list(&packet_list);
     trdb_free_instr_list(&instr_list);
@@ -780,7 +782,8 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
+        int step =
+            trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
         if (step == -1) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
@@ -788,8 +791,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         }
     }
     printf("%s\n", bin_path);
-    printf("(Compression) Bits per instruction: %lf\n",
-           ctx->stats.payloadbits / (double)ctx->stats.instrs);
+    if (TRDB_VERBOSE_TESTS)
+        printf("(Compression) Bits per instruction: %lf\n",
+               ctx->stats.payloadbits / (double)ctx->stats.instrs);
 
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
@@ -885,7 +889,8 @@ int test_decompress_trace_differential(const char *bin_path,
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
-        int step = trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
+        int step =
+            trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
         if (step == -1) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
@@ -893,18 +898,20 @@ int test_decompress_trace_differential(const char *bin_path,
         }
     }
     printf("%s\n", bin_path);
-    printf("(Compression) Bits per instruction: %lf\n",
-           ctx->stats.payloadbits / (double)ctx->stats.instrs);
-    printf("(Compression) Sign extension distribution:\n");
-    unsigned sum = 0;
-    for (unsigned i = 0; i < 32; i++) {
-        sum += ctx->stats.sext_bits[i];
-    }
-    for (unsigned i = 0; i < 32; i++) {
-        printf("(Compression) Bit %2u: %10.5lf%%\n", (i + 1),
-               (ctx->stats.sext_bits[i] * 100 / (double)sum));
-    }
 
+    if (TRDB_VERBOSE_TESTS) {
+        printf("(Compression) Bits per instruction: %lf\n",
+               ctx->stats.payloadbits / (double)ctx->stats.instrs);
+        printf("(Compression) Sign extension distribution:\n");
+        unsigned sum = 0;
+        for (unsigned i = 0; i < 32; i++) {
+            sum += ctx->stats.sext_bits[i];
+        }
+        for (unsigned i = 0; i < 32; i++) {
+            printf("(Compression) Bit %2u: %10.5lf%%\n", (i + 1),
+                   (ctx->stats.sext_bits[i] * 100 / (double)sum));
+        }
+    }
     if (TRDB_VERBOSE_TESTS)
         trdb_dump_packet_list(stdout, &packet1_head);
 
