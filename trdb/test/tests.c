@@ -981,8 +981,8 @@ int main(int argc, char *argv[argc + 1])
         "data/hello/build/pulpissimo-riscy/trdb_stimuli",
         "data/enqueue_delayed/build/pulpissimo-riscy/test/test",
         "data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli",
-        "data/timer_oneshot/build/pulpissimo-riscy/test/test",
-        "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli",
+        /* "data/timer_oneshot/build/pulpissimo-riscy/test/test", */
+        /* "data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli", */
         "data/wait_time/build/pulpissimo-riscy/test/test",
         "data/wait_time/build/pulpissimo-riscy/trdb_stimuli",
         "data/uart_send/build/pulpissimo-riscy/test/test",
