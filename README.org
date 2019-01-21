@@ -1,4 +1,6 @@
 * Trace Debugger For RISC-V Core
+#+ATTR_HTML: title="jenkins.com"
+[[https://iis-jenkins.ee.ethz.ch/job/pulpissimo_trdb][https://iis-jenkins.ee.ethz.ch/job/pulpissimo_trdb/badge/icon]]
 ** Overview
 An instruction tracer records the sequence of instructions that the CPU
 executes. Since the required bandwidth to record every instruction directly and
