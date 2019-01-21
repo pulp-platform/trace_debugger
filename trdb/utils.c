@@ -32,7 +32,7 @@ void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...)
 
 uint32_t sign_extendable_bits(uint32_t addr)
 {
-    if (addr == 0 || UINT32_MAX)
+    if (addr == 0 || addr == UINT32_MAX)
         return 32;
     int clz = __builtin_clz(addr);
     int clo = __builtin_clz(~addr);
