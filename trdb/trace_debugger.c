@@ -1384,31 +1384,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     bfd_vma pc = start_address; /* TODO: well we get a sync packet anyway... */
 
-    /* we need to be able to look at two packets to make the right
-     * decompression decision
-     */
-    struct tr_packet *last_packet = NULL;
-    struct tr_packet *packet      = NULL;
-    struct tr_packet *next_packet = NULL;
+    struct tr_packet *packet = NULL;
 
-    struct list_head *p;
-
-    list_for_each_prev (p, packet_list) {
-        packet = list_entry(p, typeof(*packet), list);
-        /* this is a bit ugly, we determine the next packet if it exists. Also
-         * we have to iterate the list in reverse order
-         */
-        if (p->prev != packet_list) {
-            next_packet = list_entry(p->prev, typeof(*next_packet), list);
-        } else {
-            next_packet = NULL;
-        }
-        if (p->next != packet_list) {
-            last_packet = list_entry(p->next, typeof(*last_packet), list);
-        } else {
-            last_packet = NULL;
-        }
-
+    list_for_each_entry_reverse (packet, packet_list, list) {
         /* we ignore unknown or unused packets (TIMER, SW) */
         if (packet->msg_type != W_TRACE) {
             info(c, "skipped a packet\n");
