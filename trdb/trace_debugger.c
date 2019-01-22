@@ -17,6 +17,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* Notes: No hardware loop support. Special additional packet for exceptions
+ * because vector table can be thought of as self-modifying code. Ingress
+ * interface is slightly different for RI5CY than according to the standard
+ * (always decompressed instruction + whether-it-was-compressed bit instead of
+ * the instruction in its original form since it fits better to RI5CY's
+ * pipeline).
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -47,7 +54,7 @@ struct filter_state;
  * decompression routine
  */
 struct trdb_config {
-    /* TODO: Unused, inspect full-address, iaddress-lsb-p, implicit-except,
+    /* TODO: Unused, inspect iaddress-lsb-p, implicit-except,
      * set-trace
      */
     uint64_t resync_max;
@@ -68,14 +75,10 @@ struct trdb_config {
     bool use_pulp_sext;
     /* Don't regard ret's as unpredictable discontinuity */
     bool implicit_ret;
-    /* Use additional packets to jump over vector table */
+    /* Use additional packets to jump over vector table, a hack for PULP */
     bool pulp_vector_table_packet;
     /* whether we compress full branch maps */
     bool compress_full_branch_map;
-
-    /* TODO: move this */
-    /* set to true to always diassemble to most general representation */
-    bool no_aliases;
 };
 
 /* Records the state of the CPU. The compression routine looks at a sequence of
@@ -102,7 +105,7 @@ struct trdb_state {
 
 /* Responsible to hold current branch state, that is the sequence of taken/not
  * taken branches so far. The bits field keeps track of that by setting the
- * cnt'th bit to 1 or 0 for a taken or not taken branch respectively. There can
+ * cnt'th bit to 0 or 1 for a taken or not taken branch respectively. There can
  * be at most 31 entries in the branch map. A full branch map has the full flag
  * set.
  */
@@ -139,30 +142,31 @@ struct trdb_compress {
     uint32_t last_iaddr; /* TODO: make this work with 64 bit */
 };
 
-/* Current state of the cpu during decompression. Allows one to
- * precisely emit a sequence  tr_instr. Handles the exception stack
- * (well here we assume that programs actually do nested exception
- * handling properly) and hardware loops (only the TODO: immediate
- * version for now).
+/* Current state of the cpu during decompression. Allows one to precisely emit a
+ * sequence tr_instr. Handles the exception stack (well here we assume that
+ * programs actually do nested exception handling properly) and hardware loops
+ * (TODO: not implemented).
  */
 /* TODO: Note on hw loops interrupted by an interrupt: look at after
  * the interrupt how many instructions of the loop are executed to
  * figure out in which loop number we got interrupted
  */
 
-/* declare stack vector */
+/* stack vector for return addresses */
 kvec_nt(trdb_stack, uint32_t);
 
 struct trdb_decompress {
-    /* TODO: loop addresses handling*/
+    /* TODO: hw loop addresses handling*/
     /* TODO: nested interrupt stacks for each privilege mode*/
     struct trdb_stack call_stack;
     /* record current privilege level */
     uint32_t privilege : PRIVLEN;
+    /* needed for address compression */
     uint32_t last_packet_addr;
     struct branch_map_state branch_map;
 };
 
+/* struct to record statistics about compression and decompression of traces */
 struct trdb_stats {
     size_t payloadbits;
     size_t packetbits;
@@ -183,8 +187,6 @@ struct trdb_stats {
 };
 
 /* Library context, needs to be passed to most function calls.
- * TODO: don't pass everything via stack
- * TODO: add comments
  */
 struct trdb_ctx {
     /* specific settings for compression/decompression */
@@ -250,7 +252,6 @@ void trdb_reset_compression(struct trdb_ctx *ctx)
 {
     ctx->config = (struct trdb_config){.resync_max               = UINT64_MAX,
                                        .full_address             = true,
-                                       .no_aliases               = true,
                                        .pulp_vector_table_packet = true,
                                        .full_statistics          = true};
 
@@ -267,7 +268,6 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
 {
     ctx->config = (struct trdb_config){.resync_max               = UINT64_MAX,
                                        .full_address             = true,
-                                       .no_aliases               = true,
                                        .pulp_vector_table_packet = true,
                                        .full_statistics          = true};
 
@@ -293,7 +293,6 @@ struct trdb_ctx *trdb_new()
 
     ctx->config = (struct trdb_config){.resync_max               = UINT64_MAX,
                                        .full_address             = true,
-                                       .no_aliases               = true,
                                        .pulp_vector_table_packet = true,
                                        .full_statistics          = true};
     ctx->cmp    = malloc(sizeof(*ctx->cmp));
@@ -472,7 +471,6 @@ static bool is_branch(uint32_t instr)
     bool is_riscv_compressed_branch =
         is_c_beqz_instr(instr) || is_c_bnez_instr(instr);
     return is_riscv_branch || is_pulp_branch || is_riscv_compressed_branch;
-    /* auipc */
 }
 
 static bool branch_taken(bool before_compressed, uint32_t addr_before,
@@ -480,7 +478,7 @@ static bool branch_taken(bool before_compressed, uint32_t addr_before,
 {
     /* TODO: this definitely doens't work for 64 bit instructions */
     /* since we have already decompressed instructions, but still compressed
-     * addresses we need this additional flag to tell us what the isntruction
+     * addresses we need this additional flag to tell us what the instruction
      * originally was. So we can't tell by looking at the lower two bits of
      * instr.
      */
@@ -544,36 +542,36 @@ static bool differential_addr(int *lead, uint32_t absolute,
     int abs  = sign_extendable_bits(absolute);
     int diff = sign_extendable_bits(differential);
 
-    /* /\* on tie we probe which one would be better *\/ */
-    /* if ((abs == 32) && (diff == 32)) { */
-    /*     if ((abs & 1) == last) { */
-    /*         *lead = 0; */
-    /*         return prefer_abs; */
-    /*     } else if ((diff & 1) == last) { */
-    /*         *lead = 0; */
-    /*         return prefer_diff; */
-    /*     } else { */
-    /*         *lead = 1; */
-    /*         return prefer_abs; */
-    /*     } */
-    /* } */
+    // /* on tie we probe which one would be better */
+    // if ((abs == 32) && (diff == 32)) {
+    //     if ((abs & 1) == last) {
+    //         *lead = 0;
+    //         return prefer_abs;
+    //     } else if ((diff & 1) == last) {
+    //         *lead = 0;
+    //         return prefer_diff;
+    //     } else {
+    //         *lead = 1;
+    //         return prefer_abs;
+    //     }
+    // }
 
-    /* /\* check if we can sign extend from the previous byte *\/ */
-    /* if (abs == 32) { */
-    /*     if ((abs & 1) == last_bit) */
-    /*         *lead = 0; */
-    /*     else */
-    /*         *lead = 1; */
-    /*     return prefer_abs; */
-    /* } */
+    // /* check if we can sign extend from the previous byte */
+    // if (abs == 32) {
+    //     if ((abs & 1) == last_bit)
+    //         *lead = 0;
+    //     else
+    //         *lead = 1;
+    //     return prefer_abs;
+    // }
 
-    /* if (diff == 32) { */
-    /*     if ((diff & 1) == last_bit) */
-    /*         *lead = 0; */
-    /*     else */
-    /*         *lead = 1; */
-    /*     return prefer_diff; */
-    /* } */
+    // if (diff == 32) {
+    //     if ((diff & 1) == last_bit)
+    //         *lead = 0;
+    //     else
+    //         *lead = 1;
+    //     return prefer_diff;
+    // }
 
     /* general case */
     *lead = diff > abs ? diff : abs;
@@ -600,36 +598,6 @@ static bool pulp_differential_addr(int *lead, uint32_t absolute,
     int abs  = sign_extendable_bits(absolute);
     int diff = sign_extendable_bits(differential);
 
-    /* /\* on tie we probe which one would be better *\/ */
-    /* if ((abs == 32) && (diff == 32)) { */
-    /*     if ((abs & 1) == last) { */
-    /*         *lead = 0; */
-    /*         return prefer_abs; */
-    /*     } else if ((diff & 1) == last) { */
-    /*         *lead = 0; */
-    /*         return prefer_diff; */
-    /*     } else { */
-    /*         *lead = 1; */
-    /*         return prefer_abs; */
-    /*     } */
-    /* } */
-
-    /* /\* check if we can sign extend from the previous byte *\/ */
-    /* if (abs == 32) { */
-    /*     if ((abs & 1) == last_bit) */
-    /*         *lead = 0; */
-    /*     else */
-    /*         *lead = 1; */
-    /*     return prefer_abs; */
-    /* } */
-
-    /* if (diff == 32) { */
-    /*     if ((diff & 1) == last_bit) */
-    /*         *lead = 0; */
-    /*     else */
-    /*         *lead = 1; */
-    /*     return prefer_diff; */
-    /* } */
     /* we are only interested in sign extension for byte boundaries */
     abs  = quantize_clz(abs);
     diff = quantize_clz(diff);
@@ -865,6 +833,10 @@ static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
     ctx->stats.bmap_full_packets++;
 }
 
+/* Compress instruction traces the same way as we do it on the PULP trace
+ * debugger, so this is meant to emulate that behaviour and not to be a generic
+ * way how a trace encoder would do it.
+ */
 int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
                              struct tr_instr *instr)
 {
@@ -978,12 +950,12 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
         /* end of cycle */
 
     } else if (lastc->emitted_exception_sync && pulp_vector_table_packet) {
-        /* First we assume that the vector table entry is a jump. Since that
-         * entry can change during runtime, we need to emit the jump
+        /* Hack of PULP: First we assume that the vector table entry is a jump.
+         * Since that entry can change during runtime, we need to emit the jump
          * destination address, which is the second instruction of the trap
-         * handler. This a bit hacky and made to work for the PULP. If
-         * someone puts something else than a jump instruction there then
-         * all bets are off. This is a custom change.
+         * handler. This a bit hacky and made to work for the PULP. If someone
+         * puts something else than a jump instruction there then all bets are
+         * off. This is a custom change.
          */
         /* Start packet */
         /* Send te_inst:
@@ -1075,20 +1047,6 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
         err(ctx, "context_change not supported\n");
         status = -trdb_unimplemented;
         goto fail;
-        /* tr->format = F_SYNC; */
-        /* tr->subformat = SF_CONTEXT; */
-        /* tr->context = 0; /\* TODO: what comes here? *\/ */
-        /* *last_iaddr = tr->address; */
-        /* tr->privilege = tc_instr->priv; */
-        /* /\* tr->branch *\/ */
-        /* /\* tr->address *\/ */
-        /* /\* tr->ecause *\/ */
-        /* /\* tr->interrupt *\/ */
-        /* /\* tr->tval *\/ */
-        /* tr->length =  */
-        /* list_add(&tr->list, packet_list); */
-
-        /* generated_packet = 1; */
     }
 
     /* update last cycle state */
@@ -1136,6 +1094,9 @@ fail:
         return status;
 }
 
+/* this is just a different interface to trdb_compress_trace_step() where
+ * packets generated packetes are appened to a given list header
+ */
 int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
                                  struct list_head *packet_list,
                                  struct tr_instr *instr)
@@ -1176,7 +1137,7 @@ int trdb_pulp_model_step(struct trdb_ctx *ctx, struct tr_instr *instr,
     /* if fifo full, do backstalling etc. depending on recovery mode*/
 }
 
-/* try to update the return address stack */
+/* try to update the return address stack*/
 static int update_ras(struct trdb_ctx *c, uint32_t instr, uint32_t addr,
                       struct trdb_stack *stack, uint32_t *ret_addr)
 {
@@ -1390,7 +1351,6 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     struct trdb_config *config = &c->config;
     bool full_address          = config->full_address;
     bool implicit_ret          = config->implicit_ret;
-    bool no_aliases            = config->no_aliases;
 
     /* find section belonging to start_address */
     bfd_vma start_address = abfd->start_address;
@@ -1411,7 +1371,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     dunit.dinfo = &dinfo;
     /* TODO: remove that stuff, goes into global context */
-    trdb_init_disassembler_unit(&dunit, abfd, no_aliases ? "no-aliases" : NULL);
+    trdb_init_disassembler_unit(&dunit, abfd, "no-aliases");
     /* advanced fprintf output handling */
     dunit.dinfo->fprintf_func = build_instr_fprintf;
     /* dunit.dinfo->stream = &instr; */
@@ -1511,7 +1471,6 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * address field
              * TODO: edgecase where we sign extend from msb of branchmap
              */
-
             uint32_t absolute_addr = packet->address;
 
             if (dec_ctx->branch_map.cnt > 0)
@@ -1559,7 +1518,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 switch (dinfo.insn_type) {
                 case dis_nonbranch:
                     /* TODO: we need this hack since {m,s,u} ret are not
-                     * classified
+                     * "classified" by libopcodes
                      */
                     if (!is_unpred_discontinuity(dis_instr->instr,
                                                  implicit_ret)) {
@@ -1582,9 +1541,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
 
+                    /* this should never happen */
                     if (dec_ctx->branch_map.cnt > 1 && dinfo.target == 0)
-                        err(c,
-                            "can't predict the jump target, never happens\n");
+                        err(c, "can't predict the jump target\n");
 
                     if (dec_ctx->branch_map.cnt == 1 && dinfo.target == 0) {
                         if (!dec_ctx->branch_map.full) {
@@ -1625,9 +1584,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         bool branch_taken = !(dec_ctx->branch_map.bits & 1);
                         dec_ctx->branch_map.bits >>= 1;
                         dec_ctx->branch_map.cnt--;
+                        /* this should never happen */
                         if (dinfo.target == 0)
-                            err(c,
-                                "can't predict the jump target, never happens\n");
+                            err(c, "can't predict the jump target\n");
                         if (branch_taken)
                             pc = dinfo.target;
                         break;
@@ -1722,7 +1681,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 switch (dinfo.insn_type) {
                 case dis_nonbranch:
                     /* TODO: we need this hack since {m,s,u} ret are not
-                     * classified
+                     * "classified" by libopcodes
                      */
                     if (!is_unpred_discontinuity(dis_instr->instr,
                                                  implicit_ret)) {
@@ -1745,9 +1704,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
 
+                    /* this should never happen */
                     if (dec_ctx->branch_map.cnt > 1 && dinfo.target == 0)
-                        err(c,
-                            "can't predict the jump target, never happens\n");
+                        err(c, "can't predict the jump target\n");
 
                     if (dec_ctx->branch_map.cnt == 1 && dinfo.target == 0) {
                         if (!dec_ctx->branch_map.full) {
@@ -1786,9 +1745,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         bool branch_taken = !(dec_ctx->branch_map.bits & 1);
                         dec_ctx->branch_map.bits >>= 1;
                         dec_ctx->branch_map.cnt--;
+                        /* this should never happen */
                         if (dinfo.target == 0)
-                            err(c,
-                                "can't predict the jump target, never happens\n");
+                            err(c, "can't predict the jump target\n");
                         if (branch_taken)
                             pc = dinfo.target;
                         break;
@@ -1842,8 +1801,8 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             int size   = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
             if (status < 0)
                 goto fail;
-            /* TODO: ras handling more difficult here?*/
 
+            /* TODO: warning, RAS handling is missing here */
             dis_instr->priv = dec_ctx->privilege;
             if ((status = add_trace(c, instr_list, dis_instr)) < 0)
                 goto fail;
@@ -1853,7 +1812,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             switch (dinfo.insn_type) {
             case dis_nonbranch:
                 /* TODO: we need this hack since {m,s,u} ret are not
-                 * classified in libopcodes
+                 * "classified"" in libopcodes
                  */
                 if (!is_unpred_discontinuity(dis_instr->instr, implicit_ret)) {
                     break;
@@ -1861,14 +1820,16 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 dbg(c, "detected mret, uret or sret\n");
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
+                             /* this should never happen */
                 if (dinfo.target == 0)
-                    err(c, "can't predict the jump target, never happens\n");
+                    err(c, "can't predict the jump target\n");
                 pc = dinfo.target;
                 break;
 
             case dis_condbranch:
+                /* this should never happen */
                 if (dinfo.target == 0)
-                    err(c, "can't predict the jump target, never happens\n");
+                    err(c, "can't predict the jump target\n");
                 if (packet->branch == 0) {
                     err(c, "doing a branch from a F_SYNC packet\n");
                     pc = dinfo.target;
@@ -1884,26 +1845,22 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 goto fail;
             }
         } else if (packet->format == F_ADDR_ONLY) {
-            /* We have to find the instruction where we can apply the address
-             * information to. This might either be a discontinuity infromation
-             * or a sync up address. So we stop either at the given address or
-             * use it on a discontinuity, whichever comes first. There can be an
-             * ambiguity between whether a packet is meant for an address for
-             * for a jump target. This could happen if we have jr infinite loop
-             * with the only way out being exception. Related to that there is
-             * also that
+            /* Thoughts on F_ADDR_ONLY packets:
              *
-             * Resync packets have an issue, namely that we can't distinguishing
-             * between address sync and unpredictable discontinuities. We can
-             * distinguish the case of advance to next address with advance to
-             * unpredictable discontinuitiy by inspecting the next packet. The
-             * events halt and unqualified happen if we don't have any more
-             * packets (next_packet == NULL, TODO: make this better). Exception
-             * and privilege change events always happen in packet pairs, which,
-             * again, we can figure out by looking at next_packet. If any test
-             * so far failed, then we know, since we are disallowing resync
-             * packets for now, that we are dealing with a unpredictable
-             * discontinuity.
+             * We have to find the instruction where we can apply the address
+             * information to. This might either be a "discontinuity
+             * information", that is the target address of e.g. a jalr, or a the
+             * address itself. The latter case e.g. happens when we get a packet
+             * due to stopping the tracing, kind of a delimiter packet. So what
+             * we do is we stop either at the given address or use it on a
+             * discontinuity, whichever comes first. This means there can be an
+             * ambiguity between whether a packet is meant for an address or
+             * for a jump target. This could happen if we have jr infinite loop
+             * with the only way out being exception.
+             *
+             * Resync packets have that issue too, namely that we can't
+             * distinguishing between address sync and unpredictable
+             * discontinuities.
              */
             bool hit_address       = false;
             bool hit_discontinuity = false;
@@ -1960,7 +1917,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 switch (dinfo.insn_type) {
                 case dis_nonbranch:
                     /* TODO: we need this hack since {m,s,u} ret are not
-                     * classified
+                     * "classified" by libopcodes
                      */
                     if (!is_unpred_discontinuity(dis_instr->instr,
                                                  implicit_ret)) {
