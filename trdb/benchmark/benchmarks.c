@@ -53,11 +53,11 @@ static double percent(size_t a, size_t total)
 
 int compress_cvs_trace(const char *trace_path, struct result *comparison)
 {
-    int status = 0;
-    struct trdb_ctx *ctx = trdb_new();
+    int status                     = 0;
+    struct trdb_ctx *ctx           = trdb_new();
     struct disassembler_unit dunit = {0};
-    struct disassemble_info dinfo = {0};
-    dunit.dinfo = &dinfo;
+    struct disassemble_info dinfo  = {0};
+    dunit.dinfo                    = &dinfo;
 
     trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 
@@ -68,8 +68,8 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
         status = -1;
         goto fail;
     }
-    bool full_address = false;
-    bool implicit_ret = true;
+    bool full_address  = false;
+    bool implicit_ret  = true;
     bool compress_bmap = true;
 
     trdb_set_dunit(ctx, &dunit);
@@ -98,16 +98,16 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     struct trdb_packet_stats stats = {0};
     trdb_get_packet_stats(ctx, &stats);
 
-    size_t packets = trdb_get_packetcnt(ctx);
-    size_t payloadbits = trdb_get_payloadbits(ctx);
-    size_t instrs = trdb_get_instrcnt(ctx);
-    size_t pulpbits = trdb_get_pulpbits(ctx);
-    size_t exception_packets = stats.exception_packets;
-    size_t addr_only_packets = stats.addr_only_packets;
-    size_t start_packets = stats.start_packets;
-    size_t diff_packets = stats.diff_packets;
-    size_t abs_packets = stats.abs_packets;
-    size_t bmap_full_packets = stats.bmap_full_packets;
+    size_t packets                = trdb_get_packetcnt(ctx);
+    size_t payloadbits            = trdb_get_payloadbits(ctx);
+    size_t instrs                 = trdb_get_instrcnt(ctx);
+    size_t pulpbits               = trdb_get_pulpbits(ctx);
+    size_t exception_packets      = stats.exception_packets;
+    size_t addr_only_packets      = stats.addr_only_packets;
+    size_t start_packets          = stats.start_packets;
+    size_t diff_packets           = stats.diff_packets;
+    size_t abs_packets            = stats.abs_packets;
+    size_t bmap_full_packets      = stats.bmap_full_packets;
     size_t bmap_full_addr_packets = stats.bmap_full_addr_packets;
 
     /* compare also against the version which doesn't use address and branchmap
@@ -129,14 +129,14 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
         }
     }
 
-    size_t noc_instrs = trdb_get_instrcnt(ctx);
+    size_t noc_instrs      = trdb_get_instrcnt(ctx);
     size_t noc_payloadbits = trdb_get_payloadbits(ctx);
 
     printf("Name of test: %s\n", trace_path);
     if (comparison->instrcnt != instrcnt)
         printf("Number of instruction mismatch! %zu, %zu\n",
                comparison->instrcnt, instrcnt);
-
+    printf("no ret packet count:%zu\n", trdb_get_packetcnt(ctx));
     printf(
         "pulp settings: full address: %s / implicit return: %s / compress full branch map: %s\n",
         conv_tf(full_address), conv_tf(implicit_ret), conv_tf(compress_bmap));
@@ -156,9 +156,9 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
            percent(start_packets, packets), exception_packets,
            percent(exception_packets, packets));
     double bpi_noc_payload = noc_payloadbits / (double)noc_instrs;
-    double bpi_payload = payloadbits / (double)instrs;
-    double bpi_full = (payloadbits + packets * 6) / (double)instrs;
-    double bpi_pulp = (pulpbits / (double)instrs);
+    double bpi_payload     = payloadbits / (double)instrs;
+    double bpi_full        = (payloadbits + packets * 6) / (double)instrs;
+    double bpi_pulp        = (pulpbits / (double)instrs);
     printf("Bits per instruction (ultra           ): %lf\n", comparison->bpi);
     printf("Bits per instruction (payload no compr): %lf "
            "(%+2.lf%% vs ultra)\n",

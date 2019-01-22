@@ -29,7 +29,7 @@
 /* define functions which help figure out what function we are dealing with */
 #define DECLARE_INSN(code, match, mask)                                        \
     static const uint32_t match_##code = match;                                \
-    static const uint32_t mask_##code = mask;                                  \
+    static const uint32_t mask_##code  = mask;                                 \
     static bool is_##code##_instr(long instr)                                  \
     {                                                                          \
         return (instr & mask) == match;                                        \
@@ -99,9 +99,9 @@ static enum trdb_ras is_jalr_funcall(uint32_t instr)
      *
      * This is table 2.1 in riscv-spec-v2.2
      */
-    bool is_jalr = is_jalr_instr(instr);
-    uint32_t rd = (instr & MASK_RD) >> OP_SH_RD;
-    uint32_t rs = (instr & MASK_RS1) >> OP_SH_RS1;
+    bool is_jalr    = is_jalr_instr(instr);
+    uint32_t rd     = (instr & MASK_RD) >> OP_SH_RD;
+    uint32_t rs     = (instr & MASK_RS1) >> OP_SH_RS1;
     bool is_rd_link = (rd == X_RA) || (rd == X_T0);
     bool is_rs_link = (rs == X_RA) || (rs == X_T0);
     bool is_eq_link = is_rd_link && is_rs_link && rd == rs;
@@ -121,8 +121,8 @@ static enum trdb_ras is_jalr_funcall(uint32_t instr)
 static enum trdb_ras is_c_jalr_funcall(uint32_t instr)
 {
     /* C.JALR expands to jalr x1=X_RA, rs1, 0 */
-    bool is_c_jalr = is_really_c_jalr_instr(instr);
-    uint32_t rs = (instr & MASK_RD) >> OP_SH_RD;
+    bool is_c_jalr  = is_really_c_jalr_instr(instr);
+    uint32_t rs     = (instr & MASK_RD) >> OP_SH_RD;
     bool is_rs_link = (rs == X_RA) || (rs == X_T0);
     if (!is_c_jalr)
         return none;
@@ -137,7 +137,7 @@ static enum trdb_ras is_c_jalr_funcall(uint32_t instr)
 static enum trdb_ras is_jal_funcall(uint32_t instr)
 {
     /* if jal with rd=x1/x5 then we know it's a function call */
-    bool is_jal = is_jal_instr(instr);
+    bool is_jal     = is_jal_instr(instr);
     bool is_rd_link = (instr & MASK_RD) == (X_RA << OP_SH_RD) ||
                       (instr & MASK_RD) == (X_T0 << OP_SH_RD);
     if (is_jal && is_rd_link)

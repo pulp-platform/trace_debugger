@@ -24,4 +24,6 @@
  * @brief Software model for the hardware trace debugger.
  */
 
+#include <stdint.h>
+
 uint32_t branch_map_len(uint32_t branches);

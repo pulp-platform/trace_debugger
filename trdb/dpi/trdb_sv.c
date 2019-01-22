@@ -95,21 +95,21 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
     *packet_valid = 0;
 
     /* Note: aval and bval are uint32_t per standard */
-    struct tr_instr tr_instr = {.valid = ivalid,
-                                .exception = iexception,
-                                .interrupt = interrupt,
-                                .cause = cause->aval,
-                                .tval = tval->aval,
-                                .priv = priv->aval,
-                                .iaddr = iaddr->aval,
-                                .instr = instr->aval,
+    struct tr_instr tr_instr = {.valid      = ivalid,
+                                .exception  = iexception,
+                                .interrupt  = interrupt,
+                                .cause      = cause->aval,
+                                .tval       = tval->aval,
+                                .priv       = priv->aval,
+                                .iaddr      = iaddr->aval,
+                                .instr      = instr->aval,
                                 .compressed = compressed};
 
     /* upper bounded local buffer for serialization */
-    size_t bitcnt = 0;
+    size_t bitcnt                          = 0;
     uint8_t buff[sizeof(struct tr_packet)] = {0};
-    svLogicVecVal tmp = {0};
-    struct tr_packet *latest_packet = NULL;
+    svLogicVecVal tmp                      = {0};
+    struct tr_packet *latest_packet        = NULL;
 
     int p = trdb_compress_trace_step_add(ctx, &packets, &tr_instr);
 

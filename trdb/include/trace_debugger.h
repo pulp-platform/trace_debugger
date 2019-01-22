@@ -90,8 +90,8 @@ struct tr_instr {
 enum tr_packet_format {
     F_BRANCH_FULL = 0,
     F_BRANCH_DIFF = 1,
-    F_ADDR_ONLY = 2,
-    F_SYNC = 3
+    F_ADDR_ONLY   = 2,
+    F_SYNC        = 3
 };
 
 /**

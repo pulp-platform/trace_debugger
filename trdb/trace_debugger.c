@@ -248,34 +248,34 @@ static int log_priority(const char *priority)
 
 void trdb_reset_compression(struct trdb_ctx *ctx)
 {
-    ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
-                                       .full_address = true,
-                                       .no_aliases = true,
+    ctx->config = (struct trdb_config){.resync_max               = UINT64_MAX,
+                                       .full_address             = true,
+                                       .no_aliases               = true,
                                        .pulp_vector_table_packet = true,
-                                       .full_statistics = true};
+                                       .full_statistics          = true};
 
-    ctx->cmp->lastc = (struct trdb_state){.privilege = 7};
-    ctx->cmp->thisc = (struct trdb_state){.privilege = 7};
-    ctx->cmp->nextc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->lastc      = (struct trdb_state){.privilege = 7};
+    ctx->cmp->thisc      = (struct trdb_state){.privilege = 7};
+    ctx->cmp->nextc      = (struct trdb_state){.privilege = 7};
     ctx->cmp->branch_map = (struct branch_map_state){0};
-    ctx->cmp->filter = (struct filter_state){0};
+    ctx->cmp->filter     = (struct filter_state){0};
     ctx->cmp->last_iaddr = 0;
-    ctx->stats = (struct trdb_stats){0};
+    ctx->stats           = (struct trdb_stats){0};
 }
 
 void trdb_reset_decompression(struct trdb_ctx *ctx)
 {
-    ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
-                                       .full_address = true,
-                                       .no_aliases = true,
+    ctx->config = (struct trdb_config){.resync_max               = UINT64_MAX,
+                                       .full_address             = true,
+                                       .no_aliases               = true,
                                        .pulp_vector_table_packet = true,
-                                       .full_statistics = true};
+                                       .full_statistics          = true};
 
-    *ctx->dec = (struct trdb_decompress){{0}};
+    *ctx->dec            = (struct trdb_decompress){{0}};
     ctx->dec->branch_map = (struct branch_map_state){0};
     kv_destroy(ctx->dec->call_stack);
     kv_init(ctx->dec->call_stack);
-    ctx->dec->privilege = 7;
+    ctx->dec->privilege        = 7;
     ctx->dec->last_packet_addr = 0;
 
     ctx->cmp->filter = (struct filter_state){0};
@@ -291,21 +291,21 @@ struct trdb_ctx *trdb_new()
         return NULL;
     *ctx = (struct trdb_ctx){0};
 
-    ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
-                                       .full_address = true,
-                                       .no_aliases = true,
+    ctx->config = (struct trdb_config){.resync_max               = UINT64_MAX,
+                                       .full_address             = true,
+                                       .no_aliases               = true,
                                        .pulp_vector_table_packet = true,
-                                       .full_statistics = true};
-    ctx->cmp = malloc(sizeof(*ctx->cmp));
+                                       .full_statistics          = true};
+    ctx->cmp    = malloc(sizeof(*ctx->cmp));
     if (!ctx->cmp) {
         free(ctx);
         return NULL;
     }
-    ctx->cmp->lastc = (struct trdb_state){.privilege = 7};
-    ctx->cmp->thisc = (struct trdb_state){.privilege = 7};
-    ctx->cmp->nextc = (struct trdb_state){.privilege = 7};
+    ctx->cmp->lastc      = (struct trdb_state){.privilege = 7};
+    ctx->cmp->thisc      = (struct trdb_state){.privilege = 7};
+    ctx->cmp->nextc      = (struct trdb_state){.privilege = 7};
     ctx->cmp->branch_map = (struct branch_map_state){0};
-    ctx->cmp->filter = (struct filter_state){0};
+    ctx->cmp->filter     = (struct filter_state){0};
     ctx->cmp->last_iaddr = 0;
 
     ctx->dec = malloc(sizeof(*ctx->dec));
@@ -328,7 +328,7 @@ struct trdb_ctx *trdb_new()
     }
     *ctx->dis_instr = (struct tr_instr){0};
 
-    ctx->log_fn = log_stdout_quiet;
+    ctx->log_fn       = log_stdout_quiet;
     ctx->log_priority = LOG_ERR; // TODO: change that
 
     /* environment overwrites config */
@@ -452,14 +452,14 @@ size_t trdb_get_instrbits(struct trdb_ctx *ctx)
 void trdb_get_packet_stats(struct trdb_ctx *ctx,
                            struct trdb_packet_stats *stats)
 {
-    struct trdb_stats *rstats = &ctx->stats;
-    stats->packets = rstats->packets;
-    stats->addr_only_packets = rstats->addr_only_packets;
-    stats->exception_packets = rstats->exception_packets;
-    stats->start_packets = rstats->start_packets;
-    stats->diff_packets = rstats->diff_packets;
-    stats->abs_packets = rstats->abs_packets;
-    stats->bmap_full_packets = rstats->bmap_full_packets;
+    struct trdb_stats *rstats     = &ctx->stats;
+    stats->packets                = rstats->packets;
+    stats->addr_only_packets      = rstats->addr_only_packets;
+    stats->exception_packets      = rstats->exception_packets;
+    stats->start_packets          = rstats->start_packets;
+    stats->diff_packets           = rstats->diff_packets;
+    stats->abs_packets            = rstats->abs_packets;
+    stats->bmap_full_packets      = rstats->bmap_full_packets;
     stats->bmap_full_addr_packets = rstats->bmap_full_addr_packets;
 }
 
@@ -541,7 +541,7 @@ static bool is_unsupported(uint32_t instr)
 static bool differential_addr(int *lead, uint32_t absolute,
                               uint32_t differential)
 {
-    int abs = sign_extendable_bits(absolute);
+    int abs  = sign_extendable_bits(absolute);
     int diff = sign_extendable_bits(differential);
 
     /* /\* on tie we probe which one would be better *\/ */
@@ -597,7 +597,7 @@ static int quantize_clz(int x)
 static bool pulp_differential_addr(int *lead, uint32_t absolute,
                                    uint32_t differential)
 {
-    int abs = sign_extendable_bits(absolute);
+    int abs  = sign_extendable_bits(absolute);
     int diff = sign_extendable_bits(differential);
 
     /* /\* on tie we probe which one would be better *\/ */
@@ -631,7 +631,7 @@ static bool pulp_differential_addr(int *lead, uint32_t absolute,
     /*     return prefer_diff; */
     /* } */
     /* we are only interested in sign extension for byte boundaries */
-    abs = quantize_clz(abs);
+    abs  = quantize_clz(abs);
     diff = quantize_clz(diff);
     assert(abs != 32); /* there is always a one or zero leading */
 
@@ -646,9 +646,9 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
                                   struct tr_instr *tc_instr,
                                   struct tr_instr *nc_instr)
 {
-    tr->format = F_SYNC;          /* sync */
+    tr->format    = F_SYNC;       /* sync */
     tr->subformat = SF_EXCEPTION; /* exception */
-    tr->context = 0;              /* TODO: what comes here? */
+    tr->context   = 0;            /* TODO: what comes here? */
     tr->privilege = tc_instr->priv;
 
     /* if we happen to generate a packet when when the pc points to a branch, we
@@ -667,10 +667,10 @@ static void emit_exception_packet(struct trdb_ctx *c, struct tr_packet *tr,
      * lastc_exception) to be true since it takes one cycle
      * for lastc_exception to change
      */
-    tr->ecause = lc_instr->cause;
+    tr->ecause    = lc_instr->cause;
     tr->interrupt = lc_instr->interrupt;
-    tr->tval = lc_instr->tval;
-    tr->length = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
+    tr->tval      = lc_instr->tval;
+    tr->length    = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN + CAUSELEN + 1;
     c->stats.exception_packets++;
 }
 
@@ -679,9 +679,9 @@ static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
                               struct tr_instr *tc_instr,
                               struct tr_instr *nc_instr)
 {
-    tr->format = F_SYNC;      /* sync */
+    tr->format    = F_SYNC;   /* sync */
     tr->subformat = SF_START; /* start */
-    tr->context = 0;          /* TODO: what comes here? */
+    tr->context   = 0;        /* TODO: what comes here? */
     tr->privilege = tc_instr->priv;
     /* again, this information won't be in any preceding or following branch map
      * so we have to put in here. See emit_exception_packet() for details.
@@ -692,7 +692,7 @@ static void emit_start_packet(struct trdb_ctx *c, struct tr_packet *tr,
     else
         tr->branch = 0;
     tr->address = tc_instr->iaddr;
-    tr->length = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
+    tr->length  = FORMATLEN + FORMATLEN + PRIVLEN + 1 + XLEN;
     c->stats.start_packets++;
 }
 
@@ -716,12 +716,12 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
 
     /* we don't have any branches to keep track of */
     if (branch_map->cnt == 0) {
-        tr->format = F_ADDR_ONLY;
+        tr->format   = F_ADDR_ONLY;
         tr->branches = branch_map->cnt;
 
         if (full_address) {
             tr->address = tc_instr->iaddr;
-            tr->length = FORMATLEN + XLEN;
+            tr->length  = FORMATLEN + XLEN;
         } else {
             /* always differential in F_ADDR_ONLY*/
             uint32_t diff = last_iaddr - tc_instr->iaddr;
@@ -733,7 +733,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             /* should only be relevant for serialization */
             /* tr->address = MASK_FROM(keep) & diff; */
             tr->address = diff;
-            tr->length = FORMATLEN + keep;
+            tr->length  = FORMATLEN + keep;
             /* record distribution */
             stats->sext_bits[keep - 1]++;
             if (tr->address == 0 || tr->address == -1)
@@ -748,7 +748,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
         tr->branches = branch_map->cnt;
 
         if (full_address) {
-            tr->format = F_BRANCH_FULL;
+            tr->format  = F_BRANCH_FULL;
             tr->address = tc_instr->iaddr;
             tr->length =
                 FORMATLEN + BRANCHLEN + branch_map_len(branch_map->cnt);
@@ -776,21 +776,21 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             uint32_t diff = last_iaddr - tc_instr->iaddr;
             uint32_t full = tc_instr->iaddr;
             uint32_t keep = 0;
-            int lead = 0;
+            int lead      = 0;
             bool use_differential =
                 ctx->config.use_pulp_sext
                     ? pulp_differential_addr(&lead, full, diff)
                     : differential_addr(&lead, full, diff);
 
             if (use_differential) {
-                keep = XLEN - lead + 1;
+                keep       = XLEN - lead + 1;
                 tr->format = F_BRANCH_DIFF;
                 /* this should only be relevant for serialization */
                 /* tr->address = MASK_FROM(keep) & diff; */
                 tr->address = diff;
                 stats->sext_bits[keep - 1]++;
             } else {
-                keep = XLEN - lead + 1;
+                keep       = XLEN - lead + 1;
                 tr->format = F_BRANCH_FULL;
                 /* this should only be relevant for serialization */
                 /* tr->address = MASK_FROM(keep) & full; */
@@ -833,7 +833,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             }
         }
         tr->branch_map = branch_map->bits;
-        *branch_map = (struct branch_map_state){0};
+        *branch_map    = (struct branch_map_state){0};
     }
 
     return 0;
@@ -850,7 +850,7 @@ static void emit_full_branch_map(struct trdb_ctx *ctx, struct tr_packet *tr,
     assert(branch_map->cnt == 31);
     tr->format = F_BRANCH_FULL;
     /* full branch map withouth address is indicated by settings branches to 0*/
-    tr->branches = 0;
+    tr->branches   = 0;
     tr->branch_map = branch_map->bits;
     /* No address needed */
     uint32_t sext = sign_extendable_bits(branch_map->bits << 1);
@@ -873,13 +873,13 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
     if (!ctx || !packet || !instr)
         return -trdb_invalid;
 
-    struct trdb_stats *stats = &ctx->stats;
+    struct trdb_stats *stats   = &ctx->stats;
     struct trdb_config *config = &ctx->config;
 
-    int generated_packet = 0;
-    bool full_address = config->full_address;
+    int generated_packet          = 0;
+    bool full_address             = config->full_address;
     bool pulp_vector_table_packet = config->pulp_vector_table_packet;
-    bool implicit_ret = config->implicit_ret;
+    bool implicit_ret             = config->implicit_ret;
 
     /* for each cycle */
     // TODO: fix this hack by doing unqualified instead
@@ -894,17 +894,17 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
     struct tr_instr *lc_instr = &ctx->cmp->lastc.instr;
 
     struct branch_map_state *branch_map = &ctx->cmp->branch_map;
-    struct filter_state *filter = &ctx->cmp->filter;
+    struct filter_state *filter         = &ctx->cmp->filter;
 
     thisc->halt = false;
     /* test for qualification by filtering */
     /* TODO: implement filtering logic */
 
-    nextc->qualified = true;
+    nextc->qualified   = true;
     nextc->unqualified = !nextc->qualified;
-    nextc->exception = instr->exception;
+    nextc->exception   = instr->exception;
     nextc->unpred_disc = is_unpred_discontinuity(instr->instr, implicit_ret);
-    nextc->privilege = instr->priv;
+    nextc->privilege   = instr->priv;
     nextc->privilege_change = (thisc->privilege != nextc->privilege);
 
     /* last address we emitted in packet, needed to compute differential
@@ -942,7 +942,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
 
     if (filter->resync_cnt++ == config->resync_max) {
         filter->resync_pend = true;
-        filter->resync_cnt = 0;
+        filter->resync_cnt  = 0;
     }
 
     if (is_branch(tc_instr->instr)) {
@@ -972,7 +972,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
         *last_iaddr = tc_instr->iaddr;
 
         thisc->emitted_exception_sync = true;
-        filter->resync_pend = false; /* TODO: how to handle this */
+        filter->resync_pend           = false; /* TODO: how to handle this */
 
         generated_packet = 1;
         /* end of cycle */
@@ -995,7 +995,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
         *last_iaddr = tc_instr->iaddr;
 
         filter->resync_pend = false;
-        generated_packet = 1;
+        generated_packet    = 1;
 
     } else if (firstc_qualified || thisc->unhalted || thisc->privilege_change ||
                (filter->resync_pend && branch_map->cnt == 0)) {
@@ -1010,7 +1010,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
         *last_iaddr = tc_instr->iaddr;
 
         filter->resync_pend = false;
-        generated_packet = 1;
+        generated_packet    = 1;
 
     } else if (lastc->unpred_disc) {
         /* Send te_inst:
@@ -1023,7 +1023,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
             goto fail;
         }
 
-        *last_iaddr = tc_instr->iaddr;
+        *last_iaddr      = tc_instr->iaddr;
         generated_packet = 1;
 
     } else if (filter->resync_pend && branch_map->cnt > 0) {
@@ -1106,7 +1106,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
         if (config->full_statistics) {
             /* figure out pulp payload by serializing and couting bits */
             uint8_t bin[16] = {0};
-            size_t bitcnt = 0;
+            size_t bitcnt   = 0;
             if (trdb_pulp_serialize_packet(ctx, packet, &bitcnt, 0, bin)) {
                 dbg(ctx, "failed to count bits of pulp packet\n");
             }
@@ -1183,7 +1183,7 @@ static int update_ras(struct trdb_ctx *c, uint32_t instr, uint32_t addr,
     if (!stack)
         return -trdb_invalid;
 
-    bool compressed = (instr & 0x3) != 0x3;
+    bool compressed   = (instr & 0x3) != 0x3;
     enum trdb_ras ras = get_instr_ras_type(instr);
 
     switch (ras) {
@@ -1260,7 +1260,7 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
 
     struct disassemble_info *dinfo = dunit->dinfo;
     /* Important to set for internal calls to fprintf */
-    c->dis_instr = instr;
+    c->dis_instr  = instr;
     dinfo->stream = c;
 
     /* print instr address */
@@ -1288,9 +1288,9 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
         return 0;
     }
 
-    instr->valid = true;
-    instr->iaddr = pc;
-    instr->instr = instr_bits;
+    instr->valid      = true;
+    instr->iaddr      = pc;
+    instr->instr      = instr_bits;
     instr->compressed = instr_size == 2;
     /* instr->priv = 0 */
     return instr_size;
@@ -1326,9 +1326,9 @@ static void free_section_for_debugging(struct disassemble_info *dinfo)
     if (!dinfo)
         return;
     free(dinfo->buffer);
-    dinfo->buffer_vma = 0;
+    dinfo->buffer_vma    = 0;
     dinfo->buffer_length = 0;
-    dinfo->section = NULL;
+    dinfo->section       = NULL;
 }
 
 /* Load the section given by @p section from @p abfd into @p dinfo. */
@@ -1352,10 +1352,10 @@ static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
         return -trdb_section_empty;
     }
 
-    dinfo->buffer = section_data;
-    dinfo->buffer_vma = section->vma;
+    dinfo->buffer        = section_data;
+    dinfo->buffer_vma    = section->vma;
     dinfo->buffer_length = section_size;
-    dinfo->section = section;
+    dinfo->section       = section;
     return 0;
 }
 
@@ -1388,13 +1388,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
      */
     /* TODO: supports only statically linked elf executables */
     struct trdb_config *config = &c->config;
-    bool full_address = config->full_address;
-    bool implicit_ret = config->implicit_ret;
-    bool no_aliases = config->no_aliases;
+    bool full_address          = config->full_address;
+    bool implicit_ret          = config->implicit_ret;
+    bool no_aliases            = config->no_aliases;
 
     /* find section belonging to start_address */
     bfd_vma start_address = abfd->start_address;
-    asection *section = trdb_get_section_for_vma(abfd, start_address);
+    asection *section     = trdb_get_section_for_vma(abfd, start_address);
     if (!section) {
         err(c, "VMA not pointing to any section\n");
         status = -trdb_bad_vma;
@@ -1403,11 +1403,11 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     info(c, "Section of start_address:%s\n", section->name);
 
     struct disassembler_unit dunit = {0};
-    struct disassemble_info dinfo = {0};
+    struct disassemble_info dinfo  = {0};
     /*TODO: move this into trdb_ctx so that we can continuously decode pieces?*/
     struct trdb_decompress *dec_ctx = c->dec;
-    struct trdb_stack *ras = &c->dec->call_stack;
-    struct tr_instr *dis_instr = c->dis_instr;
+    struct trdb_stack *ras          = &c->dec->call_stack;
+    struct tr_instr *dis_instr      = c->dis_instr;
 
     dunit.dinfo = &dinfo;
     /* TODO: remove that stuff, goes into global context */
@@ -1428,7 +1428,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
      * decompression decision
      */
     struct tr_packet *last_packet = NULL;
-    struct tr_packet *packet = NULL;
+    struct tr_packet *packet      = NULL;
     struct tr_packet *next_packet = NULL;
 
     struct list_head *p;
@@ -1479,7 +1479,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         switch (packet->format) {
         case F_BRANCH_FULL:
         case F_BRANCH_DIFF:
-            dec_ctx->branch_map.cnt = packet->branches;
+            dec_ctx->branch_map.cnt  = packet->branches;
             dec_ctx->branch_map.bits = packet->branch_map;
             dec_ctx->branch_map.full =
                 (packet->branches == 31) || (packet->branches == 0);
@@ -1535,7 +1535,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     hit_address = true;
 
                 /* handle decoding RAS */
-                uint32_t ret_addr = 0;
+                uint32_t ret_addr            = 0;
                 enum trdb_ras instr_ras_type = update_ras(
                     c, dis_instr->instr, dis_instr->iaddr, ras, &ret_addr);
                 if (instr_ras_type < 0) {
@@ -1612,7 +1612,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         /* we finally hit a jump with unknown  destination,
                          * thus the information in this packet  is used up
                          */
-                        pc = absolute_addr;
+                        pc                = absolute_addr;
                         hit_discontinuity = true;
                         info(c, "found discontinuity\n");
                     }
@@ -1697,7 +1697,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     hit_address = true;
 
                 /* handle decoding RAS */
-                uint32_t ret_addr = 0;
+                uint32_t ret_addr            = 0;
                 enum trdb_ras instr_ras_type = update_ras(
                     c, dis_instr->instr, dis_instr->iaddr, ras, &ret_addr);
                 if (instr_ras_type < 0) {
@@ -1773,7 +1773,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         /* we finally hit a jump with unknown destination, thus
                          * the information in this packet is used up
                          */
-                        pc = absolute_addr;
+                        pc                = absolute_addr;
                         hit_discontinuity = true;
                         info(c, "found discontinuity\n");
                     }
@@ -1809,7 +1809,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         } else if (packet->format == F_SYNC) {
             /* Sync pc. */
             dec_ctx->privilege = packet->privilege;
-            pc = packet->address;
+            pc                 = packet->address;
 
             /* Remember last packet address to be able to compute differential
              * addresses
@@ -1839,7 +1839,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             }
 
             int status = 0;
-            int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
+            int size   = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
             if (status < 0)
                 goto fail;
             /* TODO: ras handling more difficult here?*/
@@ -1905,7 +1905,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * packets for now, that we are dealing with a unpredictable
              * discontinuity.
              */
-            bool hit_address = false;
+            bool hit_address       = false;
             bool hit_discontinuity = false;
 
             uint32_t absolute_addr;
@@ -1936,7 +1936,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     hit_address = true;
 
                 /* handle decoding RAS */
-                uint32_t ret_addr = 0;
+                uint32_t ret_addr            = 0;
                 enum trdb_ras instr_ras_type = update_ras(
                     c, dis_instr->instr, dis_instr->iaddr, ras, &ret_addr);
                 if (instr_ras_type < 0) {
@@ -1980,7 +1980,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         pc = dinfo.target;
                     } else {
                         info(c, "found the discontinuity\n");
-                        pc = absolute_addr;
+                        pc                = absolute_addr;
                         hit_discontinuity = true;
                     }
                     break;

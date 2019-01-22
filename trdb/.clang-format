@@ -33,4 +33,5 @@ MaxEmptyLinesToKeep: 1
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
+AlignConsecutiveAssignments: true
 ...

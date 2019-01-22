@@ -86,9 +86,9 @@ __uint128_t sext128(__uint128_t val, __uint128_t bit)
 
 int clz_u128(__uint128_t u)
 {
-    uint64_t hi = u >> 64;
-    uint64_t lo = u;
+    uint64_t hi   = u >> 64;
+    uint64_t lo   = u;
     int retval[3] = {__builtin_clzll(hi), __builtin_clzll(lo) + 64, 128};
-    int idx = !hi + ((!lo) & (!hi));
+    int idx       = !hi + ((!lo) & (!hi));
     return retval[idx];
 }

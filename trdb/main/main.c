@@ -39,10 +39,10 @@
 
 #define TRDB_NUM_ARGS 1
 
-const char *argp_program_version = "trdb 0.1";
+const char *argp_program_version     = "trdb 0.1";
 const char *argp_program_bug_address = "<balasr@student.ethz.ch>";
 
-static char doc[] = "trdb -- trace debugger tools for the PULP platform";
+static char doc[]      = "trdb -- trace debugger tools for the PULP platform";
 static char args_doc[] = "TRACE-OR-PACKETS";
 
 #define TRDB_OPT_DEMANGLE 1
@@ -107,7 +107,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         arguments->output_file = arg;
         break;
     case 'b':
-        arguments->has_elf = true;
+        arguments->has_elf  = true;
         arguments->elf_file = arg;
         break;
     case 'c':
@@ -192,25 +192,25 @@ int main(int argc, char *argv[argc + 1])
     int status = EXIT_SUCCESS;
     struct arguments arguments;
     /* set default */
-    arguments = (struct arguments){{0}};
-    arguments.silent = false;
-    arguments.verbose = false;
-    arguments.compress = false;
-    arguments.cvs = false;
-    arguments.binary_output = false;
-    arguments.human = false;
-    arguments.full_address = false;
-    arguments.has_elf = false;
-    arguments.disassemble = false;
-    arguments.decompress = false;
+    arguments                 = (struct arguments){{0}};
+    arguments.silent          = false;
+    arguments.verbose         = false;
+    arguments.compress        = false;
+    arguments.cvs             = false;
+    arguments.binary_output   = false;
+    arguments.human           = false;
+    arguments.full_address    = false;
+    arguments.has_elf         = false;
+    arguments.disassemble     = false;
+    arguments.decompress      = false;
     arguments.settings_disasm = 0;
-    arguments.output_file = "-";
-    arguments.binary_format = "";
+    arguments.output_file     = "-";
+    arguments.binary_format   = "";
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
     FILE *output_fp = NULL;
-    bfd *abfd = NULL;
+    bfd *abfd       = NULL;
 
     struct trdb_ctx *ctx = trdb_new();
 
@@ -282,7 +282,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     struct tr_instr **samples = &tmp;
     LIST_HEAD(instr_list);
 
-    int success = 0;
+    int success      = 0;
     size_t samplecnt = 0;
     if (arguments->cvs) {
         success = trdb_cvs_to_trace_list(c, arguments->args[0], &instr_list,
@@ -351,7 +351,7 @@ fail:
 static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                               struct arguments *arguments)
 {
-    int status = EXIT_SUCCESS;
+    int status       = EXIT_SUCCESS;
     const char *path = arguments->args[0];
     struct disassemble_info dinfo;
     struct disassembler_unit dunit;
@@ -388,7 +388,7 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     dunit = (struct disassembler_unit){0};
 
     dunit.dinfo = &dinfo;
-    status = trdb_alloc_dinfo_with_bfd(c, abfd, &dunit);
+    status      = trdb_alloc_dinfo_with_bfd(c, abfd, &dunit);
     if (status < 0) {
         fprintf(stderr, "failed to configure bfd: %s\n",
                 trdb_errstr(trdb_errcode(status)));
@@ -399,7 +399,7 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     /* configure disassemble output */
     trdb_set_disassembly_conf(&dunit, arguments->settings_disasm);
     dinfo.fprintf_func = (fprintf_ftype)fprintf;
-    dinfo.stream = output_fp;
+    dinfo.stream       = output_fp;
 
     struct tr_instr *instr;
     list_for_each_entry_reverse (instr, &instr_list, list) {
@@ -428,8 +428,8 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     /* read stimuli file and convert to internal data structure */
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int success = 0;
+    size_t samplecnt          = 0;
+    int success               = 0;
 
     success = trdb_stimuli_to_trace(c, arguments->args[0], samples, &samplecnt);
     if (success < 0) {
@@ -439,8 +439,8 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
         goto fail;
     }
 
-    dinfo = (struct disassemble_info){0};
-    dunit = (struct disassembler_unit){0};
+    dinfo       = (struct disassemble_info){0};
+    dunit       = (struct disassembler_unit){0};
     dunit.dinfo = &dinfo;
 
     /* setup the disassembler to consider data from the bfd */
@@ -453,7 +453,7 @@ static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
         }
         /* configure disassemble output */
         dinfo.fprintf_func = (fprintf_ftype)fprintf;
-        dinfo.stream = output_fp;
+        dinfo.stream       = output_fp;
 
     } else {
         /* if we can't use a bfd assume its pulp riscv */

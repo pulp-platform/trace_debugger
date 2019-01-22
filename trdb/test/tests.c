@@ -66,7 +66,7 @@ static void shiftl_array(uint8_t arr[], size_t len, uint32_t shift)
         LOG_ERRT("Shift value too large\n");
         return;
     }
-    uint32_t carry_in = 0;
+    uint32_t carry_in  = 0;
     uint32_t carry_out = 0;
     for (size_t i = 0; i < len; i++) {
         /* carry_out = arr[i] & ~((1ull << (8 - shift)) - 1); */
@@ -82,7 +82,7 @@ static void shiftl_array(uint8_t arr[], size_t len, uint32_t shift)
 
 static int test_disasm_bfd()
 {
-    bfd *abfd = NULL;
+    bfd *abfd              = NULL;
     disassemble_info dinfo = {0};
 
     bfd_init();
@@ -94,13 +94,13 @@ static int test_disasm_bfd()
 
     /* Override the stream the disassembler outputs to */
     init_disassemble_info(&dinfo, stdout, (fprintf_ftype)fprintf);
-    dinfo.fprintf_func = (fprintf_ftype)fprintf;
+    dinfo.fprintf_func       = (fprintf_ftype)fprintf;
     dinfo.print_address_func = trdb_riscv32_print_address;
 
     dinfo.flavour = bfd_get_flavour(abfd);
-    dinfo.arch = bfd_get_arch(abfd);
-    dinfo.mach = bfd_get_mach(abfd);
-    dinfo.endian = abfd->xvec->byteorder;
+    dinfo.arch    = bfd_get_arch(abfd);
+    dinfo.mach    = bfd_get_mach(abfd);
+    dinfo.endian  = abfd->xvec->byteorder;
     disassemble_init_for_target(&dinfo);
 
     /* Tests for disassembly functions */
@@ -111,8 +111,8 @@ static int test_disasm_bfd()
 
     /* set up disassembly context */
     struct disassembler_unit dunit = {0};
-    dunit.dinfo = &dinfo;
-    dunit.disassemble_fn = disassembler(abfd);
+    dunit.dinfo                    = &dinfo;
+    dunit.disassemble_fn           = disassembler(abfd);
     if (!dunit.disassemble_fn) {
         LOG_ERRT("No suitable disassembler found\n");
         return TRDB_FAIL;
@@ -132,13 +132,13 @@ static int test_disasm_bfd()
 static int test_trdb_dinfo_init(char *path)
 {
     int status = TRDB_SUCCESS;
-    bfd *abfd = bfd_openr(path, NULL);
+    bfd *abfd  = bfd_openr(path, NULL);
     if (!(abfd && bfd_check_format(abfd, bfd_object)))
         return TRDB_FAIL;
 
     struct trdb_ctx *c = trdb_new();
 
-    struct disassemble_info dinfo = {0};
+    struct disassemble_info dinfo  = {0};
     struct disassembler_unit dunit = {0};
 
     dunit.dinfo = &dinfo;
@@ -159,7 +159,7 @@ fail:
 
 static int test_parse_packets(const char *path)
 {
-    int status = TRDB_SUCCESS;
+    int status         = TRDB_SUCCESS;
     struct trdb_ctx *c = trdb_new();
     LIST_HEAD(packet_list);
     if (trdb_pulp_read_all_packets(c, path, &packet_list)) {
@@ -337,12 +337,12 @@ fail:
 
 static int test_parse_stimuli_line()
 {
-    int valid = 0;
-    int exception = 0;
-    int interrupt = 0;
+    int valid      = 0;
+    int exception  = 0;
+    int interrupt  = 0;
     uint32_t cause = 0;
-    uint32_t tval = 0;
-    uint32_t priv = 0;
+    uint32_t tval  = 0;
+    uint32_t priv  = 0;
     uint32_t iaddr = 0;
     uint32_t instr = 0;
 
@@ -373,7 +373,7 @@ static int test_stimuli_to_tr_instr(const char *path)
     struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    int status = 0;
+    int status                = 0;
     size_t samplecnt;
     status = trdb_stimuli_to_trace(c, path, samples, &samplecnt);
     if (status < 0) {
@@ -391,9 +391,9 @@ static int test_stimuli_to_trace_list(const char *path)
     struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    int status = 0;
-    size_t sizea = 0;
-    status = trdb_stimuli_to_trace(c, path, samples, &sizea);
+    int status                = 0;
+    size_t sizea              = 0;
+    status                    = trdb_stimuli_to_trace(c, path, samples, &sizea);
     if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
@@ -401,7 +401,7 @@ static int test_stimuli_to_trace_list(const char *path)
 
     LIST_HEAD(instr_list);
     size_t sizel = 0;
-    status = trdb_stimuli_to_trace_list(c, path, &instr_list, &sizel);
+    status       = trdb_stimuli_to_trace_list(c, path, &instr_list, &sizel);
     if (status < 0) {
         LOG_ERRT("failed to parse stimuli\n");
         goto fail;
@@ -444,8 +444,8 @@ static int test_stimuli_to_packet_dump(const char *path)
 {
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    int status = TRDB_SUCCESS;
-    struct trdb_ctx *c = trdb_new();
+    int status                = TRDB_SUCCESS;
+    struct trdb_ctx *c        = trdb_new();
     if (!c) {
         LOG_ERRT("Library context allocation failed.\n");
         status = TRDB_FAIL;
@@ -453,8 +453,8 @@ static int test_stimuli_to_packet_dump(const char *path)
     }
 
     size_t samplecnt = 0;
-    status = 0;
-    status = trdb_stimuli_to_trace(c, path, samples, &samplecnt);
+    status           = 0;
+    status           = trdb_stimuli_to_trace(c, path, samples, &samplecnt);
     if (status != 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         status = TRDB_FAIL;
@@ -489,8 +489,8 @@ static int test_disassemble_trace(const char *bin_path, const char *trace_path)
     struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int status = 0;
+    size_t samplecnt          = 0;
+    int status                = 0;
     status = trdb_stimuli_to_trace(c, trace_path, samples, &samplecnt);
     if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
@@ -509,8 +509,8 @@ static int test_disassemble_trace(const char *bin_path, const char *trace_path)
     }
 
     struct disassembler_unit dunit = {0};
-    struct disassemble_info dinfo = {0};
-    dunit.dinfo = &dinfo;
+    struct disassemble_info dinfo  = {0};
+    dunit.dinfo                    = &dinfo;
     trdb_init_disassembler_unit(&dunit, abfd, NULL);
 
     if (TRDB_VERBOSE_TESTS)
@@ -533,15 +533,15 @@ static int test_disassemble_trace_with_bfd(const char *bin_path,
     struct trdb_ctx *c = trdb_new();
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int status = 0;
+    size_t samplecnt          = 0;
+    int status                = 0;
     status = trdb_stimuli_to_trace(c, trace_path, samples, &samplecnt);
     if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
         return TRDB_FAIL;
     }
 
-    struct disassemble_info dinfo = {0};
+    struct disassemble_info dinfo  = {0};
     struct disassembler_unit dunit = {0};
 
     dunit.dinfo = &dinfo;
@@ -570,16 +570,16 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     struct trdb_ctx *ctx = NULL;
 
     FILE *expected_packets = NULL;
-    FILE *tmp_fp0 = NULL;
-    FILE *tmp_fp1 = NULL;
+    FILE *tmp_fp0          = NULL;
+    FILE *tmp_fp1          = NULL;
 
-    char *compare = NULL;
+    char *compare  = NULL;
     char *expected = NULL;
 
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int status = 0;
+    size_t samplecnt          = 0;
+    int status                = 0;
     status = trdb_stimuli_to_trace(ctx, trace_path, samples, &samplecnt);
     if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
@@ -633,7 +633,7 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     rewind(tmp_fp1);
 
     size_t linecnt = 0;
-    size_t len = 0;
+    size_t len     = 0;
     ssize_t nread_compare;
     ssize_t nread_expected;
 
@@ -678,12 +678,12 @@ fail:
 
 int test_compress_cvs_trace(const char *trace_path)
 {
-    int status = TRDB_SUCCESS;
+    int status           = TRDB_SUCCESS;
     struct trdb_ctx *ctx = trdb_new();
 
     struct disassembler_unit dunit = {0};
-    struct disassemble_info dinfo = {0};
-    dunit.dinfo = &dinfo;
+    struct disassemble_info dinfo  = {0};
+    dunit.dinfo                    = &dinfo;
 
     trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 
@@ -695,10 +695,10 @@ int test_compress_cvs_trace(const char *trace_path)
         goto fail;
     }
 
-    ctx->dunit = &dunit;
-    ctx->config.full_address = false;
+    ctx->dunit                           = &dunit;
+    ctx->config.full_address             = false;
     ctx->config.pulp_vector_table_packet = false;
-    ctx->config.implicit_ret = true;
+    ctx->config.implicit_ret             = true;
     /* ctx->config.compress_full_branch_map = true; */
     size_t instrcnt = 0;
 
@@ -729,7 +729,7 @@ int test_compress_cvs_trace(const char *trace_path)
                instrcnt, ctx->stats.packets, ctx->stats.payloadbits / 8,
                ctx->stats.exception_packets, ctx->stats.zo_addresses);
         double bpi_payload = ctx->stats.payloadbits / (double)ctx->stats.instrs;
-        double bpi_full = (ctx->stats.payloadbits + ctx->stats.packets * 6) /
+        double bpi_full    = (ctx->stats.payloadbits + ctx->stats.packets * 6) /
                           (double)ctx->stats.instrs;
         double bpi_pulp = (ctx->stats.pulpbits / (double)ctx->stats.instrs);
         printf("(Compression) Bits per instruction (payload         ): %lf\n",
@@ -750,11 +750,11 @@ fail:
 
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
-    bfd *abfd = NULL;
-    struct tr_instr *tmp = NULL;
+    bfd *abfd                 = NULL;
+    struct tr_instr *tmp      = NULL;
     struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int status = 0;
+    size_t samplecnt          = 0;
+    int status                = 0;
 
     struct trdb_ctx *ctx = trdb_new();
     if (!ctx) {
@@ -779,9 +779,9 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
     status = TRDB_SUCCESS;
 
-    ctx->config.full_address = false;
+    ctx->config.full_address  = false;
     ctx->config.use_pulp_sext = true;
-    ctx->config.implicit_ret = false;
+    ctx->config.implicit_ret  = false;
 
     LIST_HEAD(packet1_head);
     LIST_HEAD(instr1_head);
@@ -823,7 +823,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
      */
     struct tr_instr *instr;
     int processedcnt = 0;
-    int i = 0;
+    int i            = 0;
     list_for_each_entry_reverse (instr, &instr1_head, list) {
         /* skip all invalid instructions for the comparison */
         while (!(*samples)[i].valid || (*samples)[i].exception) {
@@ -860,11 +860,11 @@ int test_decompress_trace_differential(const char *bin_path,
                                        const char *trace_path,
                                        bool differential, bool implicit_ret)
 {
-    bfd *abfd = NULL;
-    struct tr_instr *tmp = NULL;
+    bfd *abfd                 = NULL;
+    struct tr_instr *tmp      = NULL;
     struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int status = 0;
+    size_t samplecnt          = 0;
+    int status                = 0;
 
     struct trdb_ctx *ctx = trdb_new();
     if (!ctx) {
@@ -895,9 +895,9 @@ int test_decompress_trace_differential(const char *bin_path,
     LIST_HEAD(packet1_head);
     LIST_HEAD(instr1_head);
 
-    ctx->config.full_address = !differential;
+    ctx->config.full_address  = !differential;
     ctx->config.use_pulp_sext = true;
-    ctx->config.implicit_ret = implicit_ret;
+    ctx->config.implicit_ret  = implicit_ret;
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
@@ -947,7 +947,7 @@ int test_decompress_trace_differential(const char *bin_path,
      */
     struct tr_instr *instr;
     int processedcnt = 0;
-    int i = 0;
+    int i            = 0;
     list_for_each_entry_reverse (instr, &instr1_head, list) {
         /* skip all invalid instructions for the comparison */
         while (!(*samples)[i].valid || (*samples)[i].exception) {
@@ -1054,7 +1054,7 @@ int main(int argc, char *argv[argc + 1])
         LOG_ERRT("Test vector strings are incomplete.");
 
     for (unsigned j = 0; j < TRDB_ARRAY_SIZE(tv); j += 2) {
-        const char *bin = tv[j];
+        const char *bin  = tv[j];
         const char *stim = tv[j + 1];
         if (access(bin, R_OK) || access(stim, R_OK)) {
             LOG_ERRT("File not found, skipping test at %s\n", bin);

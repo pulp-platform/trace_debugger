@@ -99,7 +99,7 @@ static int insn_width;
 static int show_raw_insn;
 
 static int dump_dynamic_reloc_info = 0;
-static int dump_reloc_info = 0;
+static int dump_reloc_info         = 0;
 
 static bool disassemble_all;
 static int wide_output;
@@ -107,13 +107,13 @@ static int wide_output;
 void trdb_init_disassemble_info_for_pulp(struct disassemble_info *dinfo)
 {
     init_disassemble_info(dinfo, stdout, (fprintf_ftype)fprintf);
-    dinfo->fprintf_func = (fprintf_ftype)fprintf;
+    dinfo->fprintf_func       = (fprintf_ftype)fprintf;
     dinfo->print_address_func = trdb_riscv32_print_address;
 
     dinfo->flavour = bfd_target_elf_flavour;
-    dinfo->arch = bfd_arch_riscv;
-    dinfo->mach = bfd_mach_riscv32;
-    dinfo->endian = BFD_ENDIAN_LITTLE;
+    dinfo->arch    = bfd_arch_riscv;
+    dinfo->mach    = bfd_mach_riscv32;
+    dinfo->endian  = BFD_ENDIAN_LITTLE;
     disassemble_init_for_target(dinfo);
 }
 
@@ -125,7 +125,7 @@ int trdb_init_disassembler_unit_for_pulp(struct disassembler_unit *dunit,
         return -trdb_invalid;
     trdb_init_disassemble_info_for_pulp(dinfo);
     dinfo->disassembler_options = options;
-    dunit->disassemble_fn = print_insn_riscv;
+    dunit->disassemble_fn       = print_insn_riscv;
     return 0;
 }
 
@@ -133,13 +133,13 @@ void trdb_init_disassemble_info_from_bfd(struct disassemble_info *dinfo,
                                          bfd *abfd, char *options)
 {
     init_disassemble_info(dinfo, stdout, (fprintf_ftype)fprintf);
-    dinfo->fprintf_func = (fprintf_ftype)fprintf;
+    dinfo->fprintf_func       = (fprintf_ftype)fprintf;
     dinfo->print_address_func = trdb_riscv32_print_address;
 
-    dinfo->flavour = bfd_get_flavour(abfd);
-    dinfo->arch = bfd_get_arch(abfd);
-    dinfo->mach = bfd_get_mach(abfd);
-    dinfo->endian = abfd->xvec->byteorder;
+    dinfo->flavour              = bfd_get_flavour(abfd);
+    dinfo->arch                 = bfd_get_arch(abfd);
+    dinfo->mach                 = bfd_get_mach(abfd);
+    dinfo->endian               = abfd->xvec->byteorder;
     dinfo->disassembler_options = options;
     disassemble_init_for_target(dinfo);
 }
@@ -192,8 +192,8 @@ static int compare_symbols(const void *ap, const void *bp)
     else if (a->section < b->section)
         return -1;
 
-    an = bfd_asymbol_name(a);
-    bn = bfd_asymbol_name(b);
+    an  = bfd_asymbol_name(a);
+    bn  = bfd_asymbol_name(b);
     anl = strlen(an);
     bnl = strlen(bn);
 
@@ -371,7 +371,7 @@ static void trdb_print_symname(bfd *abfd, struct disassemble_info *inf,
     bfd_boolean hidden = FALSE;
 
     alloc = NULL;
-    name = bfd_asymbol_name(sym);
+    name  = bfd_asymbol_name(sym);
     if (do_demangle && name[0] != '\0') {
         /* Demangle the name.  */
         alloc = bfd_demangle(abfd, name, DMGL_ANSI | DMGL_PARAMS);
@@ -478,7 +478,7 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
 
     struct trdb_disasm_aux *aux = inf->application_data;
     /* Indices in sorted_syms.  */
-    long min = 0;
+    long min       = 0;
     long max_count = aux->sorted_symcount;
     long thisplace;
     bfd *abfd;
@@ -487,14 +487,14 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
     bfd_boolean want_section;
 
     asymbol **sorted_syms = aux->sorted_symbols;
-    long sorted_symcount = aux->sorted_symcount;
+    long sorted_symcount  = aux->sorted_symcount;
 
     if (sorted_symcount < 1)
         return NULL;
 
     abfd = aux->abfd;
-    sec = aux->sec;
-    opb = inf->octets_per_byte;
+    sec  = aux->sec;
+    opb  = inf->octets_per_byte;
 
     /* Perform a binary search looking for the closest symbol to the required
      * value. We are searching the range (min, max_count].
@@ -503,7 +503,7 @@ find_symbol_for_address(bfd_vma vma, struct disassemble_info *inf, long *place)
         asymbol *sym;
 
         thisplace = (max_count + min) / 2;
-        sym = sorted_syms[thisplace];
+        sym       = sorted_syms[thisplace];
 
         if (bfd_asymbol_value(sym) > vma)
             max_count = thisplace;
@@ -704,10 +704,10 @@ static void trdb_print_addr(bfd_vma vma, struct disassemble_info *inf,
                             bool display_file_offsets)
 {
     struct trdb_disasm_aux *aux;
-    asymbol *sym = NULL;
+    asymbol *sym          = NULL;
     bfd_boolean skip_find = FALSE;
 
-    aux = inf->application_data;
+    aux                  = inf->application_data;
     long sorted_symcount = aux->sorted_symcount;
 
     if (sorted_symcount < 1) {
@@ -745,9 +745,9 @@ static void trdb_print_addr(bfd_vma vma, struct disassemble_info *inf,
 void trdb_print_address(bfd_vma vma, struct disassemble_info *inf)
 {
     struct trdb_disasm_aux *aux = inf->application_data;
-    bool prefix_addresses = aux->prefix_addresses;
-    bool do_demangle = aux->do_demangle;
-    bool display_file_offsets = aux->display_file_offsets;
+    bool prefix_addresses       = aux->prefix_addresses;
+    bool do_demangle            = aux->do_demangle;
+    bool display_file_offsets   = aux->display_file_offsets;
 
     trdb_print_addr(vma, inf, !prefix_addresses, do_demangle,
                     display_file_offsets);
@@ -767,16 +767,16 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                               struct disassembler_unit *dunit)
 {
     /* TODO: make this configurable */
-    char *machine = NULL;
-    enum bfd_endian endian = BFD_ENDIAN_UNKNOWN;
+    char *machine              = NULL;
+    enum bfd_endian endian     = BFD_ENDIAN_UNKNOWN;
     char *disassembler_options = NULL; /* TODO: take from context */
-    int status = 0;
+    int status                 = 0;
 
     if (!c || !abfd || !dunit)
         return -trdb_invalid;
 
     struct disassemble_info *dinfo = dunit->dinfo;
-    struct trdb_disasm_aux *aux = malloc(sizeof(*aux));
+    struct trdb_disasm_aux *aux    = malloc(sizeof(*aux));
     if (!aux)
         return -trdb_nomem;
 
@@ -785,13 +785,13 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     struct bfd_target *xvec = NULL;
 
-    long symcount = 0;
-    long dynsymcount = 0;
-    long synthcount = 0;
-    long sorted_symcount = 0;
+    long symcount         = 0;
+    long dynsymcount      = 0;
+    long synthcount       = 0;
+    long sorted_symcount  = 0;
     asymbol **sorted_syms = NULL;
-    asymbol **syms = slurp_symtab(c, abfd, &symcount);
-    asymbol **dynsyms = slurp_dynamic_symtab(c, abfd, &dynsymcount);
+    asymbol **syms        = slurp_symtab(c, abfd, &symcount);
+    asymbol **dynsyms     = slurp_dynamic_symtab(c, abfd, &dynsymcount);
     asymbol *synthsyms;
 
     synthcount = bfd_get_synthetic_symtab(abfd, symcount, syms, dynsymcount,
@@ -826,22 +826,22 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     dinfo->application_data = aux;
 
-    aux->symbols = syms;
-    aux->symcount = symcount;
-    aux->dynamic_symbols = dynsyms;
-    aux->dynsymcount = dynsymcount;
+    aux->symbols            = syms;
+    aux->symcount           = symcount;
+    aux->dynamic_symbols    = dynsyms;
+    aux->dynsymcount        = dynsymcount;
     aux->synthethic_symbols = synthsyms;
-    aux->synthcount = synthcount;
-    aux->sorted_symcount = sorted_symcount;
-    aux->sorted_symbols = sorted_syms;
+    aux->synthcount         = synthcount;
+    aux->sorted_symcount    = sorted_symcount;
+    aux->sorted_symbols     = sorted_syms;
 
-    aux->abfd = abfd;
+    aux->abfd        = abfd;
     aux->require_sec = FALSE;
-    aux->dynrelbuf = NULL;
+    aux->dynrelbuf   = NULL;
     aux->dynrelcount = 0;
-    aux->reloc = NULL;
+    aux->reloc       = NULL;
 
-    dinfo->print_address_func = trdb_print_address;
+    dinfo->print_address_func     = trdb_print_address;
     dinfo->symbol_at_address_func = trdb_symbol_at_address;
 
     if (machine != NULL) {
@@ -865,7 +865,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
         }
         memcpy(xvec, abfd->xvec, sizeof(struct bfd_target));
         xvec->byteorder = endian;
-        abfd->xvec = xvec;
+        abfd->xvec      = xvec;
     }
 
     /* Use libopcodes to locate a suitable disassembler.  */
@@ -877,13 +877,13 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
         goto fail;
     }
 
-    dinfo->flavour = bfd_get_flavour(abfd);
-    dinfo->arch = bfd_get_arch(abfd);
-    dinfo->mach = bfd_get_mach(abfd);
-    dinfo->disassembler_options = disassembler_options;
-    dinfo->octets_per_byte = bfd_octets_per_byte(abfd);
-    dinfo->skip_zeroes = DEFAULT_SKIP_ZEROES;
-    dinfo->skip_zeroes_at_end = DEFAULT_SKIP_ZEROES_AT_END;
+    dinfo->flavour                   = bfd_get_flavour(abfd);
+    dinfo->arch                      = bfd_get_arch(abfd);
+    dinfo->mach                      = bfd_get_mach(abfd);
+    dinfo->disassembler_options      = disassembler_options;
+    dinfo->octets_per_byte           = bfd_octets_per_byte(abfd);
+    dinfo->skip_zeroes               = DEFAULT_SKIP_ZEROES;
+    dinfo->skip_zeroes_at_end        = DEFAULT_SKIP_ZEROES_AT_END;
     dinfo->disassembler_needs_relocs = FALSE;
 
     /* Pre-load the dynamic relocs as we may need them during the disassembly.
@@ -910,7 +910,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                   compare_relocs);
         }
     }
-    dinfo->symtab = sorted_syms;
+    dinfo->symtab      = sorted_syms;
     dinfo->symtab_size = sorted_symcount;
 
     return status;
@@ -935,7 +935,7 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
         aux = dunit->dinfo->application_data;
         free(dunit->dinfo->symtab);
         free(dunit->dinfo->buffer);
-        dunit->dinfo->buffer_vma = 0;
+        dunit->dinfo->buffer_vma    = 0;
         dunit->dinfo->buffer_length = 0;
     }
 
@@ -956,15 +956,15 @@ void trdb_set_disassembly_conf(struct disassembler_unit *dunit,
     struct trdb_disasm_aux *aux = dunit->dinfo->application_data;
     if (!aux)
         return;
-    aux->config = settings;
-    aux->no_aliases = settings & TRDB_NO_ALIASES;
-    aux->prefix_addresses = settings & TRDB_PREFIX_ADDRESSES;
-    aux->do_demangle = settings & TRDB_DO_DEMANGLE;
-    aux->display_file_offsets = settings & TRDB_DISPLAY_FILE_OFFSETS;
-    aux->with_line_numbers = settings & TRDB_LINE_NUMBERS;
-    aux->with_source_code = settings & TRDB_SOURCE_CODE;
+    aux->config                = settings;
+    aux->no_aliases            = settings & TRDB_NO_ALIASES;
+    aux->prefix_addresses      = settings & TRDB_PREFIX_ADDRESSES;
+    aux->do_demangle           = settings & TRDB_DO_DEMANGLE;
+    aux->display_file_offsets  = settings & TRDB_DISPLAY_FILE_OFFSETS;
+    aux->with_line_numbers     = settings & TRDB_LINE_NUMBERS;
+    aux->with_source_code      = settings & TRDB_SOURCE_CODE;
     aux->with_function_context = settings & TRDB_FUNCTION_CONTEXT;
-    aux->unwind_inlines = settings & TRDB_INLINES;
+    aux->unwind_inlines        = settings & TRDB_INLINES;
 }
 
 int trdb_get_disassembly_conf(struct disassembler_unit *dunit, uint32_t *conf)
@@ -1000,7 +1000,7 @@ static const char *slurp_file(const char *fn, size_t *size)
     *size = st.st_size;
 #ifdef HAVE_MMAP
     msize = (*size + ps - 1) & ~(ps - 1);
-    map = mmap(NULL, msize, PROT_READ, MAP_SHARED, fd, 0);
+    map   = mmap(NULL, msize, PROT_READ, MAP_SHARED, fd, 0);
     if (map != (char *)-1L) {
         close(fd);
         return map;
@@ -1023,12 +1023,12 @@ static const char **index_file(const char *map, size_t size,
     const char *p, *lstart, *end;
     int chars_per_line = 45; /* First iteration will use 40.  */
     unsigned int lineno;
-    const char **linemap = NULL;
+    const char **linemap        = NULL;
     unsigned long line_map_size = 0;
 
     lineno = 0;
     lstart = map;
-    end = map + size;
+    end    = map + size;
 
     for (p = map; p < end; p++) {
         if (*p == '\n') {
@@ -1056,7 +1056,7 @@ static const char **index_file(const char *map, size_t size,
         }
 
         linemap[lineno++] = lstart;
-        lstart = p + 1;
+        lstart            = p + 1;
     }
 
     *maxline = lineno;
@@ -1081,14 +1081,14 @@ static struct print_file_list *try_print_file_open(const char *origname,
         return NULL;
     }
 
-    p->linemap = index_file(p->map, p->mapsize, &p->maxline);
-    p->last_line = 0;
+    p->linemap     = index_file(p->map, p->mapsize, &p->maxline);
+    p->last_line   = 0;
     p->max_printed = 0;
-    p->filename = origname;
-    p->modname = modname;
-    p->next = print_files;
-    p->first = 1;
-    print_files = p;
+    p->filename    = origname;
+    p->modname     = modname;
+    p->next        = print_files;
+    p->first       = 1;
+    print_files    = p;
     return p;
 }
 
@@ -1169,8 +1169,8 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
     char *path = NULL;
 
     bool with_line_numbers = aux->with_line_numbers;
-    bool with_source_code = aux->with_source_code;
-    bool unwind_inlines = aux->unwind_inlines;
+    bool with_source_code  = aux->with_source_code;
+    bool unwind_inlines    = aux->unwind_inlines;
 
     if (!with_line_numbers && !with_source_code)
         return;
@@ -1217,7 +1217,7 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
         path_up[PATH_MAX] = '\0';
 
         filename = path;
-        reloc = TRUE;
+        reloc    = TRUE;
     } else
         reloc = FALSE;
 
@@ -1282,7 +1282,7 @@ static void show_line(bfd *abfd, asection *section, asymbol **syms,
             if (p->max_printed < linenumber)
                 p->max_printed = linenumber;
             p->last_line = linenumber;
-            p->first = 0;
+            p->first     = 0;
         }
     }
 
@@ -1329,7 +1329,7 @@ static int ATTRIBUTE_PRINTF_2 objdump_sprintf(SFILE *f, const char *format, ...)
         if (space > n)
             break;
 
-        f->alloc = (f->alloc + n) * 2;
+        f->alloc  = (f->alloc + n) * 2;
         f->buffer = (char *)xrealloc(f->buffer, f->alloc);
     }
     f->pos += n;
@@ -1350,16 +1350,16 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
     int skip_addr_chars;
     bfd_vma addr_offset;
     unsigned int opb = inf->octets_per_byte;
-    int octets = opb;
+    int octets       = opb;
     SFILE sfile;
 
-    aux = inf->application_data;
-    section = aux->sec;
-    bool prefix_addresses = aux->prefix_addresses;
+    aux                    = inf->application_data;
+    section                = aux->sec;
+    bool prefix_addresses  = aux->prefix_addresses;
     bool with_line_numbers = aux->with_line_numbers;
-    bool with_source_code = aux->with_source_code;
+    bool with_source_code  = aux->with_source_code;
 
-    sfile.alloc = 120;
+    sfile.alloc  = 120;
     sfile.buffer = malloc(sfile.alloc);
     /* TODO: improve this handling */
     if (!sfile.buffer)
@@ -1404,14 +1404,14 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
 
     /* Remember the length of the previous instruction.  */
     previous_octets = octets;
-    octets = 0;
+    octets          = 0;
 
     /* Make sure we don't use relocs from previous instructions.  */
     aux->reloc = NULL;
 
     char buf[50];
     int bpc = 0;
-    int pb = 0;
+    int pb  = 0;
 
     if (with_line_numbers || with_source_code)
         show_line(aux->abfd, section, aux->symbols, addr_offset, aux);
@@ -1432,12 +1432,12 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
         putchar(' ');
     }
 
-    sfile.pos = 0;
-    inf->fprintf_func = (fprintf_ftype)objdump_sprintf;
-    inf->stream = &sfile;
-    inf->bytes_per_line = 0;
+    sfile.pos            = 0;
+    inf->fprintf_func    = (fprintf_ftype)objdump_sprintf;
+    inf->stream          = &sfile;
+    inf->bytes_per_line  = 0;
     inf->bytes_per_chunk = 0;
-    inf->flags = disassemble_all ? DISASSEMBLE_DATA : 0;
+    inf->flags           = disassemble_all ? DISASSEMBLE_DATA : 0;
     /* if (machine) */
     /* 	inf->flags |= USER_SPECIFIED_MACHINE_TYPE; */
 
@@ -1471,9 +1471,9 @@ static void trdb_disassemble_bytes(struct disassemble_info *inf,
 
     octets = (*disassemble_fn)(section->vma + addr_offset, inf);
 
-    inf->stop_vma = 0;
+    inf->stop_vma     = 0;
     inf->fprintf_func = (fprintf_ftype)fprintf;
-    inf->stream = stdout;
+    inf->stream       = stdout;
     if (insn_width == 0 && inf->bytes_per_line != 0)
         octets_per_line = inf->bytes_per_line;
     if (octets < (int)opb) {
@@ -1587,19 +1587,19 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
                                            struct disassembler_unit *dunit)
 {
     const struct elf_backend_data *bed;
-    bfd_vma sign_adjust = 0;
+    bfd_vma sign_adjust            = 0;
     struct disassemble_info *pinfo = dunit->dinfo;
-    struct trdb_disasm_aux *paux = dunit->dinfo->application_data;
+    struct trdb_disasm_aux *paux   = dunit->dinfo->application_data;
 
     /* unsigned int                 opb = pinfo->octets_per_byte; */
-    bfd_byte *data = NULL;
+    bfd_byte *data         = NULL;
     bfd_size_type datasize = 0;
-    arelent **rel_pp = NULL;
-    arelent **rel_ppstart = NULL;
+    arelent **rel_pp       = NULL;
+    arelent **rel_ppstart  = NULL;
     arelent **rel_ppend;
     bfd_vma stop_offset;
     asymbol *sym = NULL;
-    long place = 0;
+    long place   = 0;
     long rel_count;
     bfd_vma rel_offset;
     unsigned long addr_offset;
@@ -1607,11 +1607,11 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
     asymbol **syms = paux->symbols;
 
     asymbol **sorted_syms = paux->sorted_symbols;
-    long sorted_symcount = paux->sorted_symcount;
+    long sorted_symcount  = paux->sorted_symcount;
 
-    bool prefix_addresses = paux->prefix_addresses;
-    bool do_demangle = paux->do_demangle;
-    bool display_file_offsets = paux->display_file_offsets;
+    bool prefix_addresses      = paux->prefix_addresses;
+    bool do_demangle           = paux->do_demangle;
+    bool display_file_offsets  = paux->display_file_offsets;
     bool with_function_context = paux->with_function_context;
 
     /* get section section which vma points to, if any */
@@ -1637,15 +1637,15 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     /* Decide which set of relocs to use.  Load them if necessary.  */
     if (paux->dynrelbuf && dump_dynamic_reloc_info) {
-        rel_pp = paux->dynrelbuf;
+        rel_pp    = paux->dynrelbuf;
         rel_count = paux->dynrelcount;
         /* Dynamic reloc addresses are absolute, non-dynamic are section
            relative.  REL_OFFSET specifies the reloc address corresponding
            to the start of this section.  */
         rel_offset = section->vma;
     } else {
-        rel_count = 0;
-        rel_pp = NULL;
+        rel_count  = 0;
+        rel_pp     = NULL;
         rel_offset = 0;
 
         if ((section->flags & SEC_RELOC) != 0 &&
@@ -1694,11 +1694,11 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
             goto fail;
         }
 
-        paux->sec = section;
-        pinfo->buffer = data;
-        pinfo->buffer_vma = section->vma;
+        paux->sec            = section;
+        pinfo->buffer        = data;
+        pinfo->buffer_vma    = section->vma;
         pinfo->buffer_length = datasize;
-        pinfo->section = section;
+        pinfo->section       = section;
     }
 
     /* Skip over the relocs belonging to addresses below the
@@ -1711,7 +1711,7 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
 
     /* Find the nearest symbol forwards from our current position.  */
     paux->require_sec = TRUE;
-    sym = (asymbol *)find_symbol_for_address(addr, pinfo, &place);
+    sym               = (asymbol *)find_symbol_for_address(addr, pinfo, &place);
     paux->require_sec = FALSE;
 
     /* PR 9774: If the target used signed addresses then we must make
@@ -1738,13 +1738,13 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
              ++x)
             continue;
 
-        pinfo->symbols = sorted_syms + place;
+        pinfo->symbols     = sorted_syms + place;
         pinfo->num_symbols = x - place;
-        pinfo->symtab_pos = place;
+        pinfo->symtab_pos  = place;
     } else {
-        pinfo->symbols = NULL;
+        pinfo->symbols     = NULL;
         pinfo->num_symbols = 0;
-        pinfo->symtab_pos = -1;
+        pinfo->symtab_pos  = -1;
     }
 
     if (!prefix_addresses) {
@@ -1807,7 +1807,7 @@ void trdb_disassemble_instruction_with_bfd(struct trdb_ctx *c, bfd *abfd,
                            addr - section->vma, rel_offset, &rel_pp, rel_ppend);
 
     addr_offset = nextstop_offset;
-    sym = nextsym;
+    sym         = nextsym;
 
     if (rel_ppstart != NULL)
         free(rel_ppstart);
@@ -1880,7 +1880,7 @@ void trdb_disassemble_section(bfd *abfd, asection *section, void *inf)
         return;
     }
 
-    struct disassemble_info *dinfo = dunit->dinfo;
+    struct disassemble_info *dinfo    = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
         fprintf(stderr, "unitialized member of disassembler_unit");
@@ -1909,10 +1909,10 @@ void trdb_disassemble_section(bfd *abfd, asection *section, void *inf)
         return;
     }
 
-    dinfo->buffer = data;
-    dinfo->buffer_vma = section->vma;
+    dinfo->buffer        = data;
+    dinfo->buffer_vma    = section->vma;
     dinfo->buffer_length = datasize;
-    dinfo->section = section;
+    dinfo->section       = section;
 
     struct trdb_disasm_aux *aux = dinfo->application_data;
     if (aux)
@@ -1944,16 +1944,16 @@ void trdb_disassemble_block(size_t len, bfd_byte data[len],
         return;
     }
 
-    struct disassemble_info *dinfo = dunit->dinfo;
+    struct disassemble_info *dinfo    = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
         fprintf(stderr, "unitialized member of disassembler_unit");
         return;
     }
 
-    size_t pc = 0;
-    dinfo->buffer = data;
-    dinfo->buffer_vma = pc;
+    size_t pc            = 0;
+    dinfo->buffer        = data;
+    dinfo->buffer_vma    = pc;
     dinfo->buffer_length = len;
 
     while (pc < len) {
@@ -1976,14 +1976,14 @@ void trdb_disassemble_single_instruction(uint32_t instr, uint32_t addr,
         return;
     }
 
-    struct disassemble_info *dinfo = dunit->dinfo;
+    struct disassemble_info *dinfo    = dunit->dinfo;
     disassembler_ftype disassemble_fn = dunit->disassemble_fn;
     if (!dinfo || !disassemble_fn) {
         fprintf(stderr, "unitialized member of disassembler_unit\n");
         return;
     }
 
-    size_t len = 8;
+    size_t len     = 8;
     bfd_byte *data = malloc(len * sizeof(*data));
     if (!data) {
         perror("disassemble_single_instruction:");
@@ -2003,8 +2003,8 @@ void trdb_disassemble_single_instruction(uint32_t instr, uint32_t addr,
         data[2] = (bfd_byte)((instr >> 16) & 0xff);
         data[3] = (bfd_byte)((instr >> 24) & 0xff);
     }
-    dinfo->buffer = data;
-    dinfo->buffer_vma = addr;
+    dinfo->buffer        = data;
+    dinfo->buffer_vma    = addr;
     dinfo->buffer_length = len;
 
     int size = (*disassemble_fn)(addr, dinfo);
@@ -2020,8 +2020,8 @@ void trdb_disassemble_single_instruction(uint32_t instr, uint32_t addr,
 void trdb_disassemble_single_instruction_slow(uint32_t instr, uint32_t addr)
 {
     struct disassembler_unit dunit = {0};
-    struct disassemble_info dinfo = {0};
-    dunit.dinfo = &dinfo;
+    struct disassemble_info dinfo  = {0};
+    dunit.dinfo                    = &dinfo;
 
     trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 

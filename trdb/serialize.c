@@ -205,7 +205,7 @@ int trdb_pulp_serialize_packet(struct trdb_ctx *c, struct tr_packet *packet,
 int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
                                  struct tr_packet *packet, uint32_t *bytes)
 {
-    uint8_t header = 0;
+    uint8_t header          = 0;
     union trdb_pack payload = {0};
     if (!c || !fp || !packet)
         return -trdb_invalid;
@@ -220,7 +220,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
     }
 
     /* read packet length it bits (including header) */
-    uint8_t len = (header & MASK_FROM(PULPPKTLEN)) * 8 + 8;
+    uint8_t len    = (header & MASK_FROM(PULPPKTLEN)) * 8 + 8;
     payload.bin[0] = header;
     /* compute how many bytes that is */
     uint32_t byte_len = len / 8 + (len % 8 != 0 ? 1 : 0);
@@ -253,13 +253,13 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
         packet->format = (payload.bits >>= MSGTYPELEN) & MASK_FROM(FORMATLEN);
         payload.bits >>= FORMATLEN;
 
-        uint32_t blen = 0;
+        uint32_t blen           = 0;
         uint32_t lower_boundary = 0;
 
         switch (packet->format) {
         case F_BRANCH_FULL:
-            packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
-            blen = branch_map_len(packet->branches);
+            packet->branches   = payload.bits & MASK_FROM(BRANCHLEN);
+            blen               = branch_map_len(packet->branches);
             packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(blen);
 
             lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN + blen;
@@ -278,10 +278,10 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
                     "F_BRANCH_DIFF packet encountered but full_address set\n");
                 return -trdb_bad_config;
             }
-            packet->branches = payload.bits & MASK_FROM(BRANCHLEN);
-            blen = branch_map_len(packet->branches);
+            packet->branches   = payload.bits & MASK_FROM(BRANCHLEN);
+            blen               = branch_map_len(packet->branches);
             packet->branch_map = (payload.bits >>= BRANCHLEN) & MASK_FROM(blen);
-            lower_boundary = MSGTYPELEN + FORMATLEN + BRANCHLEN + blen;
+            lower_boundary     = MSGTYPELEN + FORMATLEN + BRANCHLEN + blen;
 
             if (trdb_is_full_address(c)) {
                 packet->address = (payload.bits >>= blen) & MASK_FROM(XLEN);
@@ -307,11 +307,11 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
             if (packet->subformat == SF_CONTEXT)
                 return -trdb_unimplemented;
 
-            packet->branch = (payload.bits >>= PRIVLEN) & 1;
+            packet->branch  = (payload.bits >>= PRIVLEN) & 1;
             packet->address = (payload.bits >>= 1) & MASK_FROM(XLEN);
             if (packet->subformat == SF_START)
                 return 0;
-            packet->ecause = (payload.bits >>= XLEN) & MASK_FROM(CAUSELEN);
+            packet->ecause    = (payload.bits >>= XLEN) & MASK_FROM(CAUSELEN);
             packet->interrupt = (payload.bits >>= CAUSELEN) & 1;
             if (packet->subformat == SF_EXCEPTION)
                 return 0;
@@ -345,9 +345,9 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
         return -trdb_file_open;
 
     uint32_t total_bytes_read = 0;
-    struct tr_packet *packet = NULL;
-    struct tr_packet tmp = {0};
-    uint32_t bytes = 0;
+    struct tr_packet *packet  = NULL;
+    struct tr_packet tmp      = {0};
+    uint32_t bytes            = 0;
 
     /* read the file and malloc entries into the given linked list head */
     while (trdb_pulp_read_single_packet(c, fp, &tmp, &bytes) == 0) {
@@ -366,9 +366,9 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
 int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
                                   FILE *fp)
 {
-    int status = 0;
-    size_t bitcnt = 0;
-    size_t bytecnt = 0;
+    int status      = 0;
+    size_t bitcnt   = 0;
+    size_t bytecnt  = 0;
     uint8_t bin[16] = {0};
     if (!c || !fp || !packet)
         return -trdb_invalid;
@@ -401,11 +401,11 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
     }
 
     uint8_t bin[sizeof(struct tr_packet)] = {0};
-    size_t bitcnt = 0;
-    uint32_t alignment = 0;
-    uint8_t carry = 0;
-    size_t good = 0;
-    size_t rest = 0;
+    size_t bitcnt                         = 0;
+    uint32_t alignment                    = 0;
+    uint8_t carry                         = 0;
+    size_t good                           = 0;
+    size_t rest                           = 0;
 
     struct tr_packet *packet;
     /* TODO: do we need the rever version? I think we do*/
@@ -427,7 +427,7 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
             goto fail;
         }
         /* we keep that for the next packet */
-        carry = bin[good] & MASK_FROM(rest);
+        carry     = bin[good] & MASK_FROM(rest);
         alignment = rest;
     }
     /* done, write remaining carry */
@@ -444,7 +444,7 @@ int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
                                struct list_head *instrs, size_t *count)
 {
     int status = 0;
-    FILE *fp = NULL;
+    FILE *fp   = NULL;
 
     *count = 0;
 
@@ -461,13 +461,13 @@ int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
     }
     size_t scnt = 0;
 
-    int ret = 0;
-    int valid = 0;
-    int exception = 0;
-    int interrupt = 0;
+    int ret        = 0;
+    int valid      = 0;
+    int exception  = 0;
+    int interrupt  = 0;
     uint32_t cause = 0;
-    uint32_t tval = 0;
-    uint32_t priv = 0;
+    uint32_t tval  = 0;
+    uint32_t priv  = 0;
     uint32_t iaddr = 0;
     uint32_t instr = 0;
     int compressed = 0;
@@ -490,15 +490,15 @@ int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
             goto fail;
         }
 
-        *sample = (struct tr_instr){0};
-        sample->valid = valid;
-        sample->exception = exception;
-        sample->interrupt = interrupt;
-        sample->cause = cause;
-        sample->tval = tval;
-        sample->priv = priv;
-        sample->iaddr = iaddr;
-        sample->instr = instr;
+        *sample            = (struct tr_instr){0};
+        sample->valid      = valid;
+        sample->exception  = exception;
+        sample->interrupt  = interrupt;
+        sample->cause      = cause;
+        sample->tval       = tval;
+        sample->priv       = priv;
+        sample->iaddr      = iaddr;
+        sample->instr      = instr;
         sample->compressed = compressed;
 
         list_add(&sample->list, instrs);
@@ -528,7 +528,7 @@ int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
                           struct tr_instr **samples, size_t *count)
 {
     int status = 0;
-    FILE *fp = NULL;
+    FILE *fp   = NULL;
 
     *count = 0;
 
@@ -544,19 +544,19 @@ int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
     }
     size_t scnt = 0;
 
-    int ret = 0;
-    int valid = 0;
-    int exception = 0;
-    int interrupt = 0;
+    int ret        = 0;
+    int valid      = 0;
+    int exception  = 0;
+    int interrupt  = 0;
     uint32_t cause = 0;
-    uint32_t tval = 0;
-    uint32_t priv = 0;
+    uint32_t tval  = 0;
+    uint32_t priv  = 0;
     uint32_t iaddr = 0;
     uint32_t instr = 0;
     int compressed = 0;
 
     size_t size = 128;
-    *samples = malloc(size * sizeof(**samples));
+    *samples    = malloc(size * sizeof(**samples));
     if (!*samples) {
         status = -trdb_nomem;
         goto fail;
@@ -575,7 +575,7 @@ int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
         /*     continue; */
         /* } */
         if (scnt >= size) {
-            size = 2 * size;
+            size                 = 2 * size;
             struct tr_instr *tmp = realloc(*samples, size * sizeof(**samples));
             if (!tmp) {
                 status = -trdb_nomem;
@@ -583,15 +583,15 @@ int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
             }
             *samples = tmp;
         }
-        (*samples)[scnt] = (struct tr_instr){0};
-        (*samples)[scnt].valid = valid;
-        (*samples)[scnt].exception = exception;
-        (*samples)[scnt].interrupt = interrupt;
-        (*samples)[scnt].cause = cause;
-        (*samples)[scnt].tval = tval;
-        (*samples)[scnt].priv = priv;
-        (*samples)[scnt].iaddr = iaddr;
-        (*samples)[scnt].instr = instr;
+        (*samples)[scnt]            = (struct tr_instr){0};
+        (*samples)[scnt].valid      = valid;
+        (*samples)[scnt].exception  = exception;
+        (*samples)[scnt].interrupt  = interrupt;
+        (*samples)[scnt].cause      = cause;
+        (*samples)[scnt].tval       = tval;
+        (*samples)[scnt].priv       = priv;
+        (*samples)[scnt].iaddr      = iaddr;
+        (*samples)[scnt].instr      = instr;
         (*samples)[scnt].compressed = compressed;
         scnt++;
     }
@@ -618,7 +618,7 @@ int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
                            struct list_head *instrs, size_t *count)
 {
 
-    FILE *fp = NULL;
+    FILE *fp   = NULL;
     int status = 0;
 
     *count = 0;
@@ -637,12 +637,12 @@ int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
     }
     size_t scnt = 0;
 
-    int valid = 0;
-    int exception = 0;
-    int interrupt = 0;
+    int valid      = 0;
+    int exception  = 0;
+    int interrupt  = 0;
     uint32_t cause = 0;
-    uint32_t tval = 0;
-    uint32_t priv = 0;
+    uint32_t tval  = 0;
+    uint32_t priv  = 0;
     uint32_t iaddr = 0;
     uint32_t instr = 0;
 
@@ -692,7 +692,7 @@ int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
                 break;
             case 5:
                 sscanf(tok, "%" SCNx32 "", &instr);
-                sample->instr = instr;
+                sample->instr      = instr;
                 sample->compressed = ((instr & 3) != 3);
                 break;
             case 4:
