@@ -24,8 +24,11 @@ CFLAGS		= -Wall -O2 -g -march=native -Wno-unused-function \
 # we need gnu11 and no-strict-aliasing
 ALL_CFLAGS	= -std=gnu11 -fno-strict-aliasing $(CFLAGS)
 ALL_CFLAGS_DBG	= -std=gnu11 -Wall -O0 -g -fno-strict-aliasing \
-			-Wno-unused-function -fsanitize=address \
-			-DENABLE_LOGGING -DENABLE_DEBUG
+			-Wno-unused-function \
+			-fsanitize=address -fno-omit-frame-pointer \
+			-DENABLE_LOGGING -DENABLE_DEBUG \
+# -fsanitize=undefined \
+# -fsanitize=leak \
 
 
 QUESTASIM_PATH	= /usr/pack/modelsim-10.5c-kgf/questasim
