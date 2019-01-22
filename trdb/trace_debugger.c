@@ -291,15 +291,23 @@ struct trdb_ctx *trdb_new()
         return NULL;
     *ctx = (struct trdb_ctx){0};
 
+    ctx->cmp       = malloc(sizeof(*ctx->cmp));
+    ctx->dec       = malloc(sizeof(*ctx->dec));
+    ctx->dis_instr = malloc(sizeof(*ctx->dis_instr));
+    if (!ctx->cmp || !ctx->dec || !ctx->dis_instr) {
+        free(ctx);
+        free(ctx->cmp);
+        free(ctx->dec);
+        free(ctx->dis_instr);
+        return NULL;
+    }
+
     ctx->config = (struct trdb_config){.resync_max               = UINT64_MAX,
                                        .full_address             = true,
                                        .pulp_vector_table_packet = true,
                                        .full_statistics          = true};
-    ctx->cmp    = malloc(sizeof(*ctx->cmp));
-    if (!ctx->cmp) {
-        free(ctx);
-        return NULL;
-    }
+
+    *ctx->cmp            = (struct trdb_compress){0};
     ctx->cmp->lastc      = (struct trdb_state){.privilege = 7};
     ctx->cmp->thisc      = (struct trdb_state){.privilege = 7};
     ctx->cmp->nextc      = (struct trdb_state){.privilege = 7};
@@ -307,28 +315,15 @@ struct trdb_ctx *trdb_new()
     ctx->cmp->filter     = (struct filter_state){0};
     ctx->cmp->last_iaddr = 0;
 
-    ctx->dec = malloc(sizeof(*ctx->dec));
-    if (!ctx->dec) {
-        free(ctx->cmp);
-        free(ctx);
-        return NULL;
-    }
-    *ctx->dec = (struct trdb_decompress){{0}};
+    *ctx->dec = (struct trdb_decompress){0};
     kv_init(ctx->dec->call_stack);
 
-    ctx->stats = (struct trdb_stats){0};
-
-    ctx->dis_instr = malloc(sizeof(*ctx->dis_instr));
-    if (!ctx->dis_instr) {
-        free(ctx->dec); /* TODO: fix that mess */
-        free(ctx->cmp);
-        free(ctx);
-        return NULL;
-    }
     *ctx->dis_instr = (struct tr_instr){0};
 
     ctx->log_fn       = log_stdout_quiet;
-    ctx->log_priority = LOG_ERR; // TODO: change that
+    ctx->log_priority = LOG_ERR; // TODO: log nothing by default is better?
+
+    ctx->stats = (struct trdb_stats){0};
 
     /* environment overwrites config */
     env = secure_getenv("TRDB_LOG");
