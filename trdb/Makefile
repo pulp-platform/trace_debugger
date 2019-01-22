@@ -19,7 +19,8 @@
 # Author: Robert Balas (balasr@student.ethz.ch)
 # Description: Build the C model and decompression tools for the trace debugger
 
-CFLAGS		= -Wall -O2 -g -march=native -Wno-unused-function \
+CFLAGS		= -Wall -O2 -g -march=native \
+			-Wno-unused-function -Wno-missing-braces \
 			-DENABLE_LOGGING -DNDEBUG
 # we need gnu11 and no-strict-aliasing
 ALL_CFLAGS	= -std=gnu11 -fno-strict-aliasing $(CFLAGS)
