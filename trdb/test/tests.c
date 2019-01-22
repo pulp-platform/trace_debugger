@@ -28,6 +28,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdint.h>
 #include "list.h"
 #include "trace_debugger.h"
 /* #include "trace_debugger.c" */
@@ -721,7 +722,7 @@ int test_compress_cvs_trace(const char *trace_path)
             goto fail;
         }
     }
-    printf("%s\n", trace_path);
+    printf("path: %s\n", trace_path);
     if (TRDB_VERBOSE_TESTS) {
         printf("instructions: %zu, packets: %zu, payload bytes: %zu "
                "exceptions: %zu z/o: %zu\n",
@@ -749,20 +750,27 @@ fail:
 
 int test_decompress_trace(const char *bin_path, const char *trace_path)
 {
+    bfd *abfd = NULL;
+    struct tr_instr *tmp = NULL;
+    struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
+    int status = 0;
+
     struct trdb_ctx *ctx = trdb_new();
+    if (!ctx) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
 
     bfd_init();
-    bfd *abfd = bfd_openr(bin_path, NULL);
+    abfd = bfd_openr(bin_path, NULL);
 
     if (!(abfd && bfd_check_format(abfd, bfd_object))) {
         bfd_perror("test_decompress_trace");
         return TRDB_FAIL;
     }
 
-    struct tr_instr *tmp;
-    struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int status = 0;
     status = trdb_stimuli_to_trace(ctx, trace_path, samples, &samplecnt);
     if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
@@ -771,14 +779,12 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
     status = TRDB_SUCCESS;
 
+    ctx->config.full_address = false;
+    ctx->config.use_pulp_sext = true;
+    ctx->config.implicit_ret = false;
+
     LIST_HEAD(packet1_head);
     LIST_HEAD(instr1_head);
-
-    if (!ctx) {
-        LOG_ERRT("Library context allocation failed.\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
@@ -790,7 +796,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
             goto fail;
         }
     }
-    printf("%s\n", bin_path);
+    printf("path: %s\n", bin_path);
     if (TRDB_VERBOSE_TESTS)
         printf("(Compression) Bits per instruction: %lf\n",
                ctx->stats.payloadbits / (double)ctx->stats.instrs);
@@ -851,22 +857,33 @@ fail:
 }
 
 int test_decompress_trace_differential(const char *bin_path,
-                                       const char *trace_path)
+                                       const char *trace_path,
+                                       bool differential, bool implicit_ret)
 {
-    struct trdb_ctx *ctx = NULL;
+    bfd *abfd = NULL;
+    struct tr_instr *tmp = NULL;
+    struct tr_instr **samples = &tmp;
+    size_t samplecnt = 0;
+    int status = 0;
+
+    struct trdb_ctx *ctx = trdb_new();
+    if (!ctx) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    printf("differential: %s, implicit returns: %s, ",
+           differential ? "true" : "false", implicit_ret ? "true" : "false");
 
     bfd_init();
-    bfd *abfd = bfd_openr(bin_path, NULL);
+    abfd = bfd_openr(bin_path, NULL);
 
     if (!(abfd && bfd_check_format(abfd, bfd_object))) {
         bfd_perror("test_decompress_trace");
         return TRDB_FAIL;
     }
 
-    struct tr_instr *tmp;
-    struct tr_instr **samples = &tmp;
-    size_t samplecnt = 0;
-    int status = 0;
     status = trdb_stimuli_to_trace(ctx, trace_path, samples, &samplecnt);
     if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
@@ -878,14 +895,9 @@ int test_decompress_trace_differential(const char *bin_path,
     LIST_HEAD(packet1_head);
     LIST_HEAD(instr1_head);
 
-    ctx = trdb_new();
-    ctx->config.full_address = false;
+    ctx->config.full_address = !differential;
     ctx->config.use_pulp_sext = true;
-    if (!ctx) {
-        LOG_ERRT("Library context allocation failed.\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
+    ctx->config.implicit_ret = implicit_ret;
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
@@ -897,7 +909,7 @@ int test_decompress_trace_differential(const char *bin_path,
             goto fail;
         }
     }
-    printf("%s\n", bin_path);
+    printf("path: %s\n", bin_path);
 
     if (TRDB_VERBOSE_TESTS) {
         printf("(Compression) Bits per instruction: %lf\n",
@@ -1049,12 +1061,13 @@ int main(int argc, char *argv[argc + 1])
             continue;
         }
         RUN_TEST(test_decompress_trace, bin, stim);
-        RUN_TEST(test_decompress_trace_differential, bin, stim);
+        RUN_TEST(test_decompress_trace_differential, bin, stim, true, false);
+        RUN_TEST(test_decompress_trace_differential, bin, stim, true, true);
     }
 
     if (TESTS_SUCCESSFULL())
         printf("ALL TESTS PASSED\n");
     else
-        printf("ATLEAST ONE TEST FAILED\n");
+        printf("AT LEAST ONE TEST FAILED\n");
     return TESTS_SUCCESSFULL() ? EXIT_SUCCESS : EXIT_FAILURE;
 }

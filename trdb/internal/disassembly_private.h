@@ -23,6 +23,8 @@
  * @date 10 Nov 2018
  * @brief Disassembly helper function used internally
  */
+#include <stdint.h>
+#include <stdbool.h>
 
 /* define functions which help figure out what function we are dealing with */
 #define DECLARE_INSN(code, match, mask)                                        \
@@ -94,6 +96,8 @@ static enum trdb_ras is_jalr_funcall(uint32_t instr)
      * rd=link && rs!=link             push
      * rd=link && rs=link && rd!=rs    push and pop, used for coroutines
      * rd=link && rs=link && rd==rs    push
+     *
+     * This is table 2.1 in riscv-spec-v2.2
      */
     bool is_jalr = is_jalr_instr(instr);
     uint32_t rd = (instr & MASK_RD) >> OP_SH_RD;
@@ -116,16 +120,18 @@ static enum trdb_ras is_jalr_funcall(uint32_t instr)
 
 static enum trdb_ras is_c_jalr_funcall(uint32_t instr)
 {
-    /* C.JALR expands to jalr x1, rs1, 0 */
+    /* C.JALR expands to jalr x1=X_RA, rs1, 0 */
     bool is_c_jalr = is_really_c_jalr_instr(instr);
-    uint32_t rs = (instr & MASK_RS1) >> OP_SH_RS1;
+    uint32_t rs = (instr & MASK_RD) >> OP_SH_RD;
     bool is_rs_link = (rs == X_RA) || (rs == X_T0);
-    if (is_c_jalr && is_rs_link && (X_RA != rs))
-        return coret;
-    else if (is_c_jalr && is_rs_link && (X_RA == rs))
-        return ret;
-    else
+    if (!is_c_jalr)
         return none;
+
+    /* this is again derived from table 2.1 in riscv-spec-v2.2 */
+    if (is_rs_link && (X_RA != rs))
+        return coret;
+    else
+        return call;
 }
 
 static enum trdb_ras is_jal_funcall(uint32_t instr)
@@ -148,6 +154,23 @@ static enum trdb_ras is_c_jal_funcall(uint32_t instr)
         return call;
     else
         return none;
+}
+
+static enum trdb_ras get_instr_ras_type(uint32_t instr)
+{
+    enum trdb_ras type = none;
+    if (is_jalr_instr(instr)) {
+        type = is_jalr_funcall(instr);
+    } else if (is_jal_instr(instr)) {
+        type = is_jal_funcall(instr);
+    } else if (is_really_c_jalr_instr(instr)) {
+        type = is_c_jalr_funcall(instr);
+    } else if (is_c_jal_instr(instr)) {
+        type = call; /* C.JAL expands to jal x1, offset [11:1] */
+    } else if (is_c_ret_instr(instr)) {
+        type = ret;
+    }
+    return type;
 }
 
 /**

@@ -222,6 +222,13 @@ static void log_stderr(struct trdb_ctx *ctx, int priority, const char *file,
     vfprintf(stderr, format, args);
 }
 
+static void log_stdout_quiet(struct trdb_ctx *ctx, int priority,
+                             const char *file, int line, const char *fn,
+                             const char *format, va_list args)
+{
+    vfprintf(stdout, format, args);
+}
+
 static int log_priority(const char *priority)
 {
     char *endptr;
@@ -266,7 +273,13 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
 
     *ctx->dec = (struct trdb_decompress){{0}};
     ctx->dec->branch_map = (struct branch_map_state){0};
+    kv_destroy(ctx->dec->call_stack);
+    kv_init(ctx->dec->call_stack);
+    ctx->dec->privilege = 7;
+    ctx->dec->last_packet_addr = 0;
+
     ctx->cmp->filter = (struct filter_state){0};
+
     ctx->stats = (struct trdb_stats){0};
 }
 
@@ -276,6 +289,7 @@ struct trdb_ctx *trdb_new()
     struct trdb_ctx *ctx = malloc(sizeof(*ctx));
     if (!ctx)
         return NULL;
+    *ctx = (struct trdb_ctx){0};
 
     ctx->config = (struct trdb_config){.resync_max = UINT64_MAX,
                                        .full_address = true,
@@ -305,7 +319,16 @@ struct trdb_ctx *trdb_new()
 
     ctx->stats = (struct trdb_stats){0};
 
-    ctx->log_fn = log_stderr;
+    ctx->dis_instr = malloc(sizeof(*ctx->dis_instr));
+    if (!ctx->dis_instr) {
+        free(ctx->dec); /* TODO: fix that mess */
+        free(ctx->cmp);
+        free(ctx);
+        return NULL;
+    }
+    *ctx->dis_instr = (struct tr_instr){0};
+
+    ctx->log_fn = log_stdout_quiet;
     ctx->log_priority = LOG_ERR; // TODO: change that
 
     /* environment overwrites config */
@@ -1135,55 +1158,59 @@ int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
     return status;
 }
 
+int trdb_pulp_model_step(struct trdb_ctx *ctx, struct tr_instr *instr,
+                         uint32_t *packet_word)
+{
+    struct tr_packet packet;
+    int status = trdb_compress_trace_step(ctx, &packet, instr);
+    if (status < 0) {
+        /* some error */
+    }
+
+    if (status == 1) {
+        /* enqueue into fifo */
+    }
+
+    /* if fifo not empty, grab uint32_t */
+    /* if fifo empty, nothing*/
+    /* if fifo full, do backstalling etc. depending on recovery mode*/
+}
+
 /* try to update the return address stack */
-static int maybe_handle_ras(uint32_t instr, uint32_t addr,
-                            struct trdb_stack *stack, uint32_t *ret_addr)
+static int update_ras(struct trdb_ctx *c, uint32_t instr, uint32_t addr,
+                      struct trdb_stack *stack, uint32_t *ret_addr)
 {
     if (!stack)
         return -trdb_invalid;
 
     bool compressed = (instr & 0x3) != 0x3;
-    enum trdb_ras ras = none;
-    if (is_jalr_instr(instr)) {
-        ras = is_jalr_funcall(instr);
-    } else if (is_jal_instr(instr)) {
-        ras = is_jal_funcall(instr);
-    } else if (is_c_jalr_instr(instr)) {
-        ras = is_c_jalr_funcall(instr);
-    } else if (is_c_jal_instr(instr)) {
-        ras = is_c_jal_funcall(instr);
-    } else {
-        ras = none;
+    enum trdb_ras ras = get_instr_ras_type(instr);
+
+    switch (ras) {
+    case none:
+        return none;
+
+    case ret:
+        if (kv_size(*stack) == 0)
+            return -trdb_bad_ras;
+        *ret_addr = kv_pop(*stack);
+        dbg(c, "return to: %" PRIx32 "\n", *ret_addr);
+        return ret;
+
+    case coret:
+        dbg(c, "coret call/ret: %" PRIx32 "\n", addr);
+        if (kv_size(*stack) == 0)
+            return -trdb_bad_ras;
+        *ret_addr = kv_pop(*stack);
+        kv_push(uint32_t, *stack, addr + (compressed ? 2 : 4));
+        return coret;
+
+    case call:
+        dbg(c, "pushing to stack: %" PRIx32 "\n", addr);
+        kv_push(uint32_t, *stack, addr + (compressed ? 2 : 4));
+        return call;
     }
-
-    if (compressed) {
-        switch (ras) {
-        case none:
-            break;
-        case ret:
-            return -trdb_bad_instr;
-        case coret:
-            if (kv_size(*stack) == 0)
-                return -trdb_bad_ras;
-            *ret_addr = kv_pop(*stack);
-            break;
-        case call:
-            break;
-        }
-    } else {
-    }
-}
-
-static int pop_ras(struct trdb_stack *stack, uint32_t *ret_addr)
-{
-    if (!stack)
-        return -trdb_invalid;
-    /* stack underflow */
-    if (kv_size(*stack) == 0)
-        return -trdb_bad_ras;
-
-    *ret_addr = kv_pop(*stack);
-    return 0;
+    return none;
 }
 
 /* Try to read instruction at @p pc into @p instr. It uses read_memory_func()
@@ -1288,7 +1315,7 @@ static int build_instr_fprintf(void *stream, const char *format, ...)
     }
     va_end(args);
 
-    dbg(c, tmp);
+    dbg(c, "%s", tmp);
 
     return rv;
 }
@@ -1378,10 +1405,12 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     struct disassembler_unit dunit = {0};
     struct disassemble_info dinfo = {0};
     /*TODO: move this into trdb_ctx so that we can continuously decode pieces?*/
-    struct trdb_decompress dec_ctx = {.privilege = 7};
-    struct tr_instr dis_instr = {0};
+    struct trdb_decompress *dec_ctx = c->dec;
+    struct trdb_stack *ras = &c->dec->call_stack;
+    struct tr_instr *dis_instr = c->dis_instr;
 
     dunit.dinfo = &dinfo;
+    /* TODO: remove that stuff, goes into global context */
     trdb_init_disassembler_unit(&dunit, abfd, no_aliases ? "no-aliases" : NULL);
     /* advanced fprintf output handling */
     dunit.dinfo->fprintf_func = build_instr_fprintf;
@@ -1450,9 +1479,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         switch (packet->format) {
         case F_BRANCH_FULL:
         case F_BRANCH_DIFF:
-            dec_ctx.branch_map.cnt = packet->branches;
-            dec_ctx.branch_map.bits = packet->branch_map;
-            dec_ctx.branch_map.full =
+            dec_ctx->branch_map.cnt = packet->branches;
+            dec_ctx->branch_map.bits = packet->branch_map;
+            dec_ctx->branch_map.full =
                 (packet->branches == 31) || (packet->branches == 0);
             break;
         case F_SYNC:
@@ -1475,7 +1504,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * is full,(except if full and instr before last branch is
              * discontinuity)
              */
-            bool hit_discontinuity = dec_ctx.branch_map.full;
+            bool hit_discontinuity = dec_ctx->branch_map.full;
 
             /* Remember last packet address to be able to compute differential
              * address. Careful, a full branch map doesn't always have an
@@ -1485,29 +1514,42 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
             uint32_t absolute_addr = packet->address;
 
-            if (dec_ctx.branch_map.cnt > 0)
-                dec_ctx.last_packet_addr = absolute_addr;
+            if (dec_ctx->branch_map.cnt > 0)
+                dec_ctx->last_packet_addr = absolute_addr;
 
             /* this indicates we don't have a valid address but still a full
              * branch map
              */
-            if (dec_ctx.branch_map.cnt == 0)
-                dec_ctx.branch_map.cnt = 31;
+            if (dec_ctx->branch_map.cnt == 0)
+                dec_ctx->branch_map.cnt = 31;
 
-            while (!(dec_ctx.branch_map.cnt == 0 &&
+            while (!(dec_ctx->branch_map.cnt == 0 &&
                      (hit_discontinuity || hit_address))) {
 
-                int size =
-                    disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
+                int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
                 if (status < 0)
                     goto fail;
 
                 /* TODO: test if packet addr valid first */
-                if (dec_ctx.branch_map.cnt == 0 && pc == absolute_addr)
+                if (dec_ctx->branch_map.cnt == 0 && pc == absolute_addr)
                     hit_address = true;
 
-                dis_instr.priv = dec_ctx.privilege;
-                if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+                /* handle decoding RAS */
+                uint32_t ret_addr = 0;
+                enum trdb_ras instr_ras_type = update_ras(
+                    c, dis_instr->instr, dis_instr->iaddr, ras, &ret_addr);
+                if (instr_ras_type < 0) {
+                    err(c, "return address stack in bad state: %s\n",
+                        trdb_errstr(trdb_errcode(status)));
+                    goto fail;
+                }
+                if (instr_ras_type == coret) {
+                    err(c, "coret not implemented yet\n");
+                    goto fail;
+                }
+                /* generate decoded trace */
+                dis_instr->priv = dec_ctx->privilege;
+                if ((status = add_trace(c, instr_list, dis_instr)) < 0)
                     goto fail;
 
                 /* advance pc */
@@ -1519,11 +1561,11 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(dis_instr.instr,
+                    if (!is_unpred_discontinuity(dis_instr->instr,
                                                  implicit_ret)) {
                         break;
                     }
-                    info(c, "detected mret, uret or sret\n");
+                    dbg(c, "detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
@@ -1533,12 +1575,19 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                      * then we know that its actually a branch_map
                      * flush + discontinuity packet.
                      */
-                    if (dec_ctx.branch_map.cnt > 1 && dinfo.target == 0)
+                    if (implicit_ret && instr_ras_type == ret) {
+                        dbg(c, "returning with stack value %" PRIx32 "\n",
+                            ret_addr);
+                        pc = ret_addr;
+                        break;
+                    }
+
+                    if (dec_ctx->branch_map.cnt > 1 && dinfo.target == 0)
                         err(c,
                             "can't predict the jump target, never happens\n");
 
-                    if (dec_ctx.branch_map.cnt == 1 && dinfo.target == 0) {
-                        if (!dec_ctx.branch_map.full) {
+                    if (dec_ctx->branch_map.cnt == 1 && dinfo.target == 0) {
+                        if (!dec_ctx->branch_map.full) {
                             info(
                                 c,
                                 "we hit the not-full branch_map + address edge case, "
@@ -1553,7 +1602,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                             pc = absolute_addr;
                         }
                         hit_discontinuity = true;
-                    } else if (dec_ctx.branch_map.cnt > 0 ||
+                    } else if (dec_ctx->branch_map.cnt > 0 ||
                                dinfo.target != 0) {
                         /* we should not hit unpredictable
                          * discontinuities
@@ -1573,9 +1622,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* this case allows us to exhaust the branch bits */
                     {
                         /* 32 would be undefined */
-                        bool branch_taken = !(dec_ctx.branch_map.bits & 1);
-                        dec_ctx.branch_map.bits >>= 1;
-                        dec_ctx.branch_map.cnt--;
+                        bool branch_taken = !(dec_ctx->branch_map.bits & 1);
+                        dec_ctx->branch_map.bits >>= 1;
+                        dec_ctx->branch_map.cnt--;
                         if (dinfo.target == 0)
                             err(c,
                                 "can't predict the jump target, never happens\n");
@@ -1613,42 +1662,57 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
              * is full,(except if full and instr before last branch is
              * discontinuity)
              */
-            bool hit_discontinuity = dec_ctx.branch_map.full;
+            bool hit_discontinuity = dec_ctx->branch_map.full;
 
-            uint32_t absolute_addr = dec_ctx.last_packet_addr - packet->address;
+            uint32_t absolute_addr =
+                dec_ctx->last_packet_addr - packet->address;
 
             dbg(c,
                 "F_BRANCH_DIFF resolved address:%" PRIx32 " from %" PRIx32
                 " - %" PRIx32 "\n",
-                absolute_addr, dec_ctx.last_packet_addr, packet->address);
+                absolute_addr, dec_ctx->last_packet_addr, packet->address);
 
             /* Remember last packet address to be able to compute differential
              * address. Careful, a full branch map doesn't always have an
              * address field
              * TODO: edgecase where we sign extend from msb of branchmap
              */
-            if (dec_ctx.branch_map.cnt > 0)
-                dec_ctx.last_packet_addr = absolute_addr;
+            if (dec_ctx->branch_map.cnt > 0)
+                dec_ctx->last_packet_addr = absolute_addr;
             /* this indicates we don't have a valid address but still a full
              * branch map
              */
-            if (dec_ctx.branch_map.cnt == 0)
-                dec_ctx.branch_map.cnt = 31;
+            if (dec_ctx->branch_map.cnt == 0)
+                dec_ctx->branch_map.cnt = 31;
 
-            while (!(dec_ctx.branch_map.cnt == 0 &&
+            while (!(dec_ctx->branch_map.cnt == 0 &&
                      (hit_discontinuity || hit_address))) {
 
                 int status = 0;
-                int size =
-                    disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
+                int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
                 if (status < 0)
                     goto fail;
 
-                if (dec_ctx.branch_map.cnt == 0 && pc == absolute_addr)
+                if (dec_ctx->branch_map.cnt == 0 && pc == absolute_addr)
                     hit_address = true;
 
-                dis_instr.priv = dec_ctx.privilege;
-                if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+                /* handle decoding RAS */
+                uint32_t ret_addr = 0;
+                enum trdb_ras instr_ras_type = update_ras(
+                    c, dis_instr->instr, dis_instr->iaddr, ras, &ret_addr);
+                if (instr_ras_type < 0) {
+                    err(c, "return address stack in bad state: %s\n",
+                        trdb_errstr(trdb_errcode(status)));
+                    goto fail;
+                }
+                if (instr_ras_type == coret) {
+                    err(c, "coret not implemented yet\n");
+                    goto fail;
+                }
+
+                /* generate decoded trace */
+                dis_instr->priv = dec_ctx->privilege;
+                if ((status = add_trace(c, instr_list, dis_instr)) < 0)
                     goto fail;
 
                 /* advance pc */
@@ -1660,11 +1724,11 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(dis_instr.instr,
+                    if (!is_unpred_discontinuity(dis_instr->instr,
                                                  implicit_ret)) {
                         break;
                     }
-                    info(c, "detected mret, uret or sret\n");
+                    dbg(c, "detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
@@ -1674,12 +1738,19 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                      * then we know that its actually a branch_map
                      * flush + discontinuity packet.
                      */
-                    if (dec_ctx.branch_map.cnt > 1 && dinfo.target == 0)
+                    if (implicit_ret && instr_ras_type == ret) {
+                        dbg(c, "returning with stack value %" PRIx32 "\n",
+                            ret_addr);
+                        pc = ret_addr;
+                        break;
+                    }
+
+                    if (dec_ctx->branch_map.cnt > 1 && dinfo.target == 0)
                         err(c,
                             "can't predict the jump target, never happens\n");
 
-                    if (dec_ctx.branch_map.cnt == 1 && dinfo.target == 0) {
-                        if (!dec_ctx.branch_map.full) {
+                    if (dec_ctx->branch_map.cnt == 1 && dinfo.target == 0) {
+                        if (!dec_ctx->branch_map.full) {
                             info(
                                 c,
                                 "we hit the not-full branch_map + address edge case, "
@@ -1694,7 +1765,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                             pc = absolute_addr;
                         }
                         hit_discontinuity = true;
-                    } else if (dec_ctx.branch_map.cnt > 0 ||
+                    } else if (dec_ctx->branch_map.cnt > 0 ||
                                dinfo.target != 0) {
                         /* we should not hit unpredictable discontinuities */
                         pc = dinfo.target;
@@ -1712,9 +1783,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* this case allows us to exhaust the branch bits */
                     {
                         /* 32 would be undefined */
-                        bool branch_taken = !(dec_ctx.branch_map.bits & 1);
-                        dec_ctx.branch_map.bits >>= 1;
-                        dec_ctx.branch_map.cnt--;
+                        bool branch_taken = !(dec_ctx->branch_map.bits & 1);
+                        dec_ctx->branch_map.bits >>= 1;
+                        dec_ctx->branch_map.cnt--;
                         if (dinfo.target == 0)
                             err(c,
                                 "can't predict the jump target, never happens\n");
@@ -1737,13 +1808,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
         } else if (packet->format == F_SYNC) {
             /* Sync pc. */
-            dec_ctx.privilege = packet->privilege;
+            dec_ctx->privilege = packet->privilege;
             pc = packet->address;
 
             /* Remember last packet address to be able to compute differential
              * addresses
              */
-            dec_ctx.last_packet_addr = packet->address;
+            dec_ctx->last_packet_addr = packet->address;
 
             /* since we are abruptly changing the pc we have to check if we
              * leave the section before we can disassemble. This is really ugly
@@ -1768,12 +1839,13 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             }
 
             int status = 0;
-            int size = disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
+            int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
             if (status < 0)
                 goto fail;
+            /* TODO: ras handling more difficult here?*/
 
-            dis_instr.priv = dec_ctx.privilege;
-            if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+            dis_instr->priv = dec_ctx->privilege;
+            if ((status = add_trace(c, instr_list, dis_instr)) < 0)
                 goto fail;
 
             pc += size;
@@ -1783,10 +1855,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                 /* TODO: we need this hack since {m,s,u} ret are not
                  * classified in libopcodes
                  */
-                if (!is_unpred_discontinuity(dis_instr.instr, implicit_ret)) {
+                if (!is_unpred_discontinuity(dis_instr->instr, implicit_ret)) {
                     break;
                 }
-                info(c, "detected mret, uret or sret\n");
+                dbg(c, "detected mret, uret or sret\n");
             case dis_jsr:    /* There is not real difference ... */
             case dis_branch: /* ... between those two */
                 if (dinfo.target == 0)
@@ -1840,32 +1912,46 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             if (full_address) {
                 absolute_addr = packet->address;
             } else {
-                /* absolute_addr = dec_ctx.last_packet_addr - sext_addr; */
-                absolute_addr = dec_ctx.last_packet_addr - packet->address;
+                /* absolute_addr = dec_ctx->last_packet_addr - sext_addr; */
+                absolute_addr = dec_ctx->last_packet_addr - packet->address;
             }
 
             dbg(c,
                 "F_ADDR_ONLY resolved address:%" PRIx32 " from %" PRIx32
                 " - %" PRIx32 "\n",
-                absolute_addr, dec_ctx.last_packet_addr, packet->address);
+                absolute_addr, dec_ctx->last_packet_addr, packet->address);
 
             /* Remember last packet address to be able to compute differential
              * addresses
              */
-            dec_ctx.last_packet_addr = absolute_addr;
+            dec_ctx->last_packet_addr = absolute_addr;
 
             while (!(hit_address || hit_discontinuity)) {
                 int status = 0;
-                int size =
-                    disassemble_at_pc(c, pc, &dis_instr, &dunit, &status);
+                int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
                 if (status < 0)
                     goto fail;
 
                 if (pc == absolute_addr)
                     hit_address = true;
 
-                dis_instr.priv = dec_ctx.privilege;
-                if ((status = add_trace(c, instr_list, &dis_instr)) < 0)
+                /* handle decoding RAS */
+                uint32_t ret_addr = 0;
+                enum trdb_ras instr_ras_type = update_ras(
+                    c, dis_instr->instr, dis_instr->iaddr, ras, &ret_addr);
+                if (instr_ras_type < 0) {
+                    err(c, "return address stack in bad state: %s\n",
+                        trdb_errstr(trdb_errcode(status)));
+                    goto fail;
+                }
+                if (instr_ras_type == coret) {
+                    err(c, "coret not implemented yet\n");
+                    goto fail;
+                }
+
+                /* generate decoded trace */
+                dis_instr->priv = dec_ctx->privilege;
+                if ((status = add_trace(c, instr_list, dis_instr)) < 0)
                     goto fail;
 
                 /* advance pc */
@@ -1876,13 +1962,20 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     /* TODO: we need this hack since {m,s,u} ret are not
                      * classified
                      */
-                    if (!is_unpred_discontinuity(dis_instr.instr,
+                    if (!is_unpred_discontinuity(dis_instr->instr,
                                                  implicit_ret)) {
                         break;
                     }
-                    info(c, "detected mret, uret or sret\n");
+                    dbg(c, "detected mret, uret or sret\n");
                 case dis_jsr:    /* There is not real difference ... */
                 case dis_branch: /* ... between those two */
+                    if (implicit_ret && instr_ras_type == ret) {
+                        dbg(c, "returning with stack value %" PRIx32 "\n",
+                            ret_addr);
+                        pc = ret_addr;
+                        break;
+                    }
+
                     if (dinfo.target) {
                         pc = dinfo.target;
                     } else {
