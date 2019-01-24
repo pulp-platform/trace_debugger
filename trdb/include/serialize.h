@@ -77,7 +77,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
  * @return -trdb_nomem if out of memory
  */
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
-                               struct list_head *packet_list);
+                               struct trdb_packet_head *packet_list);
 
 /**
  * Serialize a single packet, like the PULP trace debugger.
@@ -107,7 +107,7 @@ int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
  * @return -trdb_file_write if file at @p path could not be fully written
  */
 int trdb_write_packets(struct trdb_ctx *c, const char *path,
-                       struct list_head *packet_list);
+                       struct trdb_packet_head *packet_list);
 
 /**
  * Read a stimuli file at @p path into a list of tr_instr. This function
@@ -124,7 +124,7 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
  * @return -trdb_scan_file if parsing the file at @p failed
  */
 int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
-                               struct list_head *instrs, size_t *count);
+                               struct trdb_instr_head *instrs, size_t *count);
 
 /**
  * Read a stimuli file at @p path into an array of tr_instr.
@@ -160,4 +160,4 @@ int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
  * @return -trdb_scan_file if parsing the file at @p failed
  */
 int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
-                           struct list_head *instrs, size_t *count);
+                           struct trdb_instr_head *instrs, size_t *count);

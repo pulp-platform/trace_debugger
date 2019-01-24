@@ -23,8 +23,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/queue.h>
 #include "serialize.h"
-#include "list.h"
 #include "trace_debugger.h"
 #include "trdb_private.h"
 #include "utils.h"
@@ -335,7 +335,7 @@ int trdb_pulp_read_single_packet(struct trdb_ctx *c, FILE *fp,
 }
 
 int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
-                               struct list_head *packet_list)
+                               struct trdb_packet_head *packet_list)
 {
     if (!c || !path || !packet_list)
         return -trdb_invalid;
@@ -357,7 +357,7 @@ int trdb_pulp_read_all_packets(struct trdb_ctx *c, const char *path,
         *packet = tmp;
         total_bytes_read += bytes;
 
-        list_add(&packet->list, packet_list);
+        TAILQ_INSERT_TAIL(packet_list, packet, list);
     }
     dbg(c, "total bytes read: %" PRIu32 "\n", total_bytes_read);
     return 0;
@@ -388,7 +388,7 @@ int trdb_pulp_write_single_packet(struct trdb_ctx *c, struct tr_packet *packet,
 }
 
 int trdb_write_packets(struct trdb_ctx *c, const char *path,
-                       struct list_head *packet_list)
+                       struct trdb_packet_head *packet_list)
 {
     int status = 0;
     if (!c || !path || !packet_list)
@@ -409,7 +409,7 @@ int trdb_write_packets(struct trdb_ctx *c, const char *path,
 
     struct tr_packet *packet;
     /* TODO: do we need the rever version? I think we do*/
-    list_for_each_entry (packet, packet_list, list) {
+    TAILQ_FOREACH_REVERSE (packet, packet_list, trdb_packet_head, list) {
         status = trdb_pulp_serialize_packet(c, packet, &bitcnt, alignment, bin);
         if (status < 0) {
             goto fail;
@@ -441,7 +441,7 @@ fail:
 }
 
 int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
-                               struct list_head *instrs, size_t *count)
+                               struct trdb_instr_head *instrs, size_t *count)
 {
     int status = 0;
     FILE *fp   = NULL;
@@ -501,7 +501,7 @@ int trdb_stimuli_to_trace_list(struct trdb_ctx *c, const char *path,
         sample->instr      = instr;
         sample->compressed = compressed;
 
-        list_add(&sample->list, instrs);
+        TAILQ_INSERT_TAIL(instrs, sample, list);
 
         scnt++;
     }
@@ -615,7 +615,7 @@ fail:
 }
 
 int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
-                           struct list_head *instrs, size_t *count)
+                           struct trdb_instr_head *instrs, size_t *count)
 {
 
     FILE *fp   = NULL;
@@ -725,7 +725,7 @@ int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
             goto fail;
         }
 
-        list_add(&sample->list, instrs);
+        TAILQ_INSERT_TAIL(instrs, sample, list);
 
         scnt++;
     }

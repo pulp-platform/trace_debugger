@@ -34,12 +34,12 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <errno.h>
+#include <sys/queue.h>
 #include "trace_debugger.h"
 #include "trdb_private.h"
 #include "disassembly.h"
 #include "disassembly_private.h"
 #include "serialize.h"
-#include "list.h"
 #include "kvec.h"
 #include "utils.h"
 
@@ -1093,7 +1093,7 @@ fail:
  * packets generated packetes are appened to a given list header
  */
 int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
-                                 struct list_head *packet_list,
+                                 struct trdb_packet_head *packet_list,
                                  struct tr_instr *instr)
 {
     if (!packet_list || !instr)
@@ -1110,7 +1110,7 @@ int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
     }
 
     if (status == 1)
-        list_add(&packet->list, packet_list);
+        TAILQ_INSERT_TAIL(packet_list, packet, list);
     return status;
 }
 
@@ -1316,7 +1316,7 @@ static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
 }
 
 /* Allocate memory and the new instruction @p instr to @p instr_list. */
-static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
+static int add_trace(struct trdb_ctx *c, struct trdb_instr_head *instr_list,
                      struct tr_instr *instr)
 {
     struct tr_instr *add = malloc(sizeof(*add));
@@ -1324,14 +1324,14 @@ static int add_trace(struct trdb_ctx *c, struct list_head *instr_list,
         return -trdb_nomem;
 
     memcpy(add, instr, sizeof(*add));
-    list_add(&add->list, instr_list);
+    TAILQ_INSERT_TAIL(instr_list, add, list);
     return 0;
 }
 
 /* TODO: packet wise decompression with error events */
 int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
-                          struct list_head *packet_list,
-                          struct list_head *instr_list)
+                          struct trdb_packet_head *packet_list,
+                          struct trdb_instr_head *instr_list)
 {
     int status = 0;
     if (!c || !abfd || !packet_list || !instr_list)
@@ -1381,7 +1381,7 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
     struct tr_packet *packet = NULL;
 
-    list_for_each_entry_reverse (packet, packet_list, list) {
+    TAILQ_FOREACH (packet, packet_list, list) {
         /* we ignore unknown or unused packets (TIMER, SW) */
         if (packet->msg_type != W_TRACE) {
             info(c, "skipped a packet\n");
@@ -1988,10 +1988,11 @@ void trdb_disassemble_instr_with_bfd(struct trdb_ctx *c, struct tr_instr *instr,
     trdb_disassemble_instruction_with_bfd(c, abfd, instr->iaddr, dunit);
 }
 
-void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list)
+void trdb_dump_packet_list(FILE *stream,
+                           const struct trdb_packet_head *packet_list)
 {
     struct tr_packet *packet;
-    list_for_each_entry_reverse (packet, packet_list, list) {
+    TAILQ_FOREACH (packet, packet_list, list) {
         trdb_print_packet(stream, packet);
     }
 }
@@ -2208,26 +2209,28 @@ bool trdb_compare_instr(struct trdb_ctx *c, const struct tr_instr *instr0,
     return sum;
 }
 
-void trdb_free_packet_list(struct list_head *packet_list)
+void trdb_free_packet_list(struct trdb_packet_head *packet_list)
 {
-    if (list_empty(packet_list))
+    if (TAILQ_EMPTY(packet_list))
         return;
 
     struct tr_packet *packet;
-    struct tr_packet *packet_next;
-    list_for_each_entry_safe (packet, packet_next, packet_list, list) {
+    while (!TAILQ_EMPTY(packet_list)) {
+        packet = TAILQ_FIRST(packet_list);
+        TAILQ_REMOVE(packet_list, packet, list);
         free(packet);
     }
 }
 
-void trdb_free_instr_list(struct list_head *instr_list)
+void trdb_free_instr_list(struct trdb_instr_head *instr_list)
 {
-    if (list_empty(instr_list))
+    if (TAILQ_EMPTY(instr_list))
         return;
 
     struct tr_instr *instr;
-    struct tr_instr *instr_next;
-    list_for_each_entry_safe (instr, instr_next, instr_list, list) {
+    while (!TAILQ_EMPTY(instr_list)) {
+        instr = TAILQ_FIRST(instr_list);
+        TAILQ_REMOVE(instr_list, instr, list);
         free(instr);
     }
 }

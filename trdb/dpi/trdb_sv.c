@@ -34,9 +34,11 @@
 #include "trace_debugger.h"
 #include "serialize.h"
 
-LIST_HEAD(packets);
+/* the newer queue.h from bsd has a macro for such an initialization */
+struct trdb_packet_head packets = {NULL, &(packets).tqh_first};
 
-// TODO: send context to simulator per userdata methods
+/* TODO: send context to simulator per userdata methods */
+
 struct trdb_ctx *ctx;
 int packetcnt = 0;
 
@@ -113,8 +115,8 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
 
     int p = trdb_compress_trace_step_add(ctx, &packets, &tr_instr);
 
-    if (!list_empty(&packets)) {
-        latest_packet = list_entry(packets.next, struct tr_packet, list);
+    if (!TAILQ_EMPTY(&packets)) {
+        latest_packet = TAILQ_LAST(&packets, trdb_packet_head);
     }
 
     if (p == -1)

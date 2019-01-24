@@ -36,11 +36,11 @@ extern "C" {
 #include <inttypes.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <sys/queue.h>
 /* fix nameconflict with basename in libiberty and libgen */
 #define HAVE_DECL_BASENAME 1
 #include "bfd.h"
 #include "disassembly.h"
-#include "list.h"
 
 /* custom header */
 #define PACKETLEN 7
@@ -72,17 +72,22 @@ struct disassembler_unit;
  * metadata.
  */
 struct tr_instr {
-    bool valid;                /**< whether this sample/struct is valid */
-    bool exception;            /**< instruction trapped */
-    bool interrupt;            /**< exception caused by interrupt */
-    uint32_t cause : CAUSELEN; /**< exception cause */
-    uint32_t tval : XLEN;      /**< not used in PULP, trap value */
-    uint32_t priv : PRIVLEN;   /**< privilege mode */
-    uint32_t iaddr : XLEN;     /**< instruction address */
-    uint32_t instr : ILEN;     /**< raw instruction value */
-    bool compressed;           /**< instruction was originally compressed */
-    struct list_head list;     /**< anchor for linked list in list.h */
+    bool valid;                 /**< whether this sample/struct is valid */
+    bool exception;             /**< instruction trapped */
+    bool interrupt;             /**< exception caused by interrupt */
+    uint32_t cause : CAUSELEN;  /**< exception cause */
+    uint32_t tval : XLEN;       /**< not used in PULP, trap value */
+    uint32_t priv : PRIVLEN;    /**< privilege mode */
+    uint32_t iaddr : XLEN;      /**< instruction address */
+    uint32_t instr : ILEN;      /**< raw instruction value */
+    bool compressed;            /**< instruction was originally compressed */
+    TAILQ_ENTRY(tr_instr) list; /**< anchor for tail queue/linked list */
 };
+
+/**
+ * Struct to represent a list of tr_instr.
+ */
+TAILQ_HEAD(trdb_instr_head, tr_instr); /**< list pointer struct to tr_instr*/
 
 /**
  * All the possible trace packet types.
@@ -136,14 +141,18 @@ struct tr_packet {
     /* we need this if the first instruction of an exception is a branch, since
      * that won't be reorcded into the branch map
      */
-    bool branch;                /**< special case for F_SYNC packets */
-    uint32_t address : XLEN;    /**< address of the instruction */
-    uint32_t ecause : CAUSELEN; /**< exception cause */
-    bool interrupt;             /**< exception through interrupt */
-    uint32_t tval : XLEN;       /**< not used in PULP, trap information */
-
-    struct list_head list; /**< used to make a linked list of tr_packet */
+    bool branch;                 /**< special case for F_SYNC packets */
+    uint32_t address : XLEN;     /**< address of the instruction */
+    uint32_t ecause : CAUSELEN;  /**< exception cause */
+    bool interrupt;              /**< exception through interrupt */
+    uint32_t tval : XLEN;        /**< not used in PULP, trap information */
+    TAILQ_ENTRY(tr_packet) list; /**< anchor for tail queue/linked list */
 };
+
+/**
+ * Struct to represent a list of tr_packet.
+ */
+TAILQ_HEAD(trdb_packet_head, tr_packet);
 
 /**
  * Keep information about generated packets.
@@ -459,11 +468,11 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
                              struct tr_instr *instr);
 /**
  * A convenience wrapper for trdb_compress_trace_step() which interacts with
- * list_head directly and handles allocation of packet.
+ * trdb_packet_head directly and handles allocation of packet.
 
- * Since the function allocates new entries for list_head, the caller has to
- * deallocate them by calling trdb_free_packet_list(). Use the functions
- * provided by list.h to handle list_head entries.
+ * Since the function allocates new entries for trdb_packet_head, the caller has
+ * to deallocate them by calling trdb_free_packet_list(). Use the functions
+ * provided by queue.h to handle trdb_packet_head entries.
  *
  * @param ctx trace debugger context/state
  * @param packet_list list to add packet to
@@ -476,7 +485,7 @@ int trdb_compress_trace_step(struct trdb_ctx *ctx, struct tr_packet *packet,
  * @return -trdb_nomem if out of memory
  */
 int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
-                                 struct list_head *packet_list,
+                                 struct trdb_packet_head *packet_list,
                                  struct tr_instr *instr);
 
 /**
@@ -501,8 +510,8 @@ int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
  * F_BRANCH_DIFF packet
  */
 int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
-                          struct list_head *packet_list,
-                          struct list_head *instr_list);
+                          struct trdb_packet_head *packet_list,
+                          struct trdb_instr_head *instr_list);
 
 /**
  * Outputs disassembled trace using fprintf_func in #disassembler_unit.dinfo.
@@ -544,7 +553,8 @@ void trdb_disassemble_instr_with_bfd(struct trdb_ctx *c, struct tr_instr *instr,
  * @param stream output to write to
  * @param packet_list sequence of packets to print
  */
-void trdb_dump_packet_list(FILE *stream, const struct list_head *packet_list);
+void trdb_dump_packet_list(FILE *stream,
+                           const struct trdb_packet_head *packet_list);
 
 /**
  * Log a single packet in a formatted manner using the library context @p c.
@@ -597,7 +607,7 @@ bool trdb_compare_instr(struct trdb_ctx *c, const struct tr_instr *instr0,
  *
  * @param packet_list list to free
  */
-void trdb_free_packet_list(struct list_head *packet_list);
+void trdb_free_packet_list(struct trdb_packet_head *packet_list);
 
 /**
  * Free the entries of a list of tr_instr, used to deallocate the list returned
@@ -605,7 +615,7 @@ void trdb_free_packet_list(struct list_head *packet_list);
  *
  * @param instr_list list to free
  */
-void trdb_free_instr_list(struct list_head *instr_list);
+void trdb_free_instr_list(struct trdb_instr_head *instr_list);
 
 /* struct packet0 {
  *     uint32_t format : 2;   // 00

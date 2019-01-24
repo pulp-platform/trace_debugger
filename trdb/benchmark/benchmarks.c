@@ -27,6 +27,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/queue.h>
 
 #include "utils.h"
 #include "trace_debugger.h"
@@ -61,8 +62,11 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
 
     trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 
-    LIST_HEAD(instr_list);
-    LIST_HEAD(packet_list);
+    struct trdb_packet_head packet_list;
+    TAILQ_INIT(&packet_list);
+    struct trdb_instr_head instr_list;
+    TAILQ_INIT(&instr_list);
+
     if (!ctx) {
         fprintf(stderr, "Library context allocation failed.\n");
         status = -1;
@@ -87,7 +91,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     }
 
     struct tr_instr *instr;
-    list_for_each_entry_reverse (instr, &instr_list, list) {
+    TAILQ_FOREACH (instr, &instr_list, list) {
         int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
         if (step == -1) {
             fprintf(stderr, "Compress trace failed\n");
@@ -120,7 +124,7 @@ int compress_cvs_trace(const char *trace_path, struct result *comparison)
     trdb_set_implicit_ret(ctx, false);
     trdb_set_compress_branch_map(ctx, false);
 
-    list_for_each_entry_reverse (instr, &instr_list, list) {
+    TAILQ_FOREACH (instr, &instr_list, list) {
         int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
         if (step == -1) {
             fprintf(stderr, "Compress trace failed\n");

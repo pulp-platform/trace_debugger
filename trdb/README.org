@@ -90,8 +90,8 @@
    To run the C-model call =trdb_compress_trace_step= for each cycle and keep
    passing in =struct tr_instr= describing the retired instruction of the CPU.
    The state of the execution will be recorded in =trdb_ctx=. Generated packet
-   will be added to the =struct list_head= pointer. Such a packet list must be
-   freed by the user by calling =trdb_free_packet_list=.
+   will be added to the =struct trdb_packet_head= pointer. Such a packet list
+   must be freed by the user by calling =trdb_free_packet_list=.
 
    To reset a =trdb_ctx= to its initial state use =trdb_reset_compression= or
    =trdb_reset_decompression= depending on your usage.

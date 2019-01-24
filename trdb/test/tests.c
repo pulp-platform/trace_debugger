@@ -29,7 +29,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdint.h>
-#include "list.h"
+#include <sys/queue.h>
 #include "trace_debugger.h"
 /* #include "trace_debugger.c" */
 #include "disassembly.h"
@@ -161,20 +161,22 @@ static int test_parse_packets(const char *path)
 {
     int status         = TRDB_SUCCESS;
     struct trdb_ctx *c = trdb_new();
-    LIST_HEAD(packet_list);
+    struct trdb_packet_head packet_list;
+    TAILQ_INIT(&packet_list);
+
     if (trdb_pulp_read_all_packets(c, path, &packet_list)) {
         status = TRDB_FAIL;
         goto fail;
     }
 
-    if (list_empty(&packet_list)) {
+    if (TAILQ_EMPTY(&packet_list)) {
         LOG_ERRT("packet list empty\n");
         status = TRDB_FAIL;
         goto fail;
     }
     struct tr_packet *packet;
     if (TRDB_VERBOSE_TESTS) {
-        list_for_each_entry_reverse (packet, &packet_list, list) {
+        TAILQ_FOREACH (packet, &packet_list, list) {
             trdb_print_packet(stdout, packet);
         }
     }
@@ -399,7 +401,9 @@ static int test_stimuli_to_trace_list(const char *path)
         return TRDB_FAIL;
     }
 
-    LIST_HEAD(instr_list);
+    struct trdb_instr_head instr_list;
+    TAILQ_INIT(&instr_list);
+
     size_t sizel = 0;
     status       = trdb_stimuli_to_trace_list(c, path, &instr_list, &sizel);
     if (status < 0) {
@@ -411,14 +415,14 @@ static int test_stimuli_to_trace_list(const char *path)
         goto fail;
     }
 
-    if (list_empty(&instr_list)) {
+    if (TAILQ_EMPTY(&instr_list)) {
         LOG_ERRT("list is empty even though we read data\n");
         goto fail;
     }
 
     int i = 0;
     struct tr_instr *instr;
-    list_for_each_entry_reverse (instr, &instr_list, list) {
+    TAILQ_FOREACH (instr, &instr_list, list) {
         if (i >= sizea) {
             LOG_ERRT("trying to access out of bounds index\n");
             goto fail;
@@ -462,7 +466,8 @@ static int test_stimuli_to_packet_dump(const char *path)
     }
     status = TRDB_SUCCESS;
 
-    LIST_HEAD(head);
+    struct trdb_packet_head head;
+    TAILQ_INIT(&head);
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
@@ -587,8 +592,10 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     }
     status = TRDB_SUCCESS;
 
-    LIST_HEAD(packet1_head);
-    LIST_HEAD(instr_head);
+    struct trdb_packet_head packet1_head;
+    TAILQ_INIT(&packet1_head);
+    struct trdb_instr_head instr_head;
+    TAILQ_INIT(&instr_head);
 
     ctx = trdb_new();
     if (!ctx) {
@@ -687,8 +694,11 @@ int test_compress_cvs_trace(const char *trace_path)
 
     trdb_init_disassembler_unit_for_pulp(&dunit, NULL);
 
-    LIST_HEAD(instr_list);
-    LIST_HEAD(packet_list);
+    struct trdb_packet_head packet_list;
+    TAILQ_INIT(&packet_list);
+    struct trdb_instr_head instr_list;
+    TAILQ_INIT(&instr_list);
+
     if (!ctx) {
         LOG_ERRT("Library context allocation failed.\n");
         status = TRDB_FAIL;
@@ -710,11 +720,11 @@ int test_compress_cvs_trace(const char *trace_path)
     }
 
     struct tr_instr *instr;
-    list_for_each_entry_reverse (instr, &instr_list, list) {
+    TAILQ_FOREACH (instr, &instr_list, list) {
         /* trdb_disassemble_instr(instr, &dunit); */
     }
 
-    list_for_each_entry_reverse (instr, &instr_list, list) {
+    TAILQ_FOREACH (instr, &instr_list, list) {
         int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
         if (step == -1) {
             LOG_ERRT("Compress trace failed\n");
@@ -783,8 +793,10 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     ctx->config.use_pulp_sext = true;
     ctx->config.implicit_ret  = false;
 
-    LIST_HEAD(packet1_head);
-    LIST_HEAD(instr1_head);
+    struct trdb_packet_head packet1_head;
+    TAILQ_INIT(&packet1_head);
+    struct trdb_instr_head instr1_head;
+    TAILQ_INIT(&instr1_head);
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
@@ -814,7 +826,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
         struct tr_instr *instr;
-        list_for_each_entry_reverse (instr, &instr1_head, list) {
+        TAILQ_FOREACH (instr, &instr1_head, list) {
         }
     }
 
@@ -824,7 +836,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     struct tr_instr *instr;
     int processedcnt = 0;
     int i            = 0;
-    list_for_each_entry_reverse (instr, &instr1_head, list) {
+    TAILQ_FOREACH (instr, &instr1_head, list) {
         /* skip all invalid instructions for the comparison */
         while (!(*samples)[i].valid || (*samples)[i].exception) {
             i++;
@@ -841,7 +853,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     }
     LOG_INFOT("Compared %d instructions\n", processedcnt);
 
-    if (list_empty(&instr1_head)) {
+    if (TAILQ_EMPTY(&instr1_head)) {
         LOG_ERRT("Empty instruction list.\n");
         return 0;
     }
@@ -892,8 +904,10 @@ int test_decompress_trace_differential(const char *bin_path,
     }
     status = TRDB_SUCCESS;
 
-    LIST_HEAD(packet1_head);
-    LIST_HEAD(instr1_head);
+    struct trdb_packet_head packet1_head;
+    TAILQ_INIT(&packet1_head);
+    struct trdb_instr_head instr1_head;
+    TAILQ_INIT(&instr1_head);
 
     ctx->config.full_address  = !differential;
     ctx->config.use_pulp_sext = true;
@@ -938,7 +952,7 @@ int test_decompress_trace_differential(const char *bin_path,
     if (TRDB_VERBOSE_TESTS) {
         LOG_INFOT("Reconstructed trace disassembly:\n");
         struct tr_instr *instr;
-        list_for_each_entry_reverse (instr, &instr1_head, list) {
+        TAILQ_FOREACH (instr, &instr1_head, list) {
         }
     }
 
@@ -948,7 +962,7 @@ int test_decompress_trace_differential(const char *bin_path,
     struct tr_instr *instr;
     int processedcnt = 0;
     int i            = 0;
-    list_for_each_entry_reverse (instr, &instr1_head, list) {
+    TAILQ_FOREACH (instr, &instr1_head, list) {
         /* skip all invalid instructions for the comparison */
         while (!(*samples)[i].valid || (*samples)[i].exception) {
             i++;
@@ -965,7 +979,7 @@ int test_decompress_trace_differential(const char *bin_path,
     }
     LOG_INFOT("Compared %d instructions\n", processedcnt);
 
-    if (list_empty(&instr1_head)) {
+    if (TAILQ_EMPTY(&instr1_head)) {
         LOG_ERRT("Empty instruction list.\n");
         return 0;
     }

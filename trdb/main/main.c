@@ -30,9 +30,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/queue.h>
 #include "bfd.h"
 #include "utils.h"
-#include "list.h"
 #include "trace_debugger.h"
 #include "disassembly.h"
 #include "serialize.h"
@@ -276,11 +276,13 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
 {
     int status = EXIT_SUCCESS;
 
-    LIST_HEAD(packet_list);
+    struct trdb_packet_head packet_list;
+    TAILQ_INIT(&packet_list);
     /* read stimuli file and convert to internal data structure */
     struct tr_instr *tmp;
     struct tr_instr **samples = &tmp;
-    LIST_HEAD(instr_list);
+    struct trdb_instr_head instr_list;
+    TAILQ_INIT(&instr_list);
 
     int success      = 0;
     size_t samplecnt = 0;
@@ -303,7 +305,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
 
     /* step by step compression */
     if (arguments->cvs) {
-        list_for_each_entry_reverse (instr, &instr_list, list) {
+        TAILQ_FOREACH (instr, &instr_list, list) {
             int step = trdb_compress_trace_step_add(c, &packet_list, instr);
             if (step < 0) {
                 fprintf(stderr, "compress trace failed: %s\n",
@@ -327,7 +329,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     /* we either produce binary or human readable output */
     if (arguments->binary_output) {
         struct tr_packet *packet;
-        list_for_each_entry_reverse (packet, &packet_list, list) {
+        TAILQ_FOREACH (packet, &packet_list, list) {
             status = trdb_pulp_write_single_packet(c, packet, output_fp);
             if (status < 0) {
                 fprintf(stderr, "failed to serialize packets: %s\n",
@@ -355,9 +357,10 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     const char *path = arguments->args[0];
     struct disassemble_info dinfo;
     struct disassembler_unit dunit;
-
-    LIST_HEAD(packet_list);
-    LIST_HEAD(instr_list);
+    struct trdb_packet_head packet_list;
+    TAILQ_INIT(&packet_list);
+    struct trdb_instr_head instr_list;
+    TAILQ_INIT(&instr_list);
 
     if (!abfd) {
         fprintf(stderr, "need to provide a binary (--bfd) for decompression\n");
@@ -402,7 +405,7 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
     dinfo.stream       = output_fp;
 
     struct tr_instr *instr;
-    list_for_each_entry_reverse (instr, &instr_list, list) {
+    TAILQ_FOREACH (instr, &instr_list, list) {
         if (arguments->disassemble)
             trdb_disassemble_instr_with_bfd(c, instr, abfd, &dunit);
         /* trdb_disassemble_instr(instr, &dunit); */
@@ -484,7 +487,8 @@ static int dump_trace_or_packets(struct trdb_ctx *c, FILE *output_fp,
     }
 
     const char *path = arguments->args[0];
-    LIST_HEAD(packet_list);
+    struct trdb_packet_head packet_list;
+    TAILQ_INIT(&packet_list);
 
     if (!strcmp(arguments->binary_format, "pulp")) {
         if ((status = trdb_pulp_read_all_packets(c, path, &packet_list)) < 0) {
