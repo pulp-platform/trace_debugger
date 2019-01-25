@@ -22,12 +22,13 @@
 CFLAGS		= -Wall -O2 -g -march=native \
 			-Wno-unused-function -Wno-missing-braces \
 			-DENABLE_LOGGING -DNDEBUG
+CFLAGS_DEBUG    =
 # we need gnu11 and no-strict-aliasing
 ALL_CFLAGS	= -std=gnu11 -fno-strict-aliasing $(CFLAGS)
 ALL_CFLAGS_DBG	= -std=gnu11 -Wall -O0 -g -fno-strict-aliasing \
 			-Wno-unused-function -Wno-missing-braces \
 			-fsanitize=address -fno-omit-frame-pointer \
-			-DENABLE_LOGGING -DENABLE_DEBUG \
+			-DENABLE_LOGGING -DENABLE_DEBUG $(CFLAGS_DEBUG)\
 # -fsanitize=undefined \
 # -fsanitize=leak \
 
@@ -158,11 +159,11 @@ $(BENCHMARK_BIN): $(OBJS) $(BENCHMARK_OBJS)
 
 $(SV_LIB).so: $(OBJS) $(DPI_OBJS)
 #	gcc -o $(SV_LIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)
-	ld -shared -E --exclude-libs ALL -o $(SV_LIB).so $(LDFLAGS) \
+	$(LD) -shared -E --exclude-libs ALL -o $(SV_LIB).so $(LDFLAGS) \
 		$(OBJS) $(DPI_OBJS) $(LDLIBS)
 
 $(LIB).so: $(OBJS) $(DPI_OBJS)
-	ld -shared -E --exclude-libs ALL -o $(LIB).so $(LDFLAGS) \
+	$(LD) -shared -E --exclude-libs ALL -o $(LIB).so $(LDFLAGS) \
 		$(OBJS) $(LDLIBS)
 
 $(STATIC_LIB).a: $(OBJS)
