@@ -770,7 +770,8 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                  << (XLEN - branch_map_len(branch_map->cnt))));
             if (sext > XLEN + branch_map_len(branch_map->cnt))
                 sext = XLEN + branch_map_len(branch_map->cnt);
-            uint32_t ext = XLEN + branch_map_len(branch_map->cnt) - sext + 1;
+            /* uint32_t ext = XLEN + branch_map_len(branch_map->cnt) - sext + 1;
+             */
             tr->length =
                 FORMATLEN + BRANCHLEN + branch_map_len(branch_map->cnt);
             /* tr->length = FORMATLEN + BRANCHLEN */
@@ -1113,7 +1114,7 @@ int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
     if (status == 1)
         TAILQ_INSERT_TAIL(packet_list, packet, list);
     else
-	free(packet);
+        free(packet);
 
     return status;
 }
@@ -1287,6 +1288,7 @@ static void free_section_for_debugging(struct disassemble_info *dinfo)
     if (!dinfo)
         return;
     free(dinfo->buffer);
+    dinfo->buffer        = NULL;
     dinfo->buffer_vma    = 0;
     dinfo->buffer_length = 0;
     dinfo->section       = NULL;

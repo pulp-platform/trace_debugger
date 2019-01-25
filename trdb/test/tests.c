@@ -580,10 +580,18 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     char *compare  = NULL;
     char *expected = NULL;
 
-    struct tr_instr *tmp;
+    struct tr_instr *tmp = NULL;
     struct tr_instr **samples = &tmp;
     size_t samplecnt          = 0;
-    int status                = 0;
+    int status                = TRDB_SUCCESS;
+
+    ctx = trdb_new();
+    if (!ctx) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
     status = trdb_stimuli_to_trace(ctx, trace_path, samples, &samplecnt);
     if (status < 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
@@ -596,12 +604,6 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     struct trdb_instr_head instr_head;
     TAILQ_INIT(&instr_head);
 
-    ctx = trdb_new();
-    if (!ctx) {
-        LOG_ERRT("Library context allocation failed.\n");
-        status = TRDB_FAIL;
-        goto fail;
-    }
 
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
@@ -763,7 +765,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     struct tr_instr *tmp      = NULL;
     struct tr_instr **samples = &tmp;
     size_t samplecnt          = 0;
-    int status                = 0;
+    int status                = TRDB_SUCCESS;
 
     struct trdb_ctx *ctx = trdb_new();
     if (!ctx) {
@@ -786,7 +788,6 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
         status = TRDB_FAIL;
         goto fail;
     }
-    status = TRDB_SUCCESS;
 
     ctx->config.full_address  = false;
     ctx->config.use_pulp_sext = true;

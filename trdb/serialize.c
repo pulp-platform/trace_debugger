@@ -532,10 +532,8 @@ int trdb_stimuli_to_trace(struct trdb_ctx *c, const char *path,
 
     *count = 0;
 
-    if (!path || !samples) { // TODO: investigate !c
-        status = -trdb_invalid;
-        goto fail;
-    }
+    if (!c || !path || !samples)
+        return -trdb_invalid;
 
     fp = fopen(path, "r");
     if (!fp) {
@@ -618,17 +616,14 @@ int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
                            struct trdb_instr_head *instrs, size_t *count)
 {
 
-    FILE *fp   = NULL;
-    int status = 0;
+    FILE *fp                = NULL;
+    int status              = 0;
     struct tr_instr *sample = NULL;
 
     *count = 0;
 
-    if (!c || !path || !instrs) {
+    if (!c || !path || !instrs)
         status = -trdb_invalid;
-        goto fail;
-    }
-
 
     fp = fopen(path, "r");
     if (!fp) {
