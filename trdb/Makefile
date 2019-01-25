@@ -25,7 +25,7 @@ CFLAGS		= -Wall -O2 -g -march=native \
 # we need gnu11 and no-strict-aliasing
 ALL_CFLAGS	= -std=gnu11 -fno-strict-aliasing $(CFLAGS)
 ALL_CFLAGS_DBG	= -std=gnu11 -Wall -O0 -g -fno-strict-aliasing \
-			-Wno-unused-function \
+			-Wno-unused-function -Wno-missing-braces \
 			-fsanitize=address -fno-omit-frame-pointer \
 			-DENABLE_LOGGING -DENABLE_DEBUG \
 # -fsanitize=undefined \
