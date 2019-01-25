@@ -34,8 +34,7 @@
 #include "trace_debugger.h"
 #include "serialize.h"
 
-/* the newer queue.h from bsd has a macro for such an initialization */
-struct trdb_packet_head packets = {NULL, &(packets).tqh_first};
+struct trdb_packet_head packets = TAILQ_HEAD_INITIALIZER(packets);
 
 /* TODO: send context to simulator per userdata methods */
 
