@@ -295,10 +295,10 @@ struct trdb_ctx *trdb_new()
     ctx->dec       = malloc(sizeof(*ctx->dec));
     ctx->dis_instr = malloc(sizeof(*ctx->dis_instr));
     if (!ctx->cmp || !ctx->dec || !ctx->dis_instr) {
-        free(ctx);
         free(ctx->cmp);
         free(ctx->dec);
         free(ctx->dis_instr);
+        free(ctx);
         return NULL;
     }
 
@@ -341,8 +341,9 @@ void trdb_free(struct trdb_ctx *ctx)
     if (!ctx)
         return;
     info(ctx, "context %p released\n", ctx);
+    free(ctx->dis_instr);
     free(ctx->cmp);
-    if (!ctx->dec)
+    if (ctx->dec)
         kv_destroy(ctx->dec->call_stack);
     free(ctx->dec);
     free(ctx);
@@ -1096,7 +1097,7 @@ int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
                                  struct trdb_packet_head *packet_list,
                                  struct tr_instr *instr)
 {
-    if (!packet_list || !instr)
+    if (!ctx || !packet_list || !instr)
         return -trdb_invalid;
 
     struct tr_packet *packet = malloc(sizeof(*packet));
@@ -1111,6 +1112,9 @@ int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
 
     if (status == 1)
         TAILQ_INSERT_TAIL(packet_list, packet, list);
+    else
+	free(packet);
+
     return status;
 }
 
@@ -1130,6 +1134,7 @@ int trdb_pulp_model_step(struct trdb_ctx *ctx, struct tr_instr *instr,
     /* if fifo not empty, grab uint32_t */
     /* if fifo empty, nothing*/
     /* if fifo full, do backstalling etc. depending on recovery mode*/
+    return 0; /* TODO: unimplemented */
 }
 
 /* try to update the return address stack*/
@@ -1347,6 +1352,14 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
     bool full_address          = config->full_address;
     bool implicit_ret          = config->implicit_ret;
 
+    /* define disassembler stuff */
+    struct disassembler_unit dunit = {0};
+    struct disassemble_info dinfo  = {0};
+    /*TODO: move this into trdb_ctx so that we can continuously decode pieces?*/
+    struct trdb_decompress *dec_ctx = c->dec;
+    struct trdb_stack *ras          = &c->dec->call_stack;
+    struct tr_instr *dis_instr      = c->dis_instr;
+
     /* find section belonging to start_address */
     bfd_vma start_address = abfd->start_address;
     asection *section     = trdb_get_section_for_vma(abfd, start_address);
@@ -1356,13 +1369,6 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
         goto fail;
     }
     info(c, "Section of start_address:%s\n", section->name);
-
-    struct disassembler_unit dunit = {0};
-    struct disassemble_info dinfo  = {0};
-    /*TODO: move this into trdb_ctx so that we can continuously decode pieces?*/
-    struct trdb_decompress *dec_ctx = c->dec;
-    struct trdb_stack *ras          = &c->dec->call_stack;
-    struct tr_instr *dis_instr      = c->dis_instr;
 
     dunit.dinfo = &dinfo;
     /* TODO: remove that stuff, goes into global context */

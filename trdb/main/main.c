@@ -279,7 +279,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     struct trdb_packet_head packet_list;
     TAILQ_INIT(&packet_list);
     /* read stimuli file and convert to internal data structure */
-    struct tr_instr *tmp;
+    struct tr_instr *tmp = NULL;
     struct tr_instr **samples = &tmp;
     struct trdb_instr_head instr_list;
     TAILQ_INIT(&instr_list);
@@ -383,7 +383,6 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                 trdb_errstr(trdb_errcode(status)));
         fprintf(stderr, "possible causes: corrupt packets or wrong bfd\n");
         fprintf(stderr, "continuing anyway...\n");
-        status = EXIT_FAILURE;
     }
 
     /* setup the disassembler to consider data from the bfd */

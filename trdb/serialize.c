@@ -620,15 +620,15 @@ int trdb_cvs_to_trace_list(struct trdb_ctx *c, const char *path,
 
     FILE *fp   = NULL;
     int status = 0;
+    struct tr_instr *sample = NULL;
 
     *count = 0;
 
-    if (!path || !instrs) { // TODO: investigate !c
+    if (!c || !path || !instrs) {
         status = -trdb_invalid;
         goto fail;
     }
 
-    struct tr_instr *sample = NULL;
 
     fp = fopen(path, "r");
     if (!fp) {
@@ -746,6 +746,7 @@ out:
 fail:
     // TODO: it's maybe better to not free the whole list, but just the part
     // where failed
+    free(sample);
     trdb_free_instr_list(instrs);
     goto out;
 }

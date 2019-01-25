@@ -917,6 +917,7 @@ int trdb_alloc_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
 fail:
     free(xvec);
     free(sorted_syms);
+    free(aux);
     return status;
 }
 
@@ -934,7 +935,8 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
     if (dunit->dinfo) {
         aux = dunit->dinfo->application_data;
         free(dunit->dinfo->symtab);
-        free(dunit->dinfo->buffer);
+        /* this is allocated and freed in trdb_disassemble_section() itself*/
+        /* free(dunit->dinfo->buffer); */
         dunit->dinfo->buffer_vma    = 0;
         dunit->dinfo->buffer_length = 0;
     }

@@ -446,7 +446,7 @@ fail:
 
 static int test_stimuli_to_packet_dump(const char *path)
 {
-    struct tr_instr *tmp;
+    struct tr_instr *tmp = NULL;
     struct tr_instr **samples = &tmp;
     int status                = TRDB_SUCCESS;
     struct trdb_ctx *c        = trdb_new();
@@ -457,7 +457,6 @@ static int test_stimuli_to_packet_dump(const char *path)
     }
 
     size_t samplecnt = 0;
-    status           = 0;
     status           = trdb_stimuli_to_trace(c, path, samples, &samplecnt);
     if (status != 0) {
         LOG_ERRT("Stimuli to tr_instr failed\n");
@@ -876,7 +875,7 @@ int test_decompress_trace_differential(const char *bin_path,
     struct tr_instr *tmp      = NULL;
     struct tr_instr **samples = &tmp;
     size_t samplecnt          = 0;
-    int status                = 0;
+    int status                = TRDB_SUCCESS;
 
     struct trdb_ctx *ctx = trdb_new();
     if (!ctx) {
@@ -902,7 +901,6 @@ int test_decompress_trace_differential(const char *bin_path,
         status = TRDB_FAIL;
         goto fail;
     }
-    status = TRDB_SUCCESS;
 
     struct trdb_packet_head packet1_head;
     TAILQ_INIT(&packet1_head);
