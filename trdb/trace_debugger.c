@@ -220,6 +220,8 @@ static void log_stderr(struct trdb_ctx *ctx, int priority, const char *file,
                        int line, const char *fn, const char *format,
                        va_list args)
 {
+    (void)ctx;
+    (void)priority;
     fprintf(stderr, "trdb: %s:%d:0: %s(): ", file, line, fn);
     vfprintf(stderr, format, args);
 }
@@ -228,6 +230,11 @@ static void log_stdout_quiet(struct trdb_ctx *ctx, int priority,
                              const char *file, int line, const char *fn,
                              const char *format, va_list args)
 {
+    (void)ctx;
+    (void)priority;
+    (void)file;
+    (void)line;
+    (void)fn;
     vfprintf(stdout, format, args);
 }
 
@@ -271,7 +278,7 @@ void trdb_reset_decompression(struct trdb_ctx *ctx)
                                        .pulp_vector_table_packet = true,
                                        .full_statistics          = true};
 
-    *ctx->dec            = (struct trdb_decompress){{0}};
+    *ctx->dec            = (struct trdb_decompress){0};
     ctx->dec->branch_map = (struct branch_map_state){0};
     kv_destroy(ctx->dec->call_stack);
     kv_init(ctx->dec->call_stack);
@@ -574,7 +581,7 @@ static bool differential_addr(int *lead, uint32_t absolute,
     return diff > abs; /* on tie we prefer absolute */
 }
 
-static int quantize_clz(int x)
+static unsigned quantize_clz(unsigned x)
 {
 
     if (x < 9)
@@ -591,8 +598,8 @@ static int quantize_clz(int x)
 static bool pulp_differential_addr(int *lead, uint32_t absolute,
                                    uint32_t differential)
 {
-    int abs  = sign_extendable_bits(absolute);
-    int diff = sign_extendable_bits(differential);
+    unsigned abs  = sign_extendable_bits(absolute);
+    unsigned diff = sign_extendable_bits(differential);
 
     /* we are only interested in sign extension for byte boundaries */
     abs  = quantize_clz(abs);
@@ -700,7 +707,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
             tr->length  = FORMATLEN + keep;
             /* record distribution */
             stats->sext_bits[keep - 1]++;
-            if (tr->address == 0 || tr->address == -1)
+            if (tr->address == 0 || tr->address == (uint32_t)-1)
                 stats->zo_addresses++;
         }
         stats->addr_only_packets++;
@@ -762,7 +769,7 @@ static int emit_branch_map_flush_packet(struct trdb_ctx *ctx,
                 stats->sext_bits[keep - 1]++;
             }
 
-            if (tr->address == 0 || tr->address == -1)
+            if (tr->address == 0 || tr->address == (uint32_t)-1)
                 stats->zo_addresses++;
             uint32_t sext = sign_extendable_bits64(
                 ((uint64_t)tr->address << XLEN) |
@@ -1122,6 +1129,7 @@ int trdb_compress_trace_step_add(struct trdb_ctx *ctx,
 int trdb_pulp_model_step(struct trdb_ctx *ctx, struct tr_instr *instr,
                          uint32_t *packet_word)
 {
+    (void)packet_word;
     struct tr_packet packet;
     int status = trdb_compress_trace_step(ctx, &packet, instr);
     if (status < 0) {
@@ -1178,7 +1186,7 @@ static int update_ras(struct trdb_ctx *c, uint32_t instr, uint32_t addr,
 /* Try to read instruction at @p pc into @p instr. It uses read_memory_func()
  * which is set using libopcodes.
  */
-static int read_memory_at_pc(bfd_vma pc, uint64_t *instr, unsigned int len,
+static int read_memory_at_pc(bfd_vma pc, uint64_t *instr,
                              struct disassemble_info *dinfo)
 {
     bfd_byte packet[2];
@@ -1244,7 +1252,7 @@ static int disassemble_at_pc(struct trdb_ctx *c, bfd_vma pc,
         return 0;
     }
     uint64_t instr_bits = 0;
-    if (read_memory_at_pc(pc, &instr_bits, 0, dinfo)) {
+    if (read_memory_at_pc(pc, &instr_bits, dinfo)) {
         err(c, "reading instr at pc failed\n");
         *status = -trdb_bad_instr;
         return 0;
@@ -1326,6 +1334,7 @@ static int alloc_section_for_debugging(struct trdb_ctx *c, bfd *abfd,
 static int add_trace(struct trdb_ctx *c, struct trdb_instr_head *instr_list,
                      struct tr_instr *instr)
 {
+    (void)c;
     struct tr_instr *add = malloc(sizeof(*add));
     if (!add)
         return -trdb_nomem;
@@ -1506,7 +1515,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
                     dbg(c, "detected mret, uret or sret\n");
+		    /* fall through */
                 case dis_jsr:    /* There is not real difference ... */
+		    /* fall through */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
                      * encoded in the binary else we would have gotten a
@@ -1669,7 +1680,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
                     dbg(c, "detected mret, uret or sret\n");
+		    /* fall through */
                 case dis_jsr:    /* There is not real difference ... */
+		    /* fall through */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
                      * encoded in the binary else we would have gotten a
@@ -1799,7 +1812,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     break;
                 }
                 dbg(c, "detected mret, uret or sret\n");
+		/* fall through */
             case dis_jsr:    /* There is not real difference ... */
+		/* fall through */
             case dis_branch: /* ... between those two */
                              /* this should never happen */
                 if (dinfo.target == 0)
@@ -1905,7 +1920,9 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
                     dbg(c, "detected mret, uret or sret\n");
+		    /* fall through */
                 case dis_jsr:    /* There is not real difference ... */
+		    /* fall through */
                 case dis_branch: /* ... between those two */
                     if (implicit_ret && instr_ras_type == ret) {
                         dbg(c, "returning with stack value %" PRIx32 "\n",
@@ -2200,6 +2217,7 @@ bool trdb_compare_packet()
 bool trdb_compare_instr(struct trdb_ctx *c, const struct tr_instr *instr0,
                         const struct tr_instr *instr1)
 {
+    (void)c;
     if (!instr0 || !instr1)
         return false;
 

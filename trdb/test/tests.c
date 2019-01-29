@@ -420,7 +420,7 @@ static int test_stimuli_to_trace_list(const char *path)
         goto fail;
     }
 
-    int i = 0;
+    size_t i = 0;
     struct tr_instr *instr;
     TAILQ_FOREACH (instr, &instr_list, list) {
         if (i >= sizea) {
@@ -993,7 +993,7 @@ fail:
     return status;
 }
 
-int main(int argc, char *argv[argc + 1])
+int main()
 {
     const char *tv[] = {
         "data/interrupt",

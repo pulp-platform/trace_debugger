@@ -185,7 +185,7 @@ fail:
     return status;
 }
 
-int main(int argc, char *argv[argc + 1])
+int main()
 {
     int status = EXIT_SUCCESS;
 

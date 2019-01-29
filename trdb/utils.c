@@ -28,6 +28,8 @@
 
 void trdb_log_null(struct trdb_ctx *ctx, const char *format, ...)
 {
+    (void)ctx;
+    (void)format;
 }
 
 uint32_t sign_extendable_bits(uint32_t addr)

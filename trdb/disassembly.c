@@ -925,8 +925,10 @@ void trdb_free_dinfo_with_bfd(struct trdb_ctx *c, bfd *abfd,
                               struct disassembler_unit *dunit)
 
 {
+    (void)abfd; /* TODO: handle this properly */
     /* if(abfd) */
     /* 	free(abfd->xvec); */
+    (void)c;
     if (!dunit)
         return;
 
@@ -1829,6 +1831,7 @@ void trdb_dump_section_names(bfd *abfd)
 
 void trdb_dump_section_header(bfd *abfd, asection *section, void *ignored)
 {
+    (void)ignored;
     bfd_printf_vma(abfd, bfd_get_section_vma(abfd, section));
     printf("%s\n", bfd_get_section_name(abfd, section));
 }
@@ -1854,6 +1857,7 @@ void trdb_dump_target_list()
 
 bool trdb_vma_in_section(bfd *abfd, asection *section, bfd_vma vma)
 {
+    (void)abfd; /* bfd_section_size ignores abfd */
     return (vma >= section->vma &&
             vma < (section->vma + bfd_section_size(abfd, section)));
 }

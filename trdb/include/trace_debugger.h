@@ -524,6 +524,22 @@ void trdb_disassemble_trace(size_t len, struct tr_instr *trace,
                             struct disassembler_unit *dunit);
 
 /**
+ * Outputs disassembled trace using fprintf_func in #disassembler_unit.dinfo and
+ * furthermore uses information from abfd to produce objdump-like output. The
+ * exact output can be configured by calling trdb_set_disassemble_conf() with
+ * the appropriate flags.
+ *
+ * @param c the context/state of the trace debugger
+ * @param len length of trace
+ * @param trace an array of instrutions
+ * @param abfd the bfd that corresponds to the @p trace
+ * @param dunit the configured disassembler
+ */
+void trdb_disassemble_trace_with_bfd(struct trdb_ctx *c, size_t len,
+                                     struct tr_instr trace[len], bfd *abfd,
+                                     struct disassembler_unit *dunit);
+
+/**
  * Output disassemble @p instr using fprintf_func in #disassembler_unit.dinfo.
  *
  * @param instr instruction, only #iaddr and #instr are needed
@@ -533,10 +549,12 @@ void trdb_disassemble_instr(struct tr_instr *instr,
                             struct disassembler_unit *dunit);
 
 /**
- * Disassemble @p instr using fprint_func in #disassembler_unit.dinfo. This
- * function additionaly uses information from the @p abfd and settings in @dp
- * dunit to produce more useful disassembly, such as intermixing sourcecode,
- * showing file and line numbers, resolving addresses to symbols etc.
+ * Disassemble @p instr using fprint_func in #disassembler_unit.dinfo and
+ * additionaly information from the @p abfd and settings in @dp dunit to produce
+ * more useful disassembly. Options such as intermixing sourcecode, showing file
+ * and line numbers, resolving addresses to symbols etc. are available. See
+ * trdb_disassemble_trace_with_bfd() and trdb_set_disassembly_conf() for more
+ * information.
  *
  * @param c trace debugger context
  * @param instr instruction to disassemble, only #iaddr is relevant

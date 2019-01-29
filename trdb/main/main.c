@@ -125,6 +125,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         break;
     case 'h':
         arguments->human = true;
+	break;
     case 'd':
         arguments->disassemble = true;
         break;
@@ -192,7 +193,7 @@ int main(int argc, char *argv[argc + 1])
     int status = EXIT_SUCCESS;
     struct arguments arguments;
     /* set default */
-    arguments                 = (struct arguments){{0}};
+    arguments                 = (struct arguments){0};
     arguments.silent          = false;
     arguments.verbose         = false;
     arguments.compress        = false;
