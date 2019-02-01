@@ -48,6 +48,8 @@ static void log_stdout_dpi(struct trdb_ctx *ctx, int priority, const char *file,
                            int line, const char *fn, const char *format,
                            va_list args)
 {
+    (void)ctx;
+    (void)priority;
     fprintf(stdout, "trdb-dpi: %s:%d:0: %s(): ", file, line, fn);
     vfprintf(stdout, format, args);
 }
@@ -132,12 +134,12 @@ void trdb_sv_feed_trace(svLogic ivalid, svLogic iexception, svLogic interrupt,
         /* SV_PACKED_DATA_NELEMS returns the number ov svLogicVecVal's, which
          * each have 4 bytes
          */
-        int total_bytes = SV_PACKED_DATA_NELEMS(packet_max_len) * 4;
+        size_t total_bytes = SV_PACKED_DATA_NELEMS(packet_max_len) * 4;
 
         /* this is just a integer divions (ceiling) of bitcount/8 */
-        int packet_bytes = (bitcnt / 8 + (bitcnt % 8 != 0));
+        size_t packet_bytes = (bitcnt / 8 + (bitcnt % 8 != 0));
 
-        if (packet_max_len / 8 < packet_bytes) {
+        if ((size_t)packet_max_len / 8 < packet_bytes) {
             err(ctx, "packet size on the sv side is too small\n");
             return;
         }

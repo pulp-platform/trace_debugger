@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <endian.h> /* Non-standard (posix), use <arpa/inet.h> instead? */
+#include <endian.h>
 #include <stdbool.h>
 #include <inttypes.h>
 #include <string.h>
