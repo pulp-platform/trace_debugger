@@ -215,6 +215,41 @@ TAGS:
 docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
 	$(DOC) doxyfile
 
+# patched spike to produce traces
+spike-generate-traces: spike riscv-tests/benchmarks/build.ok
+	for benchmark in riscv-tests/benchmarks/*.riscv; do \
+		./trdb-spike \
+			--ust-trace=riscv-traces/$$(basename $$benchmark).cvs \
+			$$benchmark; \
+	done
+
+
+spike: riscv-isa-sim/build.ok
+
+riscv-isa-sim/build.ok: riscv-fesvr/build.ok
+	rm -rf riscv-isa-sim
+	git clone https://github.com/pulp-platform/riscv-isa-sim
+	cd riscv-isa-sim && \
+		LDFLAGS="-L../riscv-fesvr" ./configure --with-isa=RV32IMC
+	+cd riscv-isa-sim && ln -s ../riscv-fesvr/fesvr . && \
+		$(MAKE) && touch build.ok & cd ..
+	echo "#!/usr/bin/env bash" > trdb-spike
+	echo "LD_LIBRARY_PATH=./riscv-isa-sim:./riscv-fesvr ./riscv-isa-sim/spike \"\$$@\"" \
+		>> trdb-spike
+	chmod u+x trdb-spike
+
+
+riscv-fesvr/build.ok:
+	rm -rf riscv-fesvr
+	git clone https://github.com/riscv/riscv-fesvr.git riscv-fesvr
+	+cd riscv-fesvr && ./configure && $(MAKE) && touch build.ok
+
+# riscv-benchmark-tests
+# have your $RISCV point to your compiler
+riscv-tests/benchmarks/build.ok:
+	rm -rf riscv-tests
+	git clone https://github.com/riscv/riscv-tests/ --recursive
+	cd riscv-tests/benchmarks && XLEN=32 $(MAKE) && touch build.ok
 # cleanup
 .PHONY: clean
 clean:
@@ -226,3 +261,7 @@ clean:
 distclean: clean
 	rm -f TAGS
 	rm -rf doc/*
+	rm -rf trdb-spike
+	rm -rf riscv-fesvr
+	rm -rf riscv-isa-sim
+	rm -rf riscv-tests
