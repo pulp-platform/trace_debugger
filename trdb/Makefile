@@ -19,71 +19,69 @@
 # Author: Robert Balas (balasr@student.ethz.ch)
 # Description: Build the C model and decompression tools for the trace debugger
 
-CFLAGS		= -Wall -Wextra -Wno-missing-field-initializers \
+CFLAGS          = -Wall -Wextra -Wno-missing-field-initializers \
 			-Wno-unused-function -Wno-missing-braces \
 			-O2 -g -march=native \
 			-DENABLE_LOGGING -DNDEBUG
-CFLAGS_DEBUG    =
+CFLAGS_DBG      =
 # we need gnu11 and no-strict-aliasing
-ALL_CFLAGS	= -std=gnu11 -fno-strict-aliasing $(CFLAGS)
-ALL_CFLAGS_DBG	= -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers \
+ALL_CFLAGS      = -std=gnu11 -fno-strict-aliasing $(CFLAGS)
+ALL_CFLAGS_DBG  = -std=gnu11 -Wall -Wextra -Wno-missing-field-initializers \
 			-Wno-unused-function -Wno-missing-braces \
 			-O0 -g -fno-strict-aliasing \
 			-fsanitize=address -fno-omit-frame-pointer \
-			-DENABLE_LOGGING -DENABLE_DEBUG $(CFLAGS_DEBUG)\
+			-DENABLE_LOGGING -DENABLE_DEBUG $(CFLAGS_DBG)\
 # -fsanitize=undefined \
 # -fsanitize=leak \
 
 
-QUESTASIM_PATH	= /usr/pack/modelsim-10.5c-kgf/questasim
+QUESTASIM_PATH  = /usr/pack/modelsim-10.5c-kgf/questasim
 
 # Prebuilt libbfd, libopcodes, libz and libiberty because it is annoying to
 # build pulp-riscv-binutils-gdb. If you decide to use your own build, then
 # change this path
-PULP_BINUTILS_PATH = lib
+BINUTILS_PATH = lib
 
-LIB_PATHS       = $(PULP_BINUTILS_PATH)/opcodes \
-		$(PULP_BINUTILS_PATH)/bfd \
-		$(PULP_BINUTILS_PATH)/libiberty \
-		$(PULP_BINUTILS_PATH)/zlib
+LIB_DIRS        = $(addprefix $(BINUTILS_PATH)/,opcodes bfd libiberty zlib)
+LIBS            = bfd opcodes iberty z dl c
 
-INCLUDE_PATHS   = ./ \
-		./include \
-		./internal \
-		$(PULP_BINUTILS_PATH)/include \
-		$(PULP_BINUTILS_PATH)/bfd \
-		$(QUESTASIM_PATH)/include \
-		/usr/include
+INCLUDE_DIRS    = ./ ./include ./internal \
+		$(addprefix $(BINUTILS_PATH)/,include bfd) \
+		$(QUESTASIM_PATH)/include
 
-MORE_TAG_PATHS  = $(PULP_BINUTILS_PATH)/bfd
 
-LIBS            = libbfd.a libopcodes.a libiberty.a libz.a
-LDFLAGS		= $(addprefix -L, $(LIB_PATHS))
-LDLIBS		= $(addprefix -l:, $(LIBS)) -ldl -lc
+LDFLAGS         = $(addprefix -L, $(LIB_DIRS))
+LDLIBS          = $(addprefix -l, $(LIBS))
 
-MAIN_SRCS	= $(wildcard main/*.c)
-MAIN_OBJS	= $(MAIN_SRCS:.c=.o)
+MAIN_SRCS       = $(wildcard main/*.c)
+MAIN_OBJS       = $(MAIN_SRCS:.c=.o)
 
-TEST_SRCS	= $(wildcard test/*.c)
-TEST_OBJS	= $(TEST_SRCS:.c=.o)
+TEST_SRCS       = $(wildcard test/*.c)
+TEST_OBJS       = $(TEST_SRCS:.c=.o)
 
 BENCHMARK_SRCS  = $(wildcard benchmark/*.c)
 BENCHMARK_OBJS  = $(BENCHMARK_SRCS:.c=.o)
 
-DPI_SRCS	= $(wildcard dpi/*.c)
-DPI_OBJS	= $(DPI_SRCS:.c=.o)
+DPI_SRCS        = $(wildcard dpi/*.c)
+DPI_OBJS        = $(DPI_SRCS:.c=.o)
 
-SRCS		= $(wildcard *.c)
-OBJS		= $(SRCS:.c=.o)
-INCLUDES	= $(addprefix -I, $(INCLUDE_PATHS))
+SRCS            = $(wildcard *.c)
+OBJS            = $(SRCS:.c=.o)
+INCLUDES        = $(addprefix -I, $(INCLUDE_DIRS))
 
-HEADERS		= $(wildcard include/*.h)
+HEADERS         = $(wildcard include/*.h)
 
-BIN		= trdb
-TEST_BIN	= tests
+# executables
+BIN             = trdb
+TEST_BIN        = tests
 BENCHMARK_BIN   = benchmarks
 
-# GNU recommendations
+# different libs (sv_lib for simulators, others for software)
+SV_LIB          = libtrdbsv
+LIB             = libtrdb
+STATIC_LIB      = libtrdb
+
+# GNU recommendations for install targets
 prefix          = /usr/local
 exec_prefix     = $(prefix)
 bindir          = $(exec_prefix)/bin
@@ -91,20 +89,12 @@ libdir          = $(exec_prefix)/lib
 includedir      = $(prefix)/include
 
 INSTALL         = install
-INSTALL_PROGRAM = $(INSTALL)
+INSTALL_PROGRAM         = $(INSTALL)
 INSTALL_DATA    = ${INSTALL} -m 644
 
-# golden model lib for simulator
-SV_LIB		= libtrdbsv
-LIB		= libtrdb
-STATIC_LIB      = libtrdb
-
-
-CTAGS		= ctags
-
-VALGRIND	= valgrind
-
-DOC		= doxygen
+CTAGS           = ctags
+VALGRIND        = valgrind
+DOXYGEN         = doxygen
 
 
 # compilation targets
@@ -122,30 +112,6 @@ lib: $(LIB).so
 static-lib: ALL_CFLAGS += -fPIC
 static-lib: $(STATIC_LIB).a
 
-# all install targets
-install-headers: $(HEADERS)
-	$(INSTALL_DATA) $(HEADERS) $(DESTDIR)$(includedir)
-
-install-static-lib: static-lib
-	$(INSTALL_DATA) $(STATIC_LIB).a $(DESTDIR)$(libdir)/$(STATIC_LIB).a
-
-install-lib: lib
-	$(INSTALL_DATA) $(LIB).so $(DESTDIR)$(libdir)/$(LIB).so
-
-install-trdb: $(BIN)
-	$(INSTALL_PROGRAM) $(BIN) $(DESTDIR)$(bindir)/$(BIN)
-
-install: install-static-lib install-lib install-trdb
-
-install-strip:
-	$(MAKE) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
-
-uninstall:
-	rm $(DESTDIR)$(bindir)/$(BIN)
-	rm $(DESTDIR)$(libdir)/$(LIB).so
-	rm $(DESTDIR)$(libdir)/$(STATIC_LIB).a
-	rm $(DESTDIR)$(includedir)/$(HEADERS)
-
 # compilation boilerplate
 $(BIN): $(OBJS) $(MAIN_OBJS)
 	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(MAIN_OBJS) $(OBJS) \
@@ -160,7 +126,6 @@ $(BENCHMARK_BIN): $(OBJS) $(BENCHMARK_OBJS)
 		$(OBJS) $(LDLIBS)
 
 $(SV_LIB).so: $(OBJS) $(DPI_OBJS)
-#	gcc -o $(SV_LIB).so -shared $(LD_FLAGS) $(OBJS) $(DPI_OBJS)
 	$(LD) -shared -E --exclude-libs ALL -o $(SV_LIB).so $(LDFLAGS) \
 		$(OBJS) $(DPI_OBJS) $(LDLIBS)
 
@@ -205,15 +170,39 @@ valgrind-main:
 valgrind-benchmark:
 	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BENCHMARK_BIN)
 
+# all install targets
+install-headers: $(HEADERS)
+	$(INSTALL_DATA) $(HEADERS) $(DESTDIR)$(includedir)
+
+install-static-lib: static-lib
+	$(INSTALL_DATA) $(STATIC_LIB).a $(DESTDIR)$(libdir)/$(STATIC_LIB).a
+
+install-lib: lib
+	$(INSTALL_DATA) $(LIB).so $(DESTDIR)$(libdir)/$(LIB).so
+
+install-trdb: $(BIN)
+	$(INSTALL_PROGRAM) $(BIN) $(DESTDIR)$(bindir)/$(BIN)
+
+install: install-static-lib install-lib install-trdb
+
+install-strip:
+	$(MAKE) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
+
+uninstall:
+	rm $(DESTDIR)$(bindir)/$(BIN)
+	rm $(DESTDIR)$(libdir)/$(LIB).so
+	rm $(DESTDIR)$(libdir)/$(STATIC_LIB).a
+	rm $(DESTDIR)$(includedir)/$(HEADERS)
+
 # emacs tag generation
 .PHONY: TAGS
 TAGS:
-	$(CTAGS) -R -e -h=".c.h" --tag-relative=always . $(LIB_PATHS) \
-		$(INCLUDE_PATHS) $(MORE_TAG_PATHS)
+	$(CTAGS) -R -e -h=".c.h" --tag-relative=always \
+		. $(LIB_DIRS) $(INCLUDE_DIRS) $(BINUTILS_PATH)/bfd
 
 # documentation
 docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
-	$(DOC) doxyfile
+	$(DOXYGEN) doxyfile
 
 # patched spike to produce traces
 spike-generate-traces: spike riscv-tests/benchmarks/build.ok
