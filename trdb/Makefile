@@ -224,7 +224,7 @@ spike-generate-traces: spike riscv-tests/benchmarks/build.ok
 	done
 
 
-spike: riscv-isa-sim/build.ok
+spike: riscv-isa-sim/build.ok riscv-fesvr/build.ok
 
 riscv-isa-sim/build.ok: riscv-fesvr/build.ok
 	rm -rf riscv-isa-sim
