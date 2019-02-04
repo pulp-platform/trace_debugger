@@ -77,6 +77,17 @@ SV_LIB          = libtrdbsv
 LIB             = libtrdb
 STATIC_LIB      = libtrdb
 
+# header file dependency generation
+DEPDIR          := .d
+DEPDIRS         := $(addsuffix /$(DEPDIR),. main benchmark test)
+# goal: make gcc put a dependency file called obj.Td (derived from subdir/obj.o)
+# in subdir/.d/
+DEPFLAGS        = -MT $@ -MMD -MP -MF $(@D)/$(DEPDIR)/$(patsubst %.o,%.Td,$(@F))
+# move gcc generated header dependencies to DEPDIR
+# this rename step is here to make the header dependency generation "atomic"
+POSTCOMPILE     = @mv -f $(@D)/$(DEPDIR)/$(patsubst %.o,%.Td,$(@F)) \
+			$(@D)/$(DEPDIR)/$(patsubst %.o,%.d,$(@F)) && touch $@
+
 # GNU recommendations for install targets
 prefix          = /usr/local
 exec_prefix     = $(prefix)
@@ -85,7 +96,7 @@ libdir          = $(exec_prefix)/lib
 includedir      = $(prefix)/include
 
 INSTALL         = install
-INSTALL_PROGRAM         = $(INSTALL)
+INSTALL_PROGRAM = $(INSTALL)
 INSTALL_DATA    = ${INSTALL} -m 644
 
 CTAGS           = ctags
@@ -126,8 +137,19 @@ $(STATIC_LIB).a: $(OBJS)
 # $@ = name of target
 # $< = first dependency
 %.o: %.c
-	$(CC) $(ALL_CFLAGS) $(INCLUDES) $(LDFLAGS) \
+%.o: %.c $(DEPDIR)/%.d $(DEPDIRS)
+	$(CC) $(DEPFLAGS) $(ALL_CFLAGS) $(INCLUDES) $(LDFLAGS) \
 		-c $(CPPFLAGS) $< -o $@ $(LDLIBS)
+	$(POSTCOMPILE)
+
+# check if we need to create the dependencies folders (gcc doesn't)
+$(DEPDIRS):
+	$(shell mkdir -p $(DEPDIRS) > /dev/null)
+# make won't fail if the dependency file doesn't exist
+$(addsuffix /$(DEPDIR)/%.d,. main benchmark test): ;
+
+# prevent automatic deletion as intermediate file
+.PRECIOUS: $(addsuffix /$(DEPDIR)/%.d,. main benchmark test)
 
 # run targets
 .PHONY: run
@@ -230,7 +252,7 @@ riscv-tests/benchmarks/build.ok:
 .PHONY: clean
 clean:
 	rm -rf $(MAINS) $(SV_LIB).so $(STATIC_LIB).a $(LIB).so \
-		$(OBJS) $(MAINS_OBJS) $(DPI_OBJS)
+		$(OBJS) $(MAINS_OBJS) $(DPI_OBJS) $(DEPDIRS)
 
 .PHONY: distclean
 distclean: clean
@@ -240,3 +262,6 @@ distclean: clean
 	rm -rf riscv-fesvr
 	rm -rf riscv-isa-sim
 	rm -rf riscv-tests
+
+# include auto generated header dependency information
+include $(wildcard $(addsuffix /*.d,$(DEPDIRS)))
