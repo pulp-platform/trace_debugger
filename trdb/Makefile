@@ -40,6 +40,7 @@ QUESTASIM_PATH  = /usr/pack/modelsim-10.5c-kgf/questasim
 # Prebuilt libbfd, libopcodes, libz and libiberty because it is annoying to
 # build pulp-riscv-binutils-gdb. If you decide to use your own build, then
 # change this path
+
 BINUTILS_PATH = lib
 
 LIB_DIRS        = $(addprefix $(BINUTILS_PATH)/,opcodes bfd libiberty zlib)
@@ -53,28 +54,23 @@ INCLUDE_DIRS    = ./ ./include ./internal \
 LDFLAGS         = $(addprefix -L, $(LIB_DIRS))
 LDLIBS          = $(addprefix -l, $(LIBS))
 
-MAIN_SRCS       = $(wildcard main/*.c)
-MAIN_OBJS       = $(MAIN_SRCS:.c=.o)
-
-TEST_SRCS       = $(wildcard test/*.c)
-TEST_OBJS       = $(TEST_SRCS:.c=.o)
-
-BENCHMARK_SRCS  = $(wildcard benchmark/*.c)
-BENCHMARK_OBJS  = $(BENCHMARK_SRCS:.c=.o)
-
-DPI_SRCS        = $(wildcard dpi/*.c)
-DPI_OBJS        = $(DPI_SRCS:.c=.o)
-
 SRCS            = $(wildcard *.c)
 OBJS            = $(SRCS:.c=.o)
 INCLUDES        = $(addprefix -I, $(INCLUDE_DIRS))
 
+DPI_SRCS        = $(wildcard dpi/*.c)
+DPI_OBJS        = $(DPI_SRCS:.c=.o)
+
 HEADERS         = $(wildcard include/*.h)
 
 # executables
-BIN             = trdb
-TEST_BIN        = tests
-BENCHMARK_BIN   = benchmarks
+CLI_BIN         = main/trdb
+BENCH_BIN       = benchmark/benchmarks
+TESTS_BIN       = test/tests
+
+MAINS           = $(CLI_BIN) $(BENCH_BIN) $(TESTS_BIN)
+MAINS_SRCS      = $(addsuffix .c,$(MAINS))
+MAINS_OBJS      = $(addsuffix .o,$(MAINS))
 
 # different libs (sv_lib for simulators, others for software)
 SV_LIB          = libtrdbsv
@@ -98,7 +94,7 @@ DOXYGEN         = doxygen
 
 
 # compilation targets
-all: $(BIN) $(TEST_BIN) $(BENCHMARK_BIN)
+all: $(MAINS)
 
 debug: ALL_CFLAGS = $(ALL_CFLAGS_DBG)
 debug: all
@@ -112,18 +108,9 @@ lib: $(LIB).so
 static-lib: ALL_CFLAGS += -fPIC
 static-lib: $(STATIC_LIB).a
 
-# compilation boilerplate
-$(BIN): $(OBJS) $(MAIN_OBJS)
-	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(MAIN_OBJS) $(OBJS) \
-		$(LDLIBS)
-
-$(TEST_BIN): $(OBJS) $(TEST_OBJS)
-	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(TEST_OBJS) $(OBJS) \
-		$(LDLIBS)
-
-$(BENCHMARK_BIN): $(OBJS) $(BENCHMARK_OBJS)
-	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $(BENCHMARK_OBJS) \
-		$(OBJS) $(LDLIBS)
+#compilation boilerplate
+$(MAINS): %: %.o $(OBJS)
+	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ $(LDFLAGS) $^ $(LDLIBS)
 
 $(SV_LIB).so: $(OBJS) $(DPI_OBJS)
 	$(LD) -shared -E --exclude-libs ALL -o $(SV_LIB).so $(LDFLAGS) \
@@ -144,31 +131,31 @@ $(STATIC_LIB).a: $(OBJS)
 
 # run targets
 .PHONY: run
-run:
-	./$(BIN)
+run: $(CLI_BIN)
+	./$(CLI_BIN)
 
 .PHONY: test
-test:
-	./$(TEST_BIN)
+test: $(TESTS_BIN)
+	./$(TESTS_BIN)
 
 .PHONY: benchmark
-benchmark:
-	./$(BENCHMARK_BIN)
+benchmark: $(BENCH_BIN)
+	./$(BENCH_BIN)
 
 .PHONY: check
 check: test
 
 .PHONY: valgrind-test
-valgrind-test:
-	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(TEST_BIN)
+valgrind-test: $(TESTS_BIN)
+	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(TESTS_BIN)
 
 .PHONY: valgrind-main
-valgrind-main:
-	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BIN)
+valgrind-main: $(CLI_BIN)
+	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(CLI_BIN)
 
 .PHONY: valgrind-benchmark
-valgrind-benchmark:
-	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BENCHMARK_BIN)
+valgrind-benchmark: $(BENCH_BIN)
+	$(VALGRIND) -v --leak-check=full --track-origins=yes ./$(BENCH_BIN)
 
 # all install targets
 install-headers: $(HEADERS)
@@ -180,8 +167,8 @@ install-static-lib: static-lib
 install-lib: lib
 	$(INSTALL_DATA) $(LIB).so $(DESTDIR)$(libdir)/$(LIB).so
 
-install-trdb: $(BIN)
-	$(INSTALL_PROGRAM) $(BIN) $(DESTDIR)$(bindir)/$(BIN)
+install-trdb: $(CLI_BIN)
+	$(INSTALL_PROGRAM) $(CLI_BIN) $(DESTDIR)$(bindir)/$(CLI_BIN)
 
 install: install-static-lib install-lib install-trdb
 
@@ -189,7 +176,7 @@ install-strip:
 	$(MAKE) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
 
 uninstall:
-	rm $(DESTDIR)$(bindir)/$(BIN)
+	rm $(DESTDIR)$(bindir)/$(CLI_BIN)
 	rm $(DESTDIR)$(libdir)/$(LIB).so
 	rm $(DESTDIR)$(libdir)/$(STATIC_LIB).a
 	rm $(DESTDIR)$(includedir)/$(HEADERS)
@@ -201,7 +188,7 @@ TAGS:
 		. $(LIB_DIRS) $(INCLUDE_DIRS) $(BINUTILS_PATH)/bfd
 
 # documentation
-docs: doxyfile $(SRCS) $(MAIN_SRCS) $(TEST_SRCS)
+docs: doxyfile $(SRCS) $(MAINS_SRCS)
 	$(DOXYGEN) doxyfile
 
 # patched spike to produce traces
@@ -242,9 +229,8 @@ riscv-tests/benchmarks/build.ok:
 # cleanup
 .PHONY: clean
 clean:
-	rm -rf $(BIN) $(TEST_BIN) $(BENCHMARK_BIN) $(SV_LIB).so \
-	$(STATIC_LIB).a $(LIB).so $(OBJS) $(MAIN_OBJS) $(TEST_OBJS) \
-	$(BENCHMARK_OBJS) $(DPI_OBJS)
+	rm -rf $(MAINS) $(SV_LIB).so $(STATIC_LIB).a $(LIB).so \
+		$(OBJS) $(MAINS_OBJS) $(DPI_OBJS)
 
 .PHONY: distclean
 distclean: clean
