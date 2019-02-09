@@ -79,7 +79,7 @@ STATIC_LIB      = libtrdb
 
 # header file dependency generation
 DEPDIR          := .d
-DEPDIRS         := $(addsuffix /$(DEPDIR),. main benchmark test)
+DEPDIRS         := $(addsuffix /$(DEPDIR),. main benchmark test dpi)
 # goal: make gcc put a dependency file called obj.Td (derived from subdir/obj.o)
 # in subdir/.d/
 DEPFLAGS        = -MT $@ -MMD -MP -MF $(@D)/$(DEPDIR)/$(patsubst %.o,%.Td,$(@F))
@@ -146,10 +146,10 @@ $(STATIC_LIB).a: $(OBJS)
 $(DEPDIRS):
 	$(shell mkdir -p $(DEPDIRS) > /dev/null)
 # make won't fail if the dependency file doesn't exist
-$(addsuffix /$(DEPDIR)/%.d,. main benchmark test): ;
+$(addsuffix /$(DEPDIR)/%.d,. main benchmark test dpi): ;
 
 # prevent automatic deletion as intermediate file
-.PRECIOUS: $(addsuffix /$(DEPDIR)/%.d,. main benchmark test)
+.PRECIOUS: $(addsuffix /$(DEPDIR)/%.d,. main benchmark test dpi)
 
 # run targets
 .PHONY: run
