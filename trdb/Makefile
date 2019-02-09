@@ -214,11 +214,16 @@ docs: doxyfile $(SRCS) $(MAINS_SRCS)
 	$(DOXYGEN) doxyfile
 
 # patched spike to produce traces
+#
+# we use sed to cutoff the internal boot sequence of spike. Alternatively we
+# could add this code to the binary but this is easier.
 spike-generate-traces: spike riscv-tests/benchmarks/build.ok
 	for benchmark in riscv-tests/benchmarks/*.riscv; do \
 		./trdb-spike \
 			--ust-trace=riscv-traces/$$(basename $$benchmark).cvs \
 			$$benchmark; \
+		sed -i 2,6d riscv-traces/$$(basename $$benchmark).cvs; \
+		cp $$benchmark riscv-traces/$$(basename $$benchmark); \
 	done
 
 
