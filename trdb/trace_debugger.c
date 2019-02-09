@@ -2022,6 +2022,15 @@ void trdb_dump_packet_list(FILE *stream,
     }
 }
 
+void trdb_dump_instr_list(FILE *stream,
+                          const struct trdb_instr_head *instr_list)
+{
+    struct tr_instr *instr;
+    TAILQ_FOREACH (instr, instr_list, list) {
+        trdb_print_instr(stream, instr);
+    }
+}
+
 void trdb_log_packet(struct trdb_ctx *c, const struct tr_packet *packet)
 {
     if (!c)

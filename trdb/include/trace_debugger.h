@@ -575,6 +575,15 @@ void trdb_dump_packet_list(FILE *stream,
                            const struct trdb_packet_head *packet_list);
 
 /**
+ * Prints a list of tr_instr in a formatted manner to @p stream.
+ *
+ * @param stream output to write to
+ * @param instr_list sequence of instructions to print
+ */
+void trdb_dump_instr_list(FILE *stream,
+                          const struct trdb_instr_head *instr_list);
+
+/**
  * Log a single packet in a formatted manner using the library context @p c.
  *
  * @param c the context of the trace debugger
