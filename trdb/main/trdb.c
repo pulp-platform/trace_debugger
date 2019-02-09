@@ -125,7 +125,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         break;
     case 'h':
         arguments->human = true;
-	break;
+        break;
     case 'd':
         arguments->disassemble = true;
         break;
@@ -185,8 +185,11 @@ static int decompress_packets(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
 static int disassemble_trace(struct trdb_ctx *c, FILE *output_fp, bfd *abfd,
                              struct arguments *);
 
-static int dump_trace_or_packets(struct trdb_ctx *c, FILE *output_fp,
-                                 struct arguments *arguments);
+static int dump_packets(struct trdb_ctx *c, FILE *output_fp,
+                        struct arguments *arguments);
+
+static int dump_trace(struct trdb_ctx *c, FILE *output_fp,
+                      struct arguments *arguments);
 
 int main(int argc, char *argv[argc + 1])
 {
@@ -255,7 +258,10 @@ int main(int argc, char *argv[argc + 1])
     } else if (arguments.compress) {
         status = compress_trace(ctx, output_fp, &arguments);
     } else if (arguments.human) {
-        status = dump_trace_or_packets(ctx, output_fp, &arguments);
+        if (arguments.trace_file)
+            status = dump_trace(ctx, output_fp, &arguments);
+        else
+            status = dump_packets(ctx, output_fp, &arguments);
     } else if (arguments.trace_file) {
         status = disassemble_trace(ctx, output_fp, abfd, &arguments);
     } else {
@@ -280,7 +286,7 @@ static int compress_trace(struct trdb_ctx *c, FILE *output_fp,
     struct trdb_packet_head packet_list;
     TAILQ_INIT(&packet_list);
     /* read stimuli file and convert to internal data structure */
-    struct tr_instr *tmp = NULL;
+    struct tr_instr *tmp      = NULL;
     struct tr_instr **samples = &tmp;
     struct trdb_instr_head instr_list;
     TAILQ_INIT(&instr_list);
@@ -474,8 +480,8 @@ fail:
     return status;
 }
 
-static int dump_trace_or_packets(struct trdb_ctx *c, FILE *output_fp,
-                                 struct arguments *arguments)
+static int dump_packets(struct trdb_ctx *c, FILE *output_fp,
+                        struct arguments *arguments)
 {
     int status = EXIT_SUCCESS;
 
@@ -508,5 +514,35 @@ static int dump_trace_or_packets(struct trdb_ctx *c, FILE *output_fp,
 
 fail:
     trdb_free_packet_list(&packet_list);
+    return status;
+}
+
+static int dump_trace(struct trdb_ctx *c, FILE *output_fp,
+                      struct arguments *arguments)
+{
+    int status = EXIT_SUCCESS;
+
+    const char *path = arguments->args[0];
+    struct trdb_instr_head instr_list;
+    size_t instrcnt = 0;
+    TAILQ_INIT(&instr_list);
+
+    if (arguments->cvs) {
+        status = trdb_cvs_to_trace_list(c, path, &instr_list, &instrcnt);
+        if (status < 0) {
+            fprintf(stderr, "failed to parse cvs file: %s\n",
+                    trdb_errstr(trdb_errcode(status)));
+            status = EXIT_FAILURE;
+            goto fail;
+        }
+        trdb_dump_instr_list(output_fp, &instr_list);
+    } else {
+        fprintf(stderr, "dump trace for non cvs file not implemented yet");
+        status = EXIT_FAILURE;
+        goto fail;
+    }
+
+fail:
+    trdb_free_instr_list(&instr_list);
     return status;
 }
