@@ -446,7 +446,7 @@ fail:
 
 static int test_stimuli_to_packet_dump(const char *path)
 {
-    struct tr_instr *tmp = NULL;
+    struct tr_instr *tmp      = NULL;
     struct tr_instr **samples = &tmp;
     int status                = TRDB_SUCCESS;
     struct trdb_ctx *c        = trdb_new();
@@ -471,7 +471,7 @@ static int test_stimuli_to_packet_dump(const char *path)
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
         int step = trdb_compress_trace_step_add(c, &head, &(*samples)[i]);
-        if (step == -1) {
+        if (step < 0) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
             goto fail;
@@ -580,7 +580,7 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     char *compare  = NULL;
     char *expected = NULL;
 
-    struct tr_instr *tmp = NULL;
+    struct tr_instr *tmp      = NULL;
     struct tr_instr **samples = &tmp;
     size_t samplecnt          = 0;
     int status                = TRDB_SUCCESS;
@@ -604,12 +604,11 @@ int test_compress_trace(const char *trace_path, const char *packets_path)
     struct trdb_instr_head instr_head;
     TAILQ_INIT(&instr_head);
 
-
     /* step by step compression */
     for (size_t i = 0; i < samplecnt; i++) {
         int step =
             trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
-        if (step == -1) {
+        if (step < 0) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
             goto fail;
@@ -727,7 +726,7 @@ int test_compress_cvs_trace(const char *trace_path)
 
     TAILQ_FOREACH (instr, &instr_list, list) {
         int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
-        if (step == -1) {
+        if (step < 0) {
             LOG_ERRT("Compress trace failed\n");
             status = TRDB_FAIL;
             goto fail;
@@ -802,7 +801,7 @@ int test_decompress_trace(const char *bin_path, const char *trace_path)
     for (size_t i = 0; i < samplecnt; i++) {
         int step =
             trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
-        if (step == -1) {
+        if (step < 0) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
             goto fail;
@@ -868,6 +867,129 @@ fail:
     return status;
 }
 
+int test_decompress_cvs_trace_differential(const char *bin_path,
+                                           const char *trace_path,
+                                           bool differential, bool implicit_ret)
+{
+    bfd *abfd              = NULL;
+    size_t instrcnt        = 0;
+    int status             = TRDB_SUCCESS;
+    struct tr_instr *instr = NULL;
+
+    struct trdb_ctx *ctx = trdb_new();
+    if (!ctx) {
+        LOG_ERRT("Library context allocation failed.\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+    struct trdb_packet_head packet_list;
+    TAILQ_INIT(&packet_list);
+    struct trdb_instr_head instr_list;
+    TAILQ_INIT(&instr_list);
+    struct trdb_instr_head instr1_head;
+    TAILQ_INIT(&instr1_head);
+
+    printf("differential: %s, implicit returns: %s, ",
+           differential ? "true" : "false", implicit_ret ? "true" : "false");
+
+    bfd_init();
+    abfd = bfd_openr(bin_path, NULL);
+
+    if (!(abfd && bfd_check_format(abfd, bfd_object))) {
+        bfd_perror("test_decompress_trace");
+        return TRDB_FAIL;
+    }
+
+    status = trdb_cvs_to_trace_list(ctx, trace_path, &instr_list, &instrcnt);
+    if (status < 0) {
+        LOG_ERRT("CVS to tr_instr failed\n");
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    ctx->config.full_address  = !differential;
+    ctx->config.use_pulp_sext = true;
+    ctx->config.implicit_ret  = implicit_ret;
+
+    printf("path: %s\n", bin_path);
+
+    TAILQ_FOREACH (instr, &instr_list, list) {
+        int step = trdb_compress_trace_step_add(ctx, &packet_list, instr);
+        if (step < 0) {
+            LOG_ERRT("Compress trace failed\n");
+            status = TRDB_FAIL;
+            goto fail;
+        }
+    }
+
+    if (TRDB_VERBOSE_TESTS) {
+        printf("(Compression) Bits per instruction: %lf\n",
+               ctx->stats.payloadbits / (double)ctx->stats.instrs);
+        printf("(Compression) Sign extension distribution:\n");
+        unsigned sum = 0;
+        for (unsigned i = 0; i < 32; i++) {
+            sum += ctx->stats.sext_bits[i];
+        }
+        for (unsigned i = 0; i < 32; i++) {
+            printf("(Compression) Bit %2u: %10.5lf%%\n", (i + 1),
+                   (ctx->stats.sext_bits[i] * 100 / (double)sum));
+        }
+    }
+    if (TRDB_VERBOSE_TESTS)
+        trdb_dump_packet_list(stdout, &packet_list);
+
+    status = trdb_decompress_trace(ctx, abfd, &packet_list, &instr1_head);
+    if (status < 0) {
+        LOG_ERRT("Decompression failed: %s\n",
+                 trdb_errstr(trdb_errcode(status)));
+        status = TRDB_FAIL;
+        goto fail;
+    }
+
+    if (TRDB_VERBOSE_TESTS) {
+        LOG_INFOT("Reconstructed trace disassembly:\n");
+        struct tr_instr *instr;
+        TAILQ_FOREACH (instr, &instr1_head, list) {
+        }
+    }
+
+    /* We compare whether the reconstruction matches the original sequence, only
+     * the pc for now.
+     */
+    int processedcnt        = 0;
+    struct tr_instr *sample = TAILQ_FIRST(&instr_list);
+    TAILQ_FOREACH (instr, &instr1_head, list) {
+        /* skip all invalid instructions for the comparison */
+        while (!sample->valid || sample->exception) {
+            sample = TAILQ_NEXT(sample, list);
+        }
+
+        if (instr->iaddr != sample->iaddr) {
+            LOG_ERRT("original instr: %" PRIx32 "\n", sample->iaddr);
+            LOG_ERRT("reconst. instr: %" PRIx32 "\n", instr->iaddr);
+            status = TRDB_FAIL;
+            goto fail;
+        }
+        sample = TAILQ_NEXT(sample, list);
+        processedcnt++;
+    }
+    LOG_INFOT("Compared %d instructions\n", processedcnt);
+
+    if (TAILQ_EMPTY(&instr1_head)) {
+        LOG_ERRT("Empty instruction list.\n");
+        return 0;
+    }
+
+fail:
+    trdb_free(ctx);
+    trdb_free_packet_list(&packet_list);
+    trdb_free_instr_list(&instr_list);
+    trdb_free_instr_list(&instr1_head);
+    bfd_close(abfd);
+
+    return status;
+}
+
 int test_decompress_trace_differential(const char *bin_path,
                                        const char *trace_path,
                                        bool differential, bool implicit_ret)
@@ -916,7 +1038,7 @@ int test_decompress_trace_differential(const char *bin_path,
     for (size_t i = 0; i < samplecnt; i++) {
         int step =
             trdb_compress_trace_step_add(ctx, &packet1_head, &(*samples)[i]);
-        if (step == -1) {
+        if (step < 0) {
             LOG_ERRT("Compress trace failed.\n");
             status = TRDB_FAIL;
             goto fail;
@@ -1029,12 +1151,26 @@ int main()
         "data/cvs/rsort.spike_trace",     "data/cvs/spmv.spike_trace",
         "data/cvs/towers.spike_trace",    "data/cvs/vvadd.spike_trace"};
 
+    const char *tv_gen_cvs[] = {
+        "riscv-traces/dhrystone.riscv", "riscv-traces/dhrystone.riscv.cvs",
+        "riscv-traces/median.riscv",    "riscv-traces/median.riscv.cvs",
+        "riscv-traces/mm.riscv",        "riscv-traces/mm.riscv.cvs",
+        "riscv-traces/mt-matmul.riscv", "riscv-traces/mt-matmul.riscv.cvs",
+        "riscv-traces/mt-vvadd.riscv",  "riscv-traces/mt-vvadd.riscv.cvs",
+        "riscv-traces/multiply.riscv",  "riscv-traces/multiply.riscv.cvs",
+        "riscv-traces/pmp.riscv",       "riscv-traces/pmp.riscv.cvs",
+        "riscv-traces/qsort.riscv",     "riscv-traces/qsort.riscv.cvs",
+        "riscv-traces/rsort.riscv",     "riscv-traces/rsort.riscv.cvs",
+        "riscv-traces/spmv.riscv",      "riscv-traces/spmv.riscv.cvs",
+        "riscv-traces/towers.riscv",    "riscv-traces/towers.riscv.cvs",
+        "riscv-traces/vvadd.riscv",     "riscv-traces/vvadd.riscv.cvs"};
+
     /* const char *tv_cvs[] = {"data/cvs/pmp.spike_trace"}; */
     INIT_TESTS();
     /* for (size_t i = 0; i < 8; i++) */
     /*     RUN_TEST(test_trdb_serialize_packet, i); */
 
-    /* RUN_TEST(test_disasm_bfd); */
+    RUN_TEST(test_disasm_bfd);
     RUN_TEST(test_parse_stimuli_line);
 
     RUN_TEST(test_parse_packets, "data/tx_spi");
@@ -1076,6 +1212,18 @@ int main()
         RUN_TEST(test_decompress_trace, bin, stim);
         RUN_TEST(test_decompress_trace_differential, bin, stim, true, false);
         RUN_TEST(test_decompress_trace_differential, bin, stim, true, true);
+    }
+
+    for (unsigned j = 0; j < TRDB_ARRAY_SIZE(tv_gen_cvs); j += 2) {
+        const char *bin  = tv_gen_cvs[j];
+        const char *stim = tv_gen_cvs[j + 1];
+        if (access(bin, R_OK) || access(stim, R_OK)) {
+            LOG_ERRT("File not found, skipping test at %s\n", bin);
+            continue;
+        }
+        RUN_TEST(test_decompress_cvs_trace_differential, bin, stim, true,
+                 false);
+        RUN_TEST(test_decompress_cvs_trace_differential, bin, stim, true, true);
     }
 
     if (TESTS_SUCCESSFULL())

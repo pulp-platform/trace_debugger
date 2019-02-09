@@ -1475,6 +1475,24 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
             while (!(dec_ctx->branch_map.cnt == 0 &&
                      (hit_discontinuity || hit_address))) {
 
+                if (pc >= section->vma + stop_offset || pc < section->vma) {
+                    section = trdb_get_section_for_vma(abfd, pc);
+                    if (!section) {
+                        err(c, "VMA (PC) not pointing to any section\n");
+                        status = -trdb_bad_vma;
+                        goto fail;
+                    }
+                    stop_offset =
+                        bfd_get_section_size(section) / dinfo.octets_per_byte;
+
+                    free_section_for_debugging(&dinfo);
+                    if ((status = alloc_section_for_debugging(c, abfd, section,
+                                                              &dinfo)) < 0)
+                        goto fail;
+
+                    info(c, "switched to section:%s\n", section->name);
+                }
+
                 int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
                 if (status < 0)
                     goto fail;
@@ -1515,9 +1533,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
                     dbg(c, "detected mret, uret or sret\n");
-		    /* fall through */
-                case dis_jsr:    /* There is not real difference ... */
-		    /* fall through */
+                    /* fall through */
+                case dis_jsr: /* There is not real difference ... */
+
+                    /* fall through */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
                      * encoded in the binary else we would have gotten a
@@ -1581,6 +1600,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                             err(c, "can't predict the jump target\n");
                         if (branch_taken)
                             pc = dinfo.target;
+                        /* see in F_BRANCH_DIFF below why we need this */
+                        if (dec_ctx->branch_map.cnt == 0 &&
+                            (pc - size) == absolute_addr)
+                            hit_address = true;
                         break;
                     }
                 case dis_dref:
@@ -1640,6 +1663,25 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                      (hit_discontinuity || hit_address))) {
 
                 int status = 0;
+
+                if (pc >= section->vma + stop_offset || pc < section->vma) {
+                    section = trdb_get_section_for_vma(abfd, pc);
+                    if (!section) {
+                        err(c, "VMA (PC) not pointing to any section\n");
+                        status = -trdb_bad_vma;
+                        goto fail;
+                    }
+                    stop_offset =
+                        bfd_get_section_size(section) / dinfo.octets_per_byte;
+
+                    free_section_for_debugging(&dinfo);
+                    if ((status = alloc_section_for_debugging(c, abfd, section,
+                                                              &dinfo)) < 0)
+                        goto fail;
+
+                    info(c, "switched to section:%s\n", section->name);
+                }
+
                 int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
                 if (status < 0)
                     goto fail;
@@ -1680,9 +1722,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
                     dbg(c, "detected mret, uret or sret\n");
-		    /* fall through */
-                case dis_jsr:    /* There is not real difference ... */
-		    /* fall through */
+                    /* fall through */
+                case dis_jsr: /* There is not real difference ... */
+
+                    /* fall through */
                 case dis_branch: /* ... between those two */
                     /* we know that this instruction must have its jump target
                      * encoded in the binary else we would have gotten a
@@ -1742,8 +1785,26 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         /* this should never happen */
                         if (dinfo.target == 0)
                             err(c, "can't predict the jump target\n");
+                        /* go to new address */
                         if (branch_taken)
                             pc = dinfo.target;
+                        /* When dealing with exceptions, a "flush" packet can
+                         * have its address set to a branch. The branchmap
+                         * counter will be incremented in that case. The
+                         * behaviour we want is that we want to consume a
+                         * branchmap entry and the address entry at the same
+                         * time. This we have to check here.
+                         *
+                         * Example:
+                         * 0x3c  [...]
+                         * [...] assume 3 branches seen
+                         * 0x40  bneq a0, a1, somewhere <- F_BRANCH_*
+                         *       with branchmap count = 3 + 1 and addr = 0x40
+                         * 0x100 first instruction of trap handler <- F_SYNC
+                         */
+                        if (dec_ctx->branch_map.cnt == 0 &&
+                            ((pc - size) == absolute_addr))
+                            hit_address = true;
                         break;
                     }
                 case dis_dref:
@@ -1812,9 +1873,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                     break;
                 }
                 dbg(c, "detected mret, uret or sret\n");
-		/* fall through */
-            case dis_jsr:    /* There is not real difference ... */
-		/* fall through */
+                /* fall through */
+            case dis_jsr: /* There is not real difference ... */
+
+                /* fall through */
             case dis_branch: /* ... between those two */
                              /* this should never happen */
                 if (dinfo.target == 0)
@@ -1881,6 +1943,25 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
 
             while (!(hit_address || hit_discontinuity)) {
                 int status = 0;
+
+                if (pc >= section->vma + stop_offset || pc < section->vma) {
+                    section = trdb_get_section_for_vma(abfd, pc);
+                    if (!section) {
+                        err(c, "VMA (PC) not pointing to any section\n");
+                        status = -trdb_bad_vma;
+                        goto fail;
+                    }
+                    stop_offset =
+                        bfd_get_section_size(section) / dinfo.octets_per_byte;
+
+                    free_section_for_debugging(&dinfo);
+                    if ((status = alloc_section_for_debugging(c, abfd, section,
+                                                              &dinfo)) < 0)
+                        goto fail;
+
+                    info(c, "switched to section:%s\n", section->name);
+                }
+
                 int size = disassemble_at_pc(c, pc, dis_instr, &dunit, &status);
                 if (status < 0)
                     goto fail;
@@ -1920,9 +2001,10 @@ int trdb_decompress_trace(struct trdb_ctx *c, bfd *abfd,
                         break;
                     }
                     dbg(c, "detected mret, uret or sret\n");
-		    /* fall through */
-                case dis_jsr:    /* There is not real difference ... */
-		    /* fall through */
+                    /* fall through */
+                case dis_jsr: /* There is not real difference ... */
+
+                    /* fall through */
                 case dis_branch: /* ... between those two */
                     if (implicit_ret && instr_ras_type == ret) {
                         dbg(c, "returning with stack value %" PRIx32 "\n",
