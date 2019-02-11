@@ -217,7 +217,8 @@ docs: doxyfile $(SRCS) $(MAINS_SRCS)
 #
 # we use sed to cutoff the internal boot sequence of spike. Alternatively we
 # could add this code to the binary but this is easier.
-spike-generate-traces: spike riscv-tests/benchmarks/build.ok
+spike-generate-traces: riscv-tests/benchmarks/build.ok spike
+	mkdir -p riscv-traces
 	for benchmark in riscv-tests/benchmarks/*.riscv; do \
 		./trdb-spike \
 			--ust-trace=riscv-traces/$$(basename $$benchmark).cvs \
@@ -234,8 +235,11 @@ riscv-isa-sim/build.ok: riscv-fesvr/build.ok
 	git clone https://github.com/pulp-platform/riscv-isa-sim
 	cd riscv-isa-sim && \
 		LDFLAGS="-L../riscv-fesvr" ./configure --with-isa=RV32IMC
-	+cd riscv-isa-sim && ln -s ../riscv-fesvr/fesvr . && \
-		$(MAKE) && touch build.ok & cd ..
+	cd riscv-isa-sim && \
+		ln -s ../riscv-fesvr/fesvr . && \
+		$(MAKE) && \
+		touch build.ok
+	cd ..
 	echo "#!/usr/bin/env bash" > trdb-spike
 	echo "LD_LIBRARY_PATH=./riscv-isa-sim:./riscv-fesvr ./riscv-isa-sim/spike \"\$$@\"" \
 		>> trdb-spike
@@ -267,6 +271,7 @@ distclean: clean
 	rm -rf riscv-fesvr
 	rm -rf riscv-isa-sim
 	rm -rf riscv-tests
+	rm -rf riscv-traces
 
 # include auto generated header dependency information
 include $(wildcard $(addsuffix /*.d,$(DEPDIRS)))
