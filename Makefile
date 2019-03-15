@@ -126,7 +126,7 @@ dpiheader: tb-all
 
 # run tb and exit
 .PHONY: tb-run
-tb-run:
+tb-run: tb-all c-sv-lib
 	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do 'source $(VSIM_SCRIPT); exit -f'
 
