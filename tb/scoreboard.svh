@@ -162,19 +162,20 @@ class Scoreboard;
             gm_packet  = gm_response.packet;
             duv_packet = duv_response.packet;
             stats.total_packets = packetcnt++;
-            if(gm_packet.bits[127:0] != duv_packet.bits[127:0]) begin
-                $display("[SCORE]  @%t: ERROR - Packet mismatch for number %0d",
-                         $time, packetcnt);
-                $display("[SCORE]  @%t: Expected: %h", $time, gm_packet.bits);
-                $display("[SCORE]  @%t: Received: %h", $time, duv_packet.bits);
-                stats.packet_bad++;
-            end else begin
+
+            assert(gm_packet.bits[127:0] === duv_packet.bits[127:0]) begin
                 msgtype = trdb_marker_t'{duv_packet.bits[5:4]};
                 packet_bytes = duv_packet.bits[3:0] + 1;
-                $display("[SCORE]  @%t: Packet with msgtype %s, length %0d,",
-                         $time, msgtype.name, packet_bytes,
+                $display("[SCORE]: Packet with msgtype %s, length %0d,",
+                          msgtype.name, packet_bytes,
                          "payload %h and number %0d ok",
                           duv_packet.bits, packetcnt);
+            end else begin
+                $error("[SCORE]: ERROR - Packet mismatch for number %0d\n",
+                         packetcnt,
+                         "Expected: %h\n", gm_packet.bits,
+                         "Received: %h", duv_packet.bits);
+                stats.packet_bad++;
             end
         end
 
@@ -193,7 +194,6 @@ class Scoreboard;
                          $time, duv_packet.bits[6:0], msgtype.name);
             end
         end
-
 
         stats.print();
 
