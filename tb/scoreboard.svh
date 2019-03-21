@@ -27,7 +27,7 @@ class Scoreboard;
             $display("------------------------------------------------------");
             $display("------------------------------------------------------");
             $display("Simulation Results");
-            $display("Test name: %s", stimuli_path);
+            $display("Test name: %s", default_stimuli_path);
             $display("FULL_ADDRESS: %0d IMPLICIT_RET: %0d", FULL_ADDRESS,
                      IMPLICIT_RET);
             $display("Good packets %0d/%0d", total_packets - packet_bad,

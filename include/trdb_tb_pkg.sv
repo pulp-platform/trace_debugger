@@ -20,11 +20,11 @@ package trdb_tb_pkg;
     parameter int IMPLICIT_RET      = 0;
 
     // stimuli file
-    // const string stimuli_path       = "trdb/data/trdb_stimuli";
+    // const string default_stimuli_path       = "trdb/data/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/uart_loopback/build/pulpissimo-riscy/trdb_stimuli";
-    const string  stimuli_path      = "trdb/data/coremark/build/pulpissimo-riscy/trdb_stimuli";
+    parameter string  default_stimuli_path = "trdb/data/coremark/build/pulpissimo-riscy/trdb_stimuli";
 
                                          // clock and acquisition related settings
     const time CLK_PHASE_HI         = 5ns;

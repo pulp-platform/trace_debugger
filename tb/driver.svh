@@ -44,10 +44,10 @@ class Driver;
 
         if(DEBUG)
             $display("[STIMULI]@%t: Opening file %s.", $time, path);
-        fp = $fopen(stimuli_path, "r");
+        fp = $fopen(path, "r");
 
         if($ferror(fp, err_str)) begin
-            $display(err_str);
+            $error(err_str);
             return -1;
         end
 
@@ -57,6 +57,10 @@ class Driver;
                     tval=%h priv=%h compressed=%h addr=%h instr=%h",
                     ivalid, iexception, interrupt, cause,
                     tval, priv, compressed, iaddr, instr);
+            if (c <= 0) begin
+                $error("$sscanf error");
+                return -1;
+            end
             linecnt++;
             stimuli.ivalid.push_front(ivalid);
             stimuli.iexception.push_front(iexception);
@@ -74,7 +78,82 @@ class Driver;
         end
 
         if ($ferror(fp, err_str)) begin
-            $display("[ERROR]: %s", err_str);
+            $error("[ERROR]: %s", err_str);
+            return -1;
+        end else if ($feof(fp)) begin
+            if(DEBUG)
+                $display("[STIMULI]@%t: Finished parsing %s.", $time, path);
+        end
+
+        if(!fp)
+            $fclose(fp);
+        return 0;
+    endfunction
+
+    // parse stimuli file in cvs format
+    function int parse_cvs_stimuli(string path, Stimuli stimuli);
+        string line;
+        int    fp, c;
+        string err_str;
+        int    linecnt = 0;
+
+        logic                ivalid;
+        logic                iexception;
+        logic                interrupt;
+        logic [CAUSELEN-1:0] cause;
+        logic [XLEN-1:0]     tval;
+        logic [PRIVLEN-1:0]  priv;
+        logic [XLEN-1:0]     iaddr;
+        logic [ILEN-1:0]     instr;
+        logic                compressed;
+
+        if(DEBUG)
+            $display("[STIMULI]@%t: Opening file %s.", $time, path);
+        fp = $fopen(path, "r");
+
+        if($ferror(fp, err_str)) begin
+            $error(err_str);
+            return -1;
+        end
+
+        c = $fgets(line, fp);
+        if (c <= 0) begin
+            $error("$sscanf error");
+            return -1;
+        end
+
+
+        while ($fgets(line, fp) != 0) begin
+            c = $sscanf(line,"%h,%h,%h,%h,%h,%h,%h,%h",
+                        ivalid, iaddr, instr, priv, iexception,
+                        cause, tval, interrupt);
+            if (c <= 0) begin
+                $error("$sscanf error");
+                return -1;
+            end
+            compressed = ((instr[1:0] & 2'h3) != 2'h3);
+            linecnt++;
+            stimuli.ivalid.push_front(ivalid);
+            stimuli.iexception.push_front(iexception);
+            stimuli.interrupt.push_front(interrupt);
+            stimuli.cause.push_front(cause);
+            stimuli.tval.push_front(tval);
+            stimuli.priv.push_front(priv);
+            stimuli.iaddr.push_front(iaddr);
+            stimuli.instr.push_front(instr);
+            stimuli.compressed.push_front(compressed);
+            $display("valid=%h exception=%h interrupt=%h cause=%h \
+tval=%h priv=%h compressed=%h addr=%h instr=%h",
+                    ivalid, iexception, interrupt, cause,
+                    tval, priv, compressed, iaddr, instr);
+        end
+
+        if(DEBUG) begin
+            $display("[STIMULI]@%t: Read %d lines.", $time, linecnt);
+        end
+
+        if ($ferror(fp, err_str)) begin
+            $error("[ERROR]: %s", err_str);
             return -1;
         end else if ($feof(fp)) begin
             if(DEBUG)
@@ -132,6 +211,7 @@ class Driver;
 
 
     task run(ref logic tb_eos);
+        string testname;
         Stimuli stimuli;
         tb_eos = 1'b0;
 
@@ -145,8 +225,18 @@ class Driver;
 
         // parse stimuli file
         stimuli = new();
-        if(parse_stimuli(stimuli_path, stimuli))
-            $display("[ERROR]: parse_stimuli() failed.");
+
+        // assign default test
+        if(!$value$plusargs("testname=%s", testname))
+            testname = default_stimuli_path;
+
+        if($test$plusargs("cvs")) begin
+            if(parse_cvs_stimuli(testname, stimuli))
+                $fatal("parse_cvs_stimuli() failed");
+        end else begin
+            if(parse_stimuli(testname, stimuli))
+                $fatal("parse_stimuli() failed");
+        end
 
         // send to scoreboard
         mail.put(stimuli);
