@@ -12,7 +12,7 @@
 // Description: Connect interface to DUV
 
 module trace_debugger_wrapper
-    (trace_debugger_if.duv duv_if);
+    (trace_debugger_if duv_if);
 
     trace_debugger i_trace_debugger
         (.clk_i(duv_if.clk_i),

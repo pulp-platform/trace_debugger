@@ -14,7 +14,7 @@
 import trdb_tb_pkg::*;
 
 module trdb_tb
-    (trace_debugger_if.tb tb_if);
+    (trace_debugger_if tb_if);
 
     // run test like instantiate a module
     tb_run i_tb_run();

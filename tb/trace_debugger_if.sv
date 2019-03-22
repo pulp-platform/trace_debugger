@@ -39,15 +39,4 @@ interface trace_debugger_if
     APB_BUS #(.APB_ADDR_WIDTH(32)) apb_bus();
 
 
-    modport duv
-        (input clk_i, rst_ni, test_mode_i, ivalid, iexception, interrupt, cause,
-         tval, priv, iaddr, instr, compressed, apb_bus, stall,
-         output packet_word, packet_word_valid);
-
-    modport tb
-        (input clk_i, rst_ni, test_mode_i, output ivalid, iexception, interrupt,
-         cause, tval, priv, iaddr, instr, compressed, apb_bus, stall,
-         input packet_word, packet_word_valid);
-
-
 endinterface

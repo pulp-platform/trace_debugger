@@ -29,10 +29,10 @@ module trdb_tb_top
     trace_debugger_if duv_if(clk, rst_n, test_mode);
 
     //instantiate duv
-    trace_debugger_wrapper i_trace_debugger_wrapper(.duv_if(duv_if.duv));
+    trace_debugger_wrapper i_trace_debugger_wrapper(.duv_if(duv_if));
 
     //instantiate testbench
-    trdb_tb i_trdb_tb(.tb_if(duv_if.tb));
+    trdb_tb i_trdb_tb(.tb_if(duv_if));
 
     // clock generation
     initial begin: clock_gen
