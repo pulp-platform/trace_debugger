@@ -19,7 +19,7 @@ module trdb_tb
     // run test like instantiate a module
     tb_run i_tb_run();
 
-program automatic tb_run();
+program automatic tb_run;
     Driver driver;
     Monitor monitor;
     Scoreboard scoreboard;

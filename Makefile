@@ -23,11 +23,11 @@ VLIB			= vlib-$(VVERSION)
 VWORK			= work
 
 VLOG			= vlog-$(VVERSION)
-VLOG_FLAGS		= #-pedanticerrors
+VLOG_FLAGS		= -lint #-pedanticerrors
 VLOG_LOG                = vloggy
 
 VOPT			= vopt-$(VVERSION)
-VOPT_FLAGS		= -debugdb -fsmdebug +acc #=mnprft -pedanticerrors
+VOPT_FLAGS		= -debugdb -fsmdebug +acc -check_synthesis #=mnprft -pedanticerrors
 
 VSIM			= vsim-$(VVERSION)
 VSIM_FLAGS		= -c

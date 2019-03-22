@@ -170,6 +170,7 @@ module trace_debugger
     // timer unit
     logic                      timer_rst;
     logic [TIMER_WIDTH-1:0]    tu_time;
+    logic                      tu_fulltime;
     logic                      tu_grant;
     logic                      tu_valid;
     logic                      tu_req;

@@ -14,8 +14,7 @@
 // TODO: inspect this value
 `timescale 1ns/1ns
 
-module trdb_tb_top
-    ();
+module trdb_tb_top;
     import trdb_tb_pkg::*;
 
     // testbench signals to dut
