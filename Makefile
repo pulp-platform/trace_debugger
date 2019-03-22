@@ -132,7 +132,7 @@ tb-run: tb-all c-sv-lib
 
 # run tb and drop into interactive shell
 .PHONY: tb-run-sh
-tb-run-sh:
+tb-run-sh: tb-all c-sv-lib
 	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do $(VSIM_SCRIPT)
 
