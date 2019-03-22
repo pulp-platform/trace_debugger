@@ -14,11 +14,6 @@ package trdb_tb_pkg;
 
     import trdb_pkg::*;
 
-    parameter int DEBUG             = 1;
-    parameter int VERBOSE           = 0;
-    parameter int FULL_ADDRESS      = 0;
-    parameter int IMPLICIT_RET      = 0;
-
     // stimuli file
     // const string default_stimuli_path       = "trdb/data/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli";

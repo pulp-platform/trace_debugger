@@ -50,7 +50,7 @@ module trdb_tb_top;
         end
         //TODO: think about when the reset sould happen
         #RESET_DEL rst_n = 1'b1;
-        if(DEBUG)
+        if($test$plusargs("debug"))
             $display("[RESET]  @%t: Reset deasserted.", $time);
 
     end: reset_gen

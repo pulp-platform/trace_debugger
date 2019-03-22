@@ -42,7 +42,7 @@ class Driver;
         logic [ILEN-1:0]     instr;
         logic                compressed;
 
-        if(DEBUG)
+        if($test$plusargs("debug"))
             $display("[STIMULI]@%t: Opening file %s.", $time, path);
         fp = $fopen(path, "r");
 
@@ -73,7 +73,7 @@ class Driver;
             stimuli.compressed.push_front(compressed);
         end
 
-        if(DEBUG) begin
+        if($test$pluargs("debug")) begin
             $display("[STIMULI]@%t: Read %d lines.", $time, linecnt);
         end
 
@@ -81,7 +81,7 @@ class Driver;
             $error("[ERROR]: %s", err_str);
             return -1;
         end else if ($feof(fp)) begin
-            if(DEBUG)
+            if($test$plusargs("debug"))
                 $display("[STIMULI]@%t: Finished parsing %s.", $time, path);
         end
 
@@ -107,7 +107,7 @@ class Driver;
         logic [ILEN-1:0]     instr;
         logic                compressed;
 
-        if(DEBUG)
+        if($test$plusargs("debug"))
             $display("[STIMULI]@%t: Opening file %s.", $time, path);
         fp = $fopen(path, "r");
 
@@ -144,7 +144,7 @@ class Driver;
             stimuli.compressed.push_front(compressed);
         end
 
-        if(DEBUG) begin
+        if($test$plusargs("debug")) begin
             $display("[STIMULI]@%t: Read %d lines.", $time, linecnt);
         end
 
@@ -152,7 +152,7 @@ class Driver;
             $error("[ERROR]: %s", err_str);
             return -1;
         end else if ($feof(fp)) begin
-            if(DEBUG)
+            if($test$plusargs("debug"))
                 $display("[STIMULI]@%t: Finished parsing %s.", $time, path);
         end
 
@@ -163,7 +163,7 @@ class Driver;
 
 
     function void apply_zero();
-        if(DEBUG)
+        if($test$plusargs("debug"))
             $display("[DRIVER] @%t: Applying zero stimuli.", $time);
         this.duv_if.ivalid     = 1'b0;
         this.duv_if.iexception = 1'b0;
@@ -209,13 +209,17 @@ class Driver;
     task run(ref logic tb_eos);
         string testname;
         Stimuli stimuli;
+        int full_address, implicit_ret;
         tb_eos = 1'b0;
 
-        if(DEBUG)
+        full_address = ($test$plusargs("fulladdr") != 0);
+        implicit_ret = ($test$plusargs("implicitret") != 0);
+
+        if($test$plusargs("debug"))
             $display("[DRIVER] @%t: Entering run() task.", $time);
 
         wait(this.duv_if.rst_ni == 1);
-            if(DEBUG)
+            if($test$plusargs("debug"))
                 $display("[DRIVER] @%t: Reset low.", $time);
 
 
@@ -246,8 +250,8 @@ class Driver;
         // enable trace debugger
         write_apb(REG_TRDB_CTRL, (1 << TRDB_ENABLE)
                   | (1 << TRDB_TRACE_ACTIVATED)
-                  | (FULL_ADDRESS << TRDB_FULL_ADDR)
-                  | (IMPLICIT_RET << TRDB_IMPLICIT_RET));
+                  | (full_address << TRDB_FULL_ADDR)
+                  | (implicit_ret << TRDB_IMPLICIT_RET));
 
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
@@ -267,10 +271,6 @@ class Driver;
             this.duv_if.iaddr      = stimuli.iaddr[i];
             this.duv_if.instr      = stimuli.instr[i];
             this.duv_if.compressed = stimuli.compressed[i];
-
-            if(VERBOSE)
-                $display("[DRIVER] @%t: Applying vector with addr=%h.", $time,
-                         this.duv_if.iaddr);
 
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             // take response in monitor.svh

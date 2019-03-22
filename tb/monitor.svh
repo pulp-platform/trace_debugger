@@ -119,7 +119,7 @@ class Monitor;
 
             if(this.duv_if.packet_word_valid == 1'b1) begin
                 packet_word = this.duv_if.packet_word;
-                if(DEBUG)
+                if($test$plusargs("debug"))
                     $display("[Monitor]@%t: slurping %h", $time, packet_word);
 
                 for(int i = 0; i < 4; i++) begin

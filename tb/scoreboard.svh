@@ -28,8 +28,9 @@ class Scoreboard;
             $display("------------------------------------------------------");
             $display("Simulation Results");
             $display("Test name: %s", default_stimuli_path);
-            $display("FULL_ADDRESS: %0d IMPLICIT_RET: %0d", FULL_ADDRESS,
-                     IMPLICIT_RET);
+            $display("FULL_ADDRESS: %0d IMPLICIT_RET: %0d",
+                     ($test$plusargs("fulladdr") != 0),
+                     ($test$plusargs("implicitret") != 0));
             $display("Good packets %0d/%0d", total_packets - packet_bad,
                      total_packets);
             $display("------------------------------------------------------");
@@ -71,8 +72,8 @@ class Scoreboard;
         trdb_sv_alloc();
 
         // configure golden model
-        trdb_sv_set_full_address(FULL_ADDRESS);
-        trdb_sv_set_implicit_ret(IMPLICIT_RET);
+        trdb_sv_set_full_address($test$plusargs("fulladdr") != 0);
+        trdb_sv_set_implicit_ret($test$plusargs("implicitret") != 0);
 
         // acquire stimuli
         inbox.get(stimuli);
