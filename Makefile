@@ -17,17 +17,17 @@ LINTER			= $(VERILATOR) --lint-only
 MAKE			= make
 CTAGS			= ctags
 
-VVERSION                = "10.5c"
+VVERSION                = "10.7b"
 
 VLIB			= vlib-$(VVERSION)
 VWORK			= work
 
 VLOG			= vlog-$(VVERSION)
-VLOG_FLAGS		= -pedanticerrors
+VLOG_FLAGS		= #-pedanticerrors
 VLOG_LOG                = vloggy
 
 VOPT			= vopt-$(VVERSION)
-VOPT_FLAGS		= -debugdb -fsmdebug -pedanticerrors +acc #=mnprft
+VOPT_FLAGS		= -debugdb -fsmdebug +acc #=mnprft -pedanticerrors
 
 VSIM			= vsim-$(VVERSION)
 VSIM_FLAGS		= -c
