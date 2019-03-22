@@ -153,21 +153,6 @@ module trdb_reg
             else $error("[TRDB]   @%t: Software FIFO is overflowing.", $time);
 `endif
 
-    /* TODO: put this into streamer */
-    generic_fifo_adv
-        #(.DATA_WIDTH(XLEN),
-          .DATA_DEPTH(2))
-    i_stream_fifo
-        (.clk(clk_i),
-         .rst_n(rst_ni),
-         .clear_i(clear_sw_fifo),
-         .data_i(packet_word_i),
-         .valid_i(dump_valid_q),
-         .grant_o(sw_fifo_not_full), // TODO: make this visible in register
-         .data_o(sw_word_o),
-         .valid_o(sw_valid_o),
-         .grant_i(sw_grant_i),
-         .test_mode_i('0)); // TODO: what to do with this
 
     // we can tie this high since according the apb protocol if we react in the
     // next cycle this is allowed
