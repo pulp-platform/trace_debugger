@@ -142,10 +142,6 @@ class Driver;
             stimuli.iaddr.push_front(iaddr);
             stimuli.instr.push_front(instr);
             stimuli.compressed.push_front(compressed);
-            $display("valid=%h exception=%h interrupt=%h cause=%h \
-tval=%h priv=%h compressed=%h addr=%h instr=%h",
-                    ivalid, iexception, interrupt, cause,
-                    tval, priv, compressed, iaddr, instr);
         end
 
         if(DEBUG) begin

@@ -120,6 +120,10 @@ module trace_debugger
     // variables for discontinuity decision making
     logic                       trace_implicit_ret;
     logic                       not_ret;
+    logic                       really_c_jalr;
+    logic                       really_c_jr;
+    logic                       is_ret;
+    logic                       is_c_ret;
 
     // variables for the branch map
     logic                       branch_map_flush;
@@ -297,23 +301,36 @@ module trace_debugger
               ((instr_q & MASK_BLTU)     == MATCH_BLTU) ||
               ((instr_q & MASK_BGEU)     == MATCH_BGEU) ||
               ((instr_q & MASK_P_BNEIMM) == MATCH_P_BNEIMM) ||
-              ((instr_q & MASK_P_BEQIMM) == MATCH_P_BEQIMM);
+              ((instr_q & MASK_P_BEQIMM) == MATCH_P_BEQIMM) ||
+              ((instr_q & MASK_C_BEQZ)   == MATCH_C_BEQZ) ||
+              ((instr_q & MASK_C_BNEZ)   == MATCH_C_BNEZ);
     end
 
     // decide whether we have a unpredictable discontinuity
     // jalr, mret, sret, uret
     always_comb begin: is_discontinuity
-        u_discontinuity0_d
-                                     = ((instr_q & MASK_JALR) == MATCH_JALR) ||
+
+        really_c_jalr = ((instr_q & MASK_C_JALR) == MATCH_C_JALR)
+                        && ((instr_q & MASK_RD) != 0);
+
+        really_c_jr = ((instr_q & MASK_C_JR) == MATCH_C_JR)
+                      && ((instr_q & MASK_RD) != 0);
+
+        u_discontinuity0_d = ((instr_q & MASK_JALR) == MATCH_JALR) ||
+              really_c_jalr || really_c_jr ||
               ((instr_q & MASK_MRET) == MATCH_MRET) ||
               ((instr_q & MASK_SRET) == MATCH_SRET) ||
               ((instr_q & MASK_URET) == MATCH_URET);
+
         // allows us to mark ret's as not being discontinuities, if we want
         not_ret = '1;
+        is_ret = ((instr_q & (MASK_JALR | MASK_RD | MASK_RS1 | MASK_IMM)) ==
+                 (MATCH_JALR | (X_RA << OP_SH_RS1)));
+        is_c_ret = (instr_q & (MASK_C_JR | MASK_RD)) ==
+                   (MATCH_C_JR | (X_RA << OP_SH_RD));
+
         if(trace_implicit_ret)
-            not_ret        = !((instr_q &
-                                (MASK_JALR | MASK_RD | MASK_RS1 | MASK_IMM)) ==
-                               (MATCH_JALR | (X_RA << OP_SH_RS1)));
+            not_ret = !(is_ret && is_c_ret);
 
         u_discontinuity0_d = u_discontinuity0_d && not_ret;
     end
