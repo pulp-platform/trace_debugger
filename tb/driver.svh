@@ -266,6 +266,8 @@ tval=%h priv=%h compressed=%h addr=%h instr=%h",
             this.duv_if.cause      = stimuli.cause[i];
             this.duv_if.tval       = stimuli.tval[i];
             this.duv_if.priv       = stimuli.priv[i];
+            this.duv_if.priv[2]    = 1'b1; // we force debug mode, stimuli from
+                                           // spike traces don't know that bit
             this.duv_if.iaddr      = stimuli.iaddr[i];
             this.duv_if.instr      = stimuli.instr[i];
             this.duv_if.compressed = stimuli.compressed[i];
