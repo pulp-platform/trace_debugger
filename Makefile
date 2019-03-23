@@ -30,8 +30,8 @@ VOPT			= vopt-$(VVERSION)
 VOPT_FLAGS		= -debugdb -fsmdebug +acc -check_synthesis #=mnprft -pedanticerrors
 
 VSIM			= vsim-$(VVERSION)
-VSIM_FLAGS		= -c
-VSIM_DEBUG_FLAGS	= -debugdb
+VSIM_FLAGS		=
+ALL_VSIM_FLAGS          = $(VSIM_FLAGS) -debugdb
 VSIM_GUI_FLAGS          = -gui -debugdb
 VSIM_SCRIPT             = tb/scripts/vsim.tcl
 
@@ -126,20 +126,25 @@ dpiheader: tb-all
 
 # run tb and exit
 .PHONY: tb-run
+tb-run: ALL_VSIM_FLAGS += -c
 tb-run: tb-all c-sv-lib
-	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(VSIM_FLAGS) \
+	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(ALL_VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do 'source $(VSIM_SCRIPT); exit -f'
 
 # run tb and drop into interactive shell
 .PHONY: tb-run-sh
+tb-run-sh: ALL_VSIM_FLAGS += -c
 tb-run-sh: tb-all c-sv-lib
-	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(VSIM_FLAGS) \
+	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(ALL_VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do $(VSIM_SCRIPT)
 
 # run tb with simulator gui
 .PHONY: tb-run-gui
-tb-run-gui: VSIM_FLAGS = $(VSIM_GUI_FLAGS)
-tb-run-gui: tb-run-sh
+tb-run-gui: ALL_VSIM_FLAGS += -gui
+tb-run-gui: tb-all c-sv-lib
+	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(ALL_VSIM_FLAGS) \
+	$(RTLSRC_VOPT_TB_TOP) -do $(VSIM_SCRIPT)
+
 
 .PHONY: tb-clean
 tb-clean:
