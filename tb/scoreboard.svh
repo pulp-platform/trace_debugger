@@ -86,6 +86,8 @@ class Scoreboard;
             cause          = stimuli.cause[i];
             tval           = stimuli.tval[i];
             priv           = stimuli.priv[i];
+            priv[2]        = 1'b1; // we force debug mode, stimuli from spike
+                                   // traces don't know that bit
             iaddr          = stimuli.iaddr[i];
             instr          = stimuli.instr[i];
             compressed     = stimuli.compressed[i];

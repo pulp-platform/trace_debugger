@@ -73,7 +73,7 @@ class Driver;
             stimuli.compressed.push_front(compressed);
         end
 
-        if($test$pluargs("debug")) begin
+        if($test$plusargs("debug")) begin
             $display("[STIMULI]@%t: Read %d lines.", $time, linecnt);
         end
 
