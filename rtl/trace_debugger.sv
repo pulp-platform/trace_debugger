@@ -330,7 +330,7 @@ module trace_debugger
                    (MATCH_C_JR | (X_RA << OP_SH_RD));
 
         if(trace_implicit_ret)
-            not_ret = !(is_ret && is_c_ret);
+            not_ret = !(is_ret || is_c_ret);
 
         u_discontinuity0_d = u_discontinuity0_d && not_ret;
     end
