@@ -163,7 +163,7 @@ test: $(ALL_TEST_RESULTS)
 		| tee test/summary.test
 
 # we use separate wlf otherwise vsim complains
-%.test: %.cvs tb-all
+%.test: %.cvs tb-all c-sv-lib
 	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(ALL_VSIM_FLAGS) -c \
 		+cvs +implicitret +testname=$< -wlf $@.wlf \
 		$(RTLSRC_VOPT_TB_TOP) -do 'source $(VSIM_SCRIPT); exit -f' > $@
