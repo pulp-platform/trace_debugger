@@ -16,3 +16,6 @@ trdb/doc/
 /vsim.wlf
 /vsim.dbg
 /vloggy
+*.wlf
+*.dbg
+*.vstf
