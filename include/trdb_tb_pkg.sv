@@ -19,8 +19,11 @@ package trdb_tb_pkg;
     // const string  stimuli_path      = "trdb/data/enqueue_delayed/build/pulpissimo-riscy/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/timer_oneshot/build/pulpissimo-riscy/trdb_stimuli";
     // const string  stimuli_path      = "trdb/data/uart_loopback/build/pulpissimo-riscy/trdb_stimuli";
-    parameter string  default_stimuli_path = "trdb/data/coremark/build/pulpissimo-riscy/trdb_stimuli";
 
+    // test that is being run by default
+    string default_stimuli_path = "trdb/data/coremark/build/pulpissimo-riscy/trdb_stimuli";
+    // name of current test
+    string testname;
                                          // clock and acquisition related settings
     const time CLK_PHASE_HI         = 5ns;
     const time CLK_PHASE_LO         = 5ns;

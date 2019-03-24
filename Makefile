@@ -31,8 +31,7 @@ VOPT_FLAGS		= -debugdb -fsmdebug +acc -check_synthesis #=mnprft -pedanticerrors
 
 VSIM			= vsim-$(VVERSION)
 VSIM_FLAGS		=
-ALL_VSIM_FLAGS          = $(VSIM_FLAGS) -debugdb
-VSIM_GUI_FLAGS          = -gui -debugdb
+ALL_VSIM_FLAGS          = $(VSIM_FLAGS)
 VSIM_SCRIPT             = tb/scripts/vsim.tcl
 
 RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
@@ -50,6 +49,9 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 DPINAME			= trdb/dpi/autogen_trdb_sv.h
 DPISRC			= $(RTLSRC_TB_PKG)
 SV_LIB			= trdb/libtrdbsv
+
+ALL_TESTS               = $(wildcard test/*.cvs)
+ALL_TEST_RESULTS        = $(addsuffix .test, $(basename $(ALL_TESTS)))
 
 # rtl related targets
 .PHONY: lint
@@ -140,7 +142,7 @@ tb-run-sh: tb-all c-sv-lib
 
 # run tb with simulator gui
 .PHONY: tb-run-gui
-tb-run-gui: ALL_VSIM_FLAGS += -gui
+tb-run-gui: ALL_VSIM_FLAGS += -gui -debugdb
 tb-run-gui: tb-all c-sv-lib
 	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(ALL_VSIM_FLAGS) \
 	$(RTLSRC_VOPT_TB_TOP) -do $(VSIM_SCRIPT)
@@ -152,6 +154,23 @@ tb-clean:
 	rm -f transcript
 	rm -f vsim.wlf
 
+generate-tests:
+	$(MAKE) -C trdb spike-traces-32
+	cp trdb/riscv-traces-32/*.cvs test/
+
+test: $(ALL_TEST_RESULTS)
+	grep -B 2 -A 6 "Simulation Results" test/*.riscv.test \
+		| tee test/summary.test
+
+# we use separate wlf otherwise vsim complains
+%.test: %.cvs tb-all
+	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(ALL_VSIM_FLAGS) -c \
+		+cvs +implicitret +testname=$< -wlf $@.wlf \
+		$(RTLSRC_VOPT_TB_TOP) -do 'source $(VSIM_SCRIPT); exit -f' > $@
+
+.PHONY: test-clean
+test-clean:
+	rm -rf test/*.test
 
 # general targets
 .PHONY: TAGS
@@ -170,7 +189,7 @@ docs: c-docs
 all: driver-all tb-all c-all
 
 .PHONY: clean
-clean: driver-clean tb-clean c-clean
+clean: driver-clean tb-clean c-clean test-clean
 
 .PHONY: distclean
 distclean: clean

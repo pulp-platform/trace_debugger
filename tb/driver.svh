@@ -207,7 +207,6 @@ class Driver;
 
 
     task run(ref logic tb_eos);
-        string testname;
         Stimuli stimuli;
         int full_address, implicit_ret;
         tb_eos = 1'b0;

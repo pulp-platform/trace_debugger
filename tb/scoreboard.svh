@@ -27,12 +27,16 @@ class Scoreboard;
             $display("------------------------------------------------------");
             $display("------------------------------------------------------");
             $display("Simulation Results");
-            $display("Test name: %s", default_stimuli_path);
+            $display("Test name: %s", testname);
             $display("FULL_ADDRESS: %0d IMPLICIT_RET: %0d",
                      ($test$plusargs("fulladdr") != 0),
                      ($test$plusargs("implicitret") != 0));
             $display("Good packets %0d/%0d", total_packets - packet_bad,
                      total_packets);
+            if (packet_bad != 0)
+                $display("TEST FAIL");
+            else
+                $display("TEST PASSED");
             $display("------------------------------------------------------");
             $display("------------------------------------------------------");
         endfunction;
