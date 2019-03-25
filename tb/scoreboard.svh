@@ -65,7 +65,7 @@ class Scoreboard;
         automatic logic                compressed;
 
         automatic int packet_max_len;
-        automatic logic [PACKET_LEN-1:0] packet_bits;
+        automatic logic [PACKET_TOTAL-1:0] packet_bits;
         automatic logic                  packet_valid;
 
         automatic trdb_packet packet;
@@ -96,7 +96,7 @@ class Scoreboard;
             instr          = stimuli.instr[i];
             compressed     = stimuli.compressed[i];
 
-            packet_max_len = PACKET_LEN;
+            packet_max_len = PACKET_TOTAL;
             trdb_sv_feed_trace(ivalid, iexception, interrupt, cause, tval, priv,
                                iaddr, instr, compressed, packet_max_len,
                                packet_bits, packet_valid);

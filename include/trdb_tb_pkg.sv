@@ -62,7 +62,7 @@ package trdb_tb_pkg;
          input logic [PRIVLEN-1:0]     priv, input logic [XLEN-1:0] iaddr,
          input logic [ILEN-1:0]        instr, input logic compressed,
          input int                     packet_max_len,
-         output logic [PACKET_LEN-1:0] packet_bits, output logic packet_valid);
+         output logic [PACKET_TOTAL-1:0] packet_bits, output logic packet_valid);
 
 `include "../tb/stimuli.svh"
 `include "../tb/response.svh"
