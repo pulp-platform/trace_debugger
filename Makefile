@@ -23,15 +23,15 @@ VLIB			= vlib-$(VVERSION)
 VWORK			= work
 
 VLOG			= vlog-$(VVERSION)
-VLOG_FLAGS		= -lint #-pedanticerrors
+VLOG_FLAGS		= -64 -lint #-pedanticerrors
 VLOG_LOG                = vloggy
 
 VOPT			= vopt-$(VVERSION)
-VOPT_FLAGS		= -debugdb -fsmdebug +acc -check_synthesis #=mnprft -pedanticerrors
+VOPT_FLAGS		= -64 -debugdb -fsmdebug +acc -check_synthesis #=mnprft -pedanticerrors
 
 VSIM			= vsim-$(VVERSION)
 VSIM_FLAGS		=
-ALL_VSIM_FLAGS          = $(VSIM_FLAGS)
+ALL_VSIM_FLAGS          = $(VSIM_FLAGS) -64
 VSIM_SCRIPT             = tb/scripts/vsim.tcl
 
 RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
