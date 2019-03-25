@@ -110,17 +110,23 @@ c-docs:
 	$(MAKE) -C trdb docs
 
 # testbench compilation and optimization
-vlib:
+.lib-rtl:
 	$(VLIB) $(VWORK)
+	touch .lib-rtl
 
-vlog: vlib $(RTLSRC_TB)
+.build-rtl: .lib-rtl $(RTLSRC_TB)
 	$(VLOG) -work $(VWORK) $(VLOG_FLAGS) $(RTLSRC_PKG) $(RTLSRC) \
 	$(RTLSRC_TB_PKG) $(RTLSRC_TB)
+	touch .build-rtl
 
-.PHONY: tb-all
-tb-all: vlog
+.opt-rtl: .build-rtl
 	$(VOPT) -work $(VWORK) $(VOPT_FLAGS) $(RTLSRC_VLOG_TB_TOP) -o \
 	$(RTLSRC_VOPT_TB_TOP)
+	touch .opt-rtl
+
+vlib: .lib-rtl
+vlog: .build-rtl
+tb-all: .opt-rtl
 
 .PHONY: dpiheader
 dpiheader: tb-all
@@ -151,8 +157,7 @@ tb-run-gui: tb-all c-sv-lib
 .PHONY: tb-clean
 tb-clean:
 	if [ -d $(VWORK) ]; then rm -r $(VWORK); fi
-	rm -f transcript
-	rm -f vsim.wlf
+	rm -f transcript vsim.wlf .build-rtl .opt-rtl .lib-rtl
 
 generate-tests:
 	$(MAKE) -C trdb spike-traces-32
@@ -170,7 +175,7 @@ test: $(ALL_TEST_RESULTS)
 
 .PHONY: test-clean
 test-clean:
-	rm -rf test/*.test
+	rm -rf test/*.test test/*.wlf test/*.dbg
 
 # general targets
 .PHONY: TAGS
