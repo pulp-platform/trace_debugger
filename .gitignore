@@ -19,3 +19,7 @@ trdb/doc/
 *.wlf
 *.dbg
 *.vstf
+.build-rtl
+.lib-rtl
+.opt-rtl
+*.riscv.cvs
