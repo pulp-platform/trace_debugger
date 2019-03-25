@@ -166,6 +166,13 @@ generate-tests:
 test: $(ALL_TEST_RESULTS)
 	grep -B 2 -A 6 "Simulation Results" test/*.riscv.test \
 		| tee test/summary.test
+	@if grep -q "TEST FAIL" test/summary.test; then \
+		echo "ATLEAST ONE FAILURE";             \
+		exit 1;					\
+	else                                            \
+		echo "ALL TESTS PASSED";                \
+		exit 0;                                 \
+	fi
 
 # we use separate wlf otherwise vsim complains
 %.test: %.cvs tb-all c-sv-lib
