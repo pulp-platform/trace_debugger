@@ -11,6 +11,7 @@ node ('centos7' + ' && !vm1-centos7'){
 	}
 	stage('Build (32-bit)') {
 	    if (isUnix()) {
+		sh "make clean"
 		sh "make tb-all"
 	    } else {
 		echo "unix only"
