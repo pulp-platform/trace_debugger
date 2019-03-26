@@ -114,6 +114,7 @@ class Monitor;
             #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             if(tb_eos == 1'b1) begin
                 $display("[MONITOR]@%t: Signaled end of simulation.", $time);
+                $finish;
                 break;
             end
 

@@ -161,7 +161,7 @@ class Scoreboard;
         while (gm_box.num() > 0) begin
             if(tb_eos == 1'b1) begin
                 $display("[SCORE]  @%t: Signaled end of stimulation.", $time);
-                break;
+                $finish;
             end
 
             gm_box.get(gm_response);
