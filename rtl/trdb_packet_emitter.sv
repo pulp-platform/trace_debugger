@@ -239,8 +239,8 @@ module trdb_packet_emitter
             packet_gen_valid     = '1;
             sw_grant_o           = '1;
             packet_bits[1:0]     = W_SOFTWARE;
-            packet_bits[2+:XLEN] = sw_word_i;
-            packet_len           = 2 + XLEN;
+            packet_bits[2+:32]   = sw_word_i;
+            packet_len           = 2 + 32;
 
         end else if(tu_valid_i) begin
             packet_gen_valid            = '1;

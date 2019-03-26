@@ -49,9 +49,16 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 DPINAME			= trdb/dpi/autogen_trdb_sv.h
 DPISRC			= $(RTLSRC_TB_PKG)
 SV_LIB			= trdb/libtrdbsv
+CFLAGS                  = -Wall -Wextra -Wno-missing-field-initializers \
+				-Wno-unused-function -Wno-missing-braces \
+				-O2 -g -march=native \
+				-DENABLE_LOGGING -DNDEBUG
+
 
 ALL_TESTS               = $(wildcard test/*.cvs)
+ALL_TESTS_64            = $(wildcard test-64/*.cvs)
 ALL_TEST_RESULTS        = $(addsuffix .test, $(basename $(ALL_TESTS)))
+ALL_TEST_RESULTS_64     = $(addsuffix .test, $(basename $(ALL_TESTS_64)))
 
 # rtl related targets
 .PHONY: lint
@@ -83,6 +90,10 @@ check-env:
 		exit 1; \
 	fi
 
+# make sure that we also compile the library in 64-bit mode if we request it
+ifeq ($(findstring +define+TRDB_ARCH64,$(VLOG_FLAGS)),+define+TRDB_ARCH64)
+CFLAGS+=-DTRDB_ARCH64
+endif
 
 # c model and decompression tools
 .PHONY: c-all
@@ -95,7 +106,7 @@ c-lib:
 
 .PHONY: c-sv-lib
 c-sv-lib:
-	$(MAKE) -C trdb sv-lib
+	$(MAKE) -C trdb sv-lib CFLAGS="$(CFLAGS)"
 
 .PHONY: c-run
 c-run:
@@ -163,6 +174,10 @@ generate-tests:
 	$(MAKE) -C trdb spike-traces-32
 	cp trdb/riscv-traces-32/*.cvs test/
 
+generate-tests-64:
+	$(MAKE) -C trdb spike-traces-64
+	cp trdb/riscv-traces-64/*.cvs test-64/
+
 test: $(ALL_TEST_RESULTS)
 	grep -B 2 -A 6 "Simulation Results" test/*.riscv.test \
 		| tee test/summary.test
@@ -174,6 +189,20 @@ test: $(ALL_TEST_RESULTS)
 		exit 0;                                 \
 	fi
 
+test-64: VLOG_FLAGS+=+define+TRDB_ARCH64
+test-64: CFLAGS+=-DTRDB_ARCH64
+test-64: $(ALL_TEST_RESULTS_64)
+	grep -B 2 -A 6 "Simulation Results" test-64/*.riscv.test \
+		| tee test-64/summary.test
+	@if grep -q "TEST FAIL" test-64/summary.test; then \
+		echo "ATLEAST ONE FAILURE";                \
+		exit 1;					   \
+	else                                               \
+		echo "ALL TESTS PASSED";                   \
+		exit 0;                                    \
+	fi
+
+
 # we use separate wlf otherwise vsim complains
 %.test: %.cvs tb-all c-sv-lib
 	$(VSIM) -work $(VWORK) -sv_lib $(SV_LIB) $(ALL_VSIM_FLAGS) -c \
@@ -183,6 +212,7 @@ test: $(ALL_TEST_RESULTS)
 .PHONY: test-clean
 test-clean:
 	rm -rf test/*.test test/*.wlf test/*.dbg
+	rm -rf test-64/*.test test-64/*.wlf test-64/*.dbg
 
 # general targets
 .PHONY: TAGS

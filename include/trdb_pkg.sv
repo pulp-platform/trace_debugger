@@ -15,22 +15,31 @@ package trdb_pkg;
 
 // number of bits required to encode address, instruction, privilege mode,
 // exception cause, context switch etc.
-parameter FORMATLEN = 2;
-parameter BRANCHLEN = 5;
-parameter ILEN = 32;
-parameter XLEN = 32;
-parameter PRIVLEN = 3;
-parameter CAUSELEN = 5;
-parameter CONTEXTLEN = 32; //TODO: currently not used
-parameter PACKET_LEN = 80; //TODO: careful double check that
-parameter PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
-parameter PACKET_BYTE_HEADER_LEN = 4;
-parameter PACKET_TOTAL = PACKET_LEN + PACKET_BYTE_HEADER_LEN;
+    localparam FORMATLEN = 2;
+    localparam BRANCHLEN = 5;
+    localparam ILEN = 32;
+`ifdef TRDB_ARCH64
+    localparam XLEN = 64;
+`else
+    localparam XLEN = 32;
+`endif
+    localparam PRIVLEN = 3;
+    localparam CAUSELEN = 5;
+    localparam CONTEXTLEN = 32; //TODO: currently not used
 
-parameter PACKET_BUFFER_STAGES = 4;
-parameter SOFTWARE_BUFFER_STAGES = 2;
+`ifdef TRDB_ARCH64
+    localparam PACKET_LEN = 104;
+    localparam PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
+`else
+    localparam PACKET_LEN = 72;
+    localparam PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
+`endif
+    localparam PACKET_BYTE_HEADER_LEN = 4;
+    localparam PACKET_TOTAL = PACKET_LEN + PACKET_BYTE_HEADER_LEN;
+    localparam PACKET_BUFFER_STAGES = 4;
+    localparam SOFTWARE_BUFFER_STAGES = 2;
 
-parameter TIMER_WIDTH = 40;
+    localparam TIMER_WIDTH = 40;
 
 // available packet types
 typedef enum logic[1:0]

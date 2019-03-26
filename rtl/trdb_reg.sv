@@ -133,7 +133,7 @@ module trdb_reg
     // this buffers our software writes, since we are contesting with packets
     // which have a priority over software writes.
     generic_fifo_adv
-        #(.DATA_WIDTH(XLEN),
+        #(.DATA_WIDTH(32),
           .DATA_DEPTH(SOFTWARE_BUFFER_STAGES))
     i_sw_fifo
         (.clk(clk_i),

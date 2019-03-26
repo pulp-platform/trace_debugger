@@ -3,21 +3,35 @@ node ('centos7' + ' && !vm1-centos7'){
 	stage('Preparation') {
 	    withEnv(['SPIKE_TEST_TRACES_URL=https://github.com/bluewww/spike-instruction-trace-patch',
 		     'PATH+WHATEVER=/home/balasr/.local/bin:/home/balasr/.riscv/bin']) {
-		git 'https://github.com/pulp-platform/trace_debugger/'
+		checkout scm
 		sh 'git submodule update --init --recursive'
 		sh "make generate-tests"
+		sh "make generate-tests-64"
 	    }
 	}
-	stage('Build') {
+	stage('Build (32-bit)') {
 	    if (isUnix()) {
 		sh "make tb-all"
 	    } else {
 		echo "unix only"
 	    }
 	}
-	stage('Test') {
+	stage('Test (32-bit)') {
 	    sh "make -j8 test"
 	}
+
+	stage('Build (64-bit)') {
+	    if (isUnix()) {
+		sh "make clean"
+		sh "make c-sv-lib tb-all VLOG_FLAGS+=+define+TRDB_ARCH64"
+	    } else {
+		echo "unix only"
+	    }
+	}
+	stage('Test (64-bit)') {
+	    sh "make -j8 test-64"
+	}
+
     } catch (e) {
 	currentBuild.result = "FAILED"
 	echo "SENDING E-MAIL"
