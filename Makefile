@@ -231,7 +231,7 @@ docs: c-docs
 all: driver-all tb-all c-all
 
 .PHONY: clean
-clean: driver-clean tb-clean c-clean test-clean
+clean: tb-clean c-clean test-clean
 
 .PHONY: distclean
 distclean: clean
