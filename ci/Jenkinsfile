@@ -1,0 +1,36 @@
+node ('centos7' + ' && !vm1-centos7'){
+    try {
+	stage('Preparation') {
+	    withEnv(['SPIKE_TEST_TRACES_URL=https://github.com/bluewww/spike-instruction-trace-patch',
+		     'PATH+WHATEVER=/home/balasr/.local/bin:/home/balasr/.riscv/bin']) {
+		git 'https://github.com/pulp-platform/trace_debugger/'
+		sh 'git submodule update --init --recursive'
+		sh "make generate-tests"
+	    }
+	}
+	stage('Build') {
+	    if (isUnix()) {
+		sh "make tb-all"
+	    } else {
+		echo "unix only"
+	    }
+	}
+	stage('Test') {
+	    sh "make -j8 test"
+	}
+    } catch (e) {
+	currentBuild.result = "FAILED"
+	echo "SENDING E-MAIL"
+	notifyFailed()
+	throw e
+    }
+}
+
+def notifyFailed() {
+  emailext (
+      subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+      body: """<p>FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+	<p>Check console output at "<a href="${env.BUILD_URL}">${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>"</p>""",
+      recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+    )
+}
