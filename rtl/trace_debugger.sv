@@ -134,8 +134,8 @@ module trace_debugger
 
     // variables for the packet generation
     logic                       packet_valid;
-    trdb_format_t               packet_format;
-    trdb_subformat_t            packet_subformat;
+    trdb_format_e               packet_format;
+    trdb_subformat_e            packet_subformat;
 
     // variables for address compression
     logic [$clog2(XLEN)-1+1:0]  keep_addr_bits;

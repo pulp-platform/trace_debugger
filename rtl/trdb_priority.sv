@@ -54,8 +54,8 @@ module trdb_priority
      // how many bits of the address are useful
      output logic [$clog2(XLEN):0] keep_bits_o,
      output logic                  valid_o,
-     output                        trdb_format_t packet_format_o,
-     output                        trdb_subformat_t packet_subformat_o);
+     output trdb_format_e          packet_format_o,
+     output trdb_subformat_e       packet_subformat_o);
 
     // to compress addresses we can, instead of always giving out the full
     // address, only give out the difference to the last emitted packet address

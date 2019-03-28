@@ -20,8 +20,8 @@ module trdb_packet_emitter
      input logic                    rst_ni,
 
      // trace packet generation request with associated conditions
-     input                          trdb_format_t packet_format_i,
-     input                          trdb_subformat_t packet_subformat_i,
+     input trdb_format_e            packet_format_i,
+     input trdb_subformat_e         packet_subformat_i,
 
      input logic [$clog2(XLEN):0] keep_bits_i,
      input logic                    valid_i,

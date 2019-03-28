@@ -64,18 +64,19 @@ module trdb_reg
      // timer packet request through user
      output logic                     tu_req_o);
 
+    import trdb_pkg::*;
 
     // clock gating for everything but the ctrl register
     logic                             clk_gated;
 
     // hold control status
-    logic [TRDB_CTRL_SIZE-1:0] ctrl_q, ctrl_d;
+    trdb_ctrl_t ctrl_q, ctrl_d;
 
     // hold trace debugger status
-    logic [TRDB_STATUS_SIZE-1:0] status_q, status_d;
+    trdb_status_t status_q, status_d;
 
     // hold trace debugger filter settings
-    logic [TRDB_FILTER_SIZE-1:0] filter_q, filter_d;
+    trdb_filterconf_t filter_q, filter_d;
 
     // allow the user to write to this register to dump data through the trace
     // debugger
@@ -90,19 +91,19 @@ module trdb_reg
 
 
     // control reg outgoing signals
-    assign trace_enable_o = ctrl_q[TRDB_ENABLE];
-    assign trace_activated_o = ctrl_q[TRDB_TRACE_ACTIVATED];
-    assign clear_fifo_o = ctrl_q[TRDB_CLEAR_FIFO];
-    assign flush_stream_o = ctrl_q[TRDB_FLUSH_STREAM];
-    assign trace_full_addr_o = ctrl_q[TRDB_FULL_ADDR];
-    assign trace_implicit_ret_o = ctrl_q[TRDB_IMPLICIT_RET];
+    assign trace_enable_o = ctrl_q.enable;
+    assign trace_activated_o = ctrl_q.activated;
+    assign clear_fifo_o = ctrl_q.clear_fifo;
+    assign flush_stream_o = ctrl_q.flush_stream;
+    assign trace_full_addr_o = ctrl_q.full_addr;
+    assign trace_implicit_ret_o = ctrl_q.implicit_ret;
 
     // status reg outgoing signals
-    assign apply_filters_o = filter_q[TRDB_APPLY_FILTERS];
-    assign trace_selected_priv_o = filter_q[TRDB_TRACE_PRIV];
-    assign trace_which_priv_o = filter_q[TRDB_WHICH_PRIV:TRDB_WHICH_PRIV-1];
-    assign trace_range_event_o = filter_q[TRDB_RANGE_EVENT];
-    assign trace_stop_event_o = filter_q[TRDB_STOP_EVENT];
+    assign apply_filters_o = filter_q.apply_filters;
+    assign trace_selected_priv_o = filter_q.trace_priv;
+    assign trace_which_priv_o = filter_q.which_priv;
+    assign trace_range_event_o = filter_q.range_event[0];
+    assign trace_stop_event_o = filter_q.stop_event[0];
 
     // for range tracing
     assign trace_lower_addr_o = lower_addr_q;
@@ -112,7 +113,7 @@ module trdb_reg
     always_comb begin: read_reg
         per_rdata_o = 32'h0;
         if(per_valid_i & ~per_we_i) begin
-            case(per_addr_i)
+            case(per_addr_i[7:0])
             REG_TRDB_CTRL:
                 per_rdata_o = ctrl_q;
             REG_TRDB_STATUS:
@@ -160,14 +161,17 @@ module trdb_reg
 
 
     // status from trace debugger
-    assign status_d[TRDB_QUALIFIED] = trace_qualified_i;
-    assign status_d[TRDB_PRIV_MATCH] = trace_priv_match_i;
-    assign status_d[TRDB_RANGE_MATCH] = trace_range_match_i;
-    assign status_d[TRDB_FIFO_OVERFLOW] = trace_fifo_overflow_i;
-    assign status_d[TRDB_EXTERNAL_FIFO_OVERFLOW] = external_fifo_overflow_i;
+    assign status_d.qualified = trace_qualified_i;
+    assign status_d.priv_match = trace_priv_match_i;
+    assign status_d.range_match = trace_range_match_i;
+    assign status_d.fifo_overflow = trace_fifo_overflow_i;
+    assign status_d.ext_fifo_overflow = external_fifo_overflow_i;
 
     // register write logic
     always_comb begin: write_reg
+        trdb_ctrl_t ctrl_w;
+
+        ctrl_w        = '0;
         ctrl_d        = ctrl_q;
         filter_d      = filter_q;
         dump_d        = dump_q;
@@ -177,9 +181,16 @@ module trdb_reg
         higher_addr_d = higher_addr_q;
 
         if(per_valid_i & per_we_i) begin
-            case (per_addr_i)
-            REG_TRDB_CTRL:
-                ctrl_d = per_wdata_i;
+            case (per_addr_i[7:0])
+            REG_TRDB_CTRL: begin
+                ctrl_w              = trdb_ctrl_t'(per_wdata_i);
+                ctrl_d.activated    = ctrl_w.activated;
+                ctrl_d.flush_stream = ctrl_w.flush_stream;
+                ctrl_d.enable       = ctrl_w.enable;
+                ctrl_d.clear_fifo   = ctrl_w.clear_fifo;
+                ctrl_d.full_addr    = ctrl_w.full_addr;
+                ctrl_d.implicit_ret = ctrl_w.implicit_ret;
+            end
             REG_TRDB_STATUS: begin
             end
             REG_TRDB_FILTER:
@@ -200,22 +211,21 @@ module trdb_reg
             endcase
         end
 
-        if(flush_confirm_i) begin
-            ctrl_d                    = ctrl_q;
-            ctrl_d[TRDB_FLUSH_STREAM] = 1'b0;
-        end
+        if(flush_confirm_i)
+            ctrl_d.flush_stream = 1'b0;
 
-        if(trace_req_deactivate_i) begin
-            ctrl_d                       = ctrl_q;
-            ctrl_d[TRDB_TRACE_ACTIVATED] = 1'b0;
-        end
+        // Force disable tracer when we the filter requests it. User needs to
+        // change filter to allow tracing in filtered region.
+        if(trace_req_deactivate_i)
+            ctrl_d.activated = 1'b0;
+
     end
 
     // clock gating logic
     pulp_clock_gating i_trdb_clock_gating
         (.clk_i(clk_i),
          .test_en_i(test_mode_i),
-         .en_i(ctrl_q[TRDB_ENABLE]),
+         .en_i(ctrl_q.enable),
          .clk_o(clk_gated));
 
     assign clk_gated_o = clk_gated;

@@ -146,7 +146,7 @@ class Scoreboard;
         Response duv_response;
         trdb_packet gm_packet;
         trdb_packet duv_packet;
-        trdb_marker_t msgtype;
+        trdb_marker_e msgtype;
 
         gm_box = new();
         // generate responses
@@ -171,7 +171,7 @@ class Scoreboard;
             stats.total_packets = packetcnt++;
 
             assert(gm_packet.bits[127:0] === duv_packet.bits[127:0]) begin
-                msgtype = trdb_marker_t'{duv_packet.bits[5:4]};
+                msgtype = trdb_marker_e'{duv_packet.bits[5:4]};
                 packet_bytes = duv_packet.bits[3:0] + 1;
                 $display("[SCORE]: Packet with msgtype %s, length %0d,",
                           msgtype.name, packet_bytes,
@@ -195,7 +195,7 @@ class Scoreboard;
             while(duv_box.num > 0) begin
                 duv_box.get(duv_response);
                 duv_packet = duv_response.packet;
-                msgtype    = trdb_marker_t'{duv_packet.bits[5:4]};
+                msgtype    = trdb_marker_e'{duv_packet.bits[5:4]};
                 $display("[SCORE]  @%t: Remaning: %h", $time, duv_packet.bits);
                 $display("[SCORE]  @%t: length: %0d msgtype: %s",
                          $time, duv_packet.bits[6:0], msgtype.name);

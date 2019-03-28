@@ -42,31 +42,28 @@ package trdb_pkg;
     localparam TIMER_WIDTH = 40;
 
 // available packet types
-typedef enum logic[1:0]
-{
- F_BRANCH_FULL = 2'h0,
- F_BRANCH_DIFF = 2'h1,
- F_ADDR_ONLY   = 2'h2,
- F_SYNC        = 2'h3
- } trdb_format_t;
+typedef enum logic[1:0] {
+   F_BRANCH_FULL = 2'h0,
+   F_BRANCH_DIFF = 2'h1,
+   F_ADDR_ONLY   = 2'h2,
+   F_SYNC        = 2'h3
+} trdb_format_e;
 
 // subtypes of the F_SYNC packet
-typedef enum logic[1:0]
-{
- SF_START     = 2'h0,
- SF_EXCEPTION = 2'h1,
- SF_CONTEXT   = 2'h2,
- SF_UNDEF     = 2'h3
- } trdb_subformat_t;
+typedef enum logic[1:0] {
+    SF_START     = 2'h0,
+    SF_EXCEPTION = 2'h1,
+    SF_CONTEXT   = 2'h2,
+    SF_UNDEF     = 2'h3
+} trdb_subformat_e;
 
 // available message types
-typedef enum logic [1:0]
-{
- W_EMPTY    = 2'h0,
- W_TIME     = 2'h1,
- W_TRACE    = 2'h2,
- W_SOFTWARE = 2'h3
- } trdb_marker_t;
+typedef enum logic [1:0] {
+    W_EMPTY    = 2'h0,
+    W_TIME     = 2'h1,
+    W_TRACE    = 2'h2,
+    W_SOFTWARE = 2'h3
+} trdb_marker_e;
 
 
 // This is information regarding the mapping of configuration registers and the
@@ -78,6 +75,31 @@ parameter REG_TRDB_DUMP           = 8'hc; //BASEADDR+0x08
 parameter REG_TRDB_DUMP_WITH_TIME = 8'h10;//BASEADDR+0x10
 parameter REG_TRDB_LOWER_ADDR     = 8'h20;//BASEADDR+0x20
 parameter REG_TRDB_HIGHER_ADDR    = 8'h24;//BASEADDR+0x24
+
+typedef struct packed {
+    logic      implicit_ret;
+    logic      full_addr;
+    logic      flush_stream;
+    logic      clear_fifo;
+    logic      activated;
+    logic      enable;
+} trdb_ctrl_t;
+
+typedef struct packed {
+    logic      ext_fifo_overflow;
+    logic      fifo_overflow;
+    logic      range_match;
+    logic      priv_match;
+    logic      qualified;
+} trdb_status_t;
+
+typedef struct packed {
+    logic [1:0] stop_event;
+    logic [1:0] range_event;
+    logic [1:0] which_priv;
+    logic       trace_priv;
+    logic       apply_filters;
+} trdb_filterconf_t;
 
 
 parameter TRDB_CTRL_SIZE = 6;
