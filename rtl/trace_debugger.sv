@@ -11,10 +11,7 @@
 // Author: Robert Balas (balasr@student.ethz.ch)
 // Description: Compress instruction traces and filter them
 
-
-import trdb_pkg::*;
-
-module trace_debugger
+module trace_debugger import trdb_pkg::*;
     #(parameter APB_ADDR_WIDTH = 32)
     (input logic                clk_i,
      input logic                rst_ni,
@@ -124,6 +121,8 @@ module trace_debugger
     logic                       really_c_jr;
     logic                       is_ret;
     logic                       is_c_ret;
+    logic                       is_jump;
+    logic                       is_priv_ret;
 
     // variables for the branch map
     logic                       branch_map_flush;
@@ -316,11 +315,12 @@ module trace_debugger
         really_c_jr = ((instr_q & MASK_C_JR) == MATCH_C_JR)
                       && ((instr_q & MASK_RD) != 0);
 
-        u_discontinuity0_d = ((instr_q & MASK_JALR) == MATCH_JALR) ||
-              really_c_jalr || really_c_jr ||
-              ((instr_q & MASK_MRET) == MATCH_MRET) ||
-              ((instr_q & MASK_SRET) == MATCH_SRET) ||
-              ((instr_q & MASK_URET) == MATCH_URET);
+        is_jump = ((instr_q & MASK_JALR) == MATCH_JALR) ||
+                  really_c_jalr || really_c_jr;
+
+        is_priv_ret = ((instr_q & MASK_MRET) == MATCH_MRET) ||
+                  ((instr_q & MASK_SRET) == MATCH_SRET) ||
+                  ((instr_q & MASK_URET) == MATCH_URET);
 
         // allows us to mark ret's as not being discontinuities, if we want
         not_ret = '1;
@@ -332,7 +332,7 @@ module trace_debugger
         if(trace_implicit_ret)
             not_ret = !(is_ret || is_c_ret);
 
-        u_discontinuity0_d = u_discontinuity0_d && not_ret;
+        u_discontinuity0_d = (is_jump || is_priv_ret) && not_ret;
     end
 
     // figure out whether we are dealing with the first qualified instruction
@@ -367,9 +367,7 @@ module trace_debugger
     // decides, by looking at the history of instructions, whether a packet is
     // necessary or not
     trdb_priority i_trdb_priority
-        (.clk_i(clk_gated),
-         .rst_ni(rst_ni),
-         // there might be some data stuck in the
+        (// there might be some data stuck in the
          // pipeline if valid never goes high again (e.g.
          // after wfi), but this shouldnt matter
          .valid_i(trace_valid && tc_qualified),
@@ -593,7 +591,7 @@ module trace_debugger
          .per_valid_i(per_valid),
          .flush_stream_o(flush_stream),
          .flush_confirm_i(flush_confirm),
-         .clear_fifo_o(clear_fifo),
+         .clear_fifo_o(), // TODO: connect
          .trace_enable_o(trace_enable),
          .trace_activated_o(trace_activated),
          .trace_full_addr_o(trace_full_addr),

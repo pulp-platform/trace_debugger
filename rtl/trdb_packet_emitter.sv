@@ -23,7 +23,7 @@ module trdb_packet_emitter
      input trdb_format_e            packet_format_i,
      input trdb_subformat_e         packet_subformat_i,
 
-     input logic [$clog2(XLEN):0] keep_bits_i,
+     input logic [$clog2(XLEN):0]   keep_bits_i,
      input logic                    valid_i,
 
      input logic                    use_full_addr_i,

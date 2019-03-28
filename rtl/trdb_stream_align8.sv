@@ -62,7 +62,7 @@ module trdb_stream_align8
 
     assign packet_len_no_header = packet_len_i - 4;
     assign packet_bytes_no_header_len = (packet_len_no_header >> 3)
-        + (packet_len_no_header[2:0] ? 1 : 0);
+        + (packet_len_no_header[2:0] != 2'h0);
 
     assign padded_packet_bits = {32'b0,
                                  packet_bits_i,
@@ -77,7 +77,7 @@ module trdb_stream_align8
     assign effective_packet_len = packet_len_i + PACKET_BYTE_HEADER_LEN;
     // ceiling division
     assign packet_bytes_len = (effective_packet_len >> 3)
-        + (effective_packet_len[2:0] ? 1 : 0);
+        + (effective_packet_len[2:0] != 2'h0);
 
     always_comb begin
         ns              = cs;

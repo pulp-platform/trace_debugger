@@ -16,10 +16,7 @@ import trdb_pkg::*;
 
 // TODO: add commented out signals
 module trdb_priority
-    (input logic  clk_i,
-     input logic                   rst_ni,
-
-     input logic                   valid_i,
+    (input logic                   valid_i,
 
      input logic [XLEN-1:0]        full_addr_i,
      input logic [XLEN-1:0]        diff_addr_i,
