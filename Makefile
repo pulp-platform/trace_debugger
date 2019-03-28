@@ -125,7 +125,7 @@ c-docs:
 	$(VLIB) $(VWORK)
 	touch .lib-rtl
 
-.build-rtl: .lib-rtl $(RTLSRC_TB)
+.build-rtl: .lib-rtl $(RTLSRC_PKG) $(RTLSRC) $(RTLSRC_TB_PKG) $(RTLSRC_TB)
 	$(VLOG) -work $(VWORK) $(VLOG_FLAGS) $(RTLSRC_PKG) $(RTLSRC) \
 	$(RTLSRC_TB_PKG) $(RTLSRC_TB)
 	touch .build-rtl
@@ -181,25 +181,32 @@ generate-tests-64:
 test: $(ALL_TEST_RESULTS)
 	grep -B 2 -A 6 "Simulation Results" test/*.riscv.test \
 		| tee test/summary.test
-	@if grep -q "TEST FAIL" test/summary.test; then \
-		echo "ATLEAST ONE FAILURE";             \
-		exit 1;					\
-	else                                            \
-		echo "ALL TESTS PASSED";                \
-		exit 0;                                 \
+	@if [ ! -s test/summary.test ]; then                \
+		echo "EMPTY RESULTS";                       \
+		exit 1;                                     \
+	elif grep -q "TEST FAIL" test/summary.test; then    \
+		echo "ATLEAST ONE FAILURE";                 \
+		exit 1;                                     \
+	else                                                \
+		echo "ALL TESTS PASSED";                    \
+		exit 0;                                     \
 	fi
+
 
 test-64: VLOG_FLAGS+=+define+TRDB_ARCH64
 test-64: CFLAGS+=-DTRDB_ARCH64
 test-64: $(ALL_TEST_RESULTS_64)
 	grep -B 2 -A 6 "Simulation Results" test-64/*.riscv.test \
 		| tee test-64/summary.test
-	@if grep -q "TEST FAIL" test-64/summary.test; then \
-		echo "ATLEAST ONE FAILURE";                \
-		exit 1;					   \
-	else                                               \
-		echo "ALL TESTS PASSED";                   \
-		exit 0;                                    \
+	@if [ ! -s test-64/summary.test ]; then             \
+		echo "EMPTY RESULTS";                       \
+		exit 1;                                     \
+	elif grep -q "TEST FAIL" test-64/summary.test; then \
+		echo "ATLEAST ONE FAILURE";                 \
+		exit 1;                                     \
+	else                                                \
+		echo "ALL TESTS PASSED";                    \
+		exit 0;                                     \
 	fi
 
 
