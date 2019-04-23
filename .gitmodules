@@ -7,3 +7,6 @@
 [submodule "trdb"]
 	path = trdb
 	url = git@github.com:pulp-platform/trdb.git
+[submodule "rtl/axi"]
+	path = rtl/axi
+	url = git@github.com:pulp-platform/axi.git

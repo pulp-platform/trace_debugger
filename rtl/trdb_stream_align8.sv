@@ -31,9 +31,6 @@ module trdb_stream_align8
      output logic [31:0]                 data_o,
      output logic                        valid_o);
 
-
-    enum logic [1:0] {WORD0, WORD1} cs, ns;
-
     logic [32+PACKET_TOTAL-1:0]       padded_packet_bits;
     logic [$clog2(32+PACKET_TOTAL):0] low_ptr_d, low_ptr_q, high_ptr;
 
@@ -80,7 +77,6 @@ module trdb_stream_align8
         + (effective_packet_len[2:0] != 2'h0);
 
     always_comb begin
-        ns              = cs;
         low_ptr_d       = low_ptr_q;
         valid_d         = '0;
         data_d          = '0;
@@ -162,14 +158,12 @@ module trdb_stream_align8
 
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
-            cs              <= WORD0;
             offset_q        <= '0;
             low_ptr_q       <= '0;
             residual_q      <= '0;
             valid_q         <= '0;
             data_q          <= '0;
         end else begin
-            cs              <= ns;
             offset_q        <= offset_d;
             low_ptr_q       <= low_ptr_d;
             residual_q      <= residual_d;
