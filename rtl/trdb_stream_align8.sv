@@ -17,19 +17,19 @@ import trdb_pkg::*;
 // TODO: inserting double WORD header not done yet
 module trdb_stream_align8
     #(parameter ID = 1)
-    (input logic                         clk_i,
-     input logic                         rst_ni,
+    (input logic                          clk_i,
+     input logic                          rst_ni,
 
-     input logic [PACKET_LEN-1:0]        packet_bits_i,
-     input logic [PACKET_HEADER_LEN-1:0] packet_len_i,
-     input logic                         valid_i,
-     output logic                        grant_o,
+     input logic [PACKET_LEN-1:0]         payload_bits_i,
+     input logic [$clog2(PACKET_LEN)-1:0] payload_len_i,
+     input logic                          valid_i,
+     output logic                         grant_o,
 
-     input logic                         flush_stream_i,
-     output logic                        flush_confirm_o,
+     input logic                          flush_stream_i,
+     output logic                         flush_confirm_o,
 
-     output logic [31:0]                 data_o,
-     output logic                        valid_o);
+     output logic [31:0]                  data_o,
+     output logic                         valid_o);
 
     logic [32+PACKET_TOTAL-1:0]       padded_packet_bits;
     logic [$clog2(32+PACKET_TOTAL):0] low_ptr_d, low_ptr_q, high_ptr;
@@ -37,9 +37,9 @@ module trdb_stream_align8
     // TODO: change hardcoding, use $clog
     // TODO: remove PACKER_HEADER_LEN, move upwards to packet emitter
     // TODO: this is a mess, clean up
-    logic [PACKET_BYTE_HEADER_LEN-1:0] packet_bytes_no_header_len;
-    logic [PACKET_HEADER_LEN-1:0]      packet_len_no_header;
-    logic [PACKET_HEADER_LEN-1+1:0]    effective_packet_len;
+    logic [PACKET_BYTE_HEADER_LEN-1:0] payload_bytes;
+    logic [$clog2(PACKET_LEN)-1:0]     packet_len_no_header;
+    logic [$clog2(PACKET_LEN)-1+1:0]   effective_packet_len;
     logic [3:0]                        packet_bytes_len;
 
     logic [3:0]                       offset_q, offset_d;
@@ -57,13 +57,14 @@ module trdb_stream_align8
     assign valid_o = valid_q;
     assign data_o = data_q;
 
-    assign packet_len_no_header = packet_len_i - 4;
-    assign packet_bytes_no_header_len = (packet_len_no_header >> 3)
+    // strip off 4 custom bits
+    assign packet_len_no_header = payload_len_i - 4;
+    assign payload_bytes = (packet_len_no_header >> 3)
         + (packet_len_no_header[2:0] != 2'h0);
 
     assign padded_packet_bits = {32'b0,
-                                 packet_bits_i,
-                                 packet_bytes_no_header_len};
+                                 payload_bits_i,
+                                 payload_bytes};
 
     // TODO: halfword, byte, nibble, bit alignment
     assign offset_shifted = offset_q << 3;
@@ -71,7 +72,7 @@ module trdb_stream_align8
     assign offset_inv_shifted = offset_inv << 3;
 
     // packet length with header TODO: should rename other to payload
-    assign effective_packet_len = packet_len_i + PACKET_BYTE_HEADER_LEN;
+    assign effective_packet_len = payload_len_i + PACKET_BYTE_HEADER_LEN;
     // ceiling division
     assign packet_bytes_len = (effective_packet_len >> 3)
         + (effective_packet_len[2:0] != 2'h0);

@@ -29,10 +29,8 @@ package trdb_pkg;
 
 `ifdef TRDB_ARCH64
     localparam PACKET_LEN = 104;
-    localparam PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
 `else
     localparam PACKET_LEN = 72;
-    localparam PACKET_HEADER_LEN = 7; // $clog(PACKET_LEN+1);
 `endif
     localparam PACKET_BYTE_HEADER_LEN = 4;
     localparam PACKET_TOTAL = PACKET_LEN + PACKET_BYTE_HEADER_LEN;

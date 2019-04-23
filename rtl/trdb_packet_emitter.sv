@@ -66,7 +66,7 @@ module trdb_packet_emitter
      output logic                   packet_valid_o);
 
     logic [PACKET_LEN-1:0]         packet_bits;
-    logic [PACKET_HEADER_LEN-1:0]  packet_len;
+    logic [$clog2(PACKET_LEN)-1:0] packet_len;
     logic                          packet_gen_valid;
 
     // request to flush the branch map so that it is empty for the next packet

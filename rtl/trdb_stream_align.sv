@@ -17,16 +17,16 @@ import trdb_pkg::*;
 // TODO: inserting double WORD header not done yet
 module trdb_stream_align
     #(parameter ID = 1)
-    (input logic                         clk_i,
-     input logic                         rst_ni,
+    (input logic                          clk_i,
+     input logic                          rst_ni,
 
-     input logic [PACKET_LEN-1:0]        packet_bits_i,
-     input logic [PACKET_HEADER_LEN-1:0] packet_len_i,
-     input logic                         valid_i,
-     output logic                        grant_o,
+     input logic [PACKET_LEN-1:0]         packet_bits_i,
+     input logic [$clog2(PACKET_LEN)-1:0] packet_len_i,
+     input logic                          valid_i,
+     output logic                         grant_o,
 
-     output logic [31:0]                 data_o,
-     output logic                        valid_o);
+     output logic [31:0]                  data_o,
+     output logic                         valid_o);
 
 
     enum logic [1:0] {WORD0, WORD1} cs, ns;

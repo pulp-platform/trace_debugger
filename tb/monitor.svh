@@ -51,8 +51,8 @@ class Monitor;
                     //we are dealing with a new packet
                     packet.bits = '0;
                     pbits = (wordmod == 0 ?
-                             this.duv_if.packet_word[PACKET_HEADER_LEN-1+7:7]:
-                             this.duv_if.packet_word[PACKET_HEADER_LEN-1:0]);
+                             this.duv_if.packet_word[$clog2(PACKET_LEN)-1+7:7]:
+                             this.duv_if.packet_word[$clog2(PACKET_LEN)-1:0]);
 
                     // every other words (wordmod == 0) has an additional 7 bits
                     totalbits = pbits + (pbits/(32+32-7)) * 7

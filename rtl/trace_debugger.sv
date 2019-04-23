@@ -459,7 +459,7 @@ module trace_debugger import trdb_pkg::*;
     // this buffers our generated packet, since packets can be generated every
     // cycle, but we only read atmost 32 bit per cycle
     generic_fifo_adv
-        #(.DATA_WIDTH(PACKET_LEN + PACKET_HEADER_LEN),
+        #(.DATA_WIDTH(PACKET_LEN + $clog2(PACKET_LEN)),
           .DATA_DEPTH(PACKET_BUFFER_STAGES))
     i_packet_fifo
         (.clk(clk_i),
@@ -482,8 +482,8 @@ module trace_debugger import trdb_pkg::*;
     trdb_stream_align8 i_trdb_stream_align
         (.clk_i(clk_gated),
          .rst_ni(rst_ni),
-         .packet_bits_i(packet_fifo_bits),
-         .packet_len_i(packet_fifo_len),
+         .payload_bits_i(packet_fifo_bits),
+         .payload_len_i(packet_fifo_len),
          .valid_i(packet_fifo_valid),
          .grant_o(packet_is_read),
          .flush_stream_i(flush_stream),
