@@ -49,6 +49,15 @@ The used packet format is described [[https://github.com/riscv/riscv-trace-spec]
 `-- src_files.yml    Configuration file to use it as an IP in the PULP platform
 #+END_EXAMPLE
 
+** Checkout, build and running tests
+   Make sure that the environment variables ~VSIM~ and ~RISCV~ point to your
+   simulator and RISC-V toolchain respectively. Checkout the repository like
+   this ~git clone --recurse https://github.com/pulp-platform/trace_debugger~.
+   Build the tests by calling ~make generate-tests-64~. This will fetch spike
+   and riscv-tests and put them into ~trdb/~. These are then run and the
+   instruction traces captured which in turn can be fed to the rtl testbench by
+   calling ~make test~.
+
 ** TRDB, the trace compression/decompression tool
    Trdb is a command line tool which can produce the same output has the
    hardware trace debugger given a stimuli file, decompress received packets
