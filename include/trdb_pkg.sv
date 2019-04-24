@@ -39,6 +39,9 @@ package trdb_pkg;
 
     localparam TIMER_WIDTH = 40;
 
+    localparam STREAM_ADDR_WIDTH = 32;
+    localparam STREAM_DATA_WIDTH = 32;
+
 // available packet types
 typedef enum logic[1:0] {
    F_BRANCH_FULL = 2'h0,

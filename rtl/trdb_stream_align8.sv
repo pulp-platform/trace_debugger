@@ -31,26 +31,30 @@ module trdb_stream_align8
      output logic [31:0]                  data_o,
      output logic                         valid_o);
 
-    logic [32+PACKET_TOTAL-1:0]       padded_packet_bits;
-    logic [$clog2(32+PACKET_TOTAL):0] low_ptr_d, low_ptr_q, high_ptr;
+    localparam PACKET_MAX_BYTES = PACKET_TOTAL/8 + (PACKET_TOTAL % 8 != 0);
+    localparam DATA_OFFSET_LEN = STREAM_DATA_WIDTH/8 + 1;
+
+    logic [32+PACKET_TOTAL-1:0]           padded_packet_bits;
+    logic [$clog2(32+PACKET_TOTAL):0]     low_ptr_d, low_ptr_q, high_ptr;
 
     // TODO: change hardcoding, use $clog
     // TODO: remove PACKER_HEADER_LEN, move upwards to packet emitter
     // TODO: this is a mess, clean up
-    logic [PACKET_BYTE_HEADER_LEN-1:0] payload_bytes;
-    logic [$clog2(PACKET_LEN)-1:0]     packet_len_no_header;
-    logic [$clog2(PACKET_LEN)-1+1:0]   effective_packet_len;
-    logic [3:0]                        packet_bytes_len;
+    logic [PACKET_BYTE_HEADER_LEN-1:0]    payload_bytes;
+    logic [$clog2(PACKET_LEN)-1:0]        packet_len_no_header;
+    logic [$clog2(PACKET_TOTAL)-1:0]      effective_packet_len;
+    logic [$clog2(PACKET_MAX_BYTES)-1:0]  packet_bytes;
 
-    logic [3:0]                       offset_q, offset_d;
-    logic [3:0]                       offset_inv;
-    logic [3+3:0]                     offset_shifted, offset_inv_shifted;
+    // for keeping track of the offset (carry over bytes) of residual
+    logic [$clog2(DATA_OFFSET_LEN)-1:0]   offset_q, offset_d, offset_inv;
+    // same as above, but in terms of bit position
+    logic [$clog2(DATA_OFFSET_LEN)-1+3:0] offset_shifted, offset_inv_shifted;
     // TODO: change residual size
-    logic [31:0]                      data_q, data_d, residual_q, residual_d;
-    logic                             valid_d, valid_q;
+    logic [31:0]                          data_q, data_d, residual_q, residual_d;
+    logic                                 valid_d, valid_q;
 
     // TODO: this is not used for now, meant for multi core tracing
-    logic [4:0]                       instance_id;
+    logic [4:0]                          instance_id;
 
     assign instance_id = ID;
 
@@ -74,10 +78,12 @@ module trdb_stream_align8
     // packet length with header TODO: should rename other to payload
     assign effective_packet_len = payload_len_i + PACKET_BYTE_HEADER_LEN;
     // ceiling division
-    assign packet_bytes_len = (effective_packet_len >> 3)
+    assign packet_bytes = (effective_packet_len >> 3)
         + (effective_packet_len[2:0] != 2'h0);
 
-    always_comb begin
+    always_comb begin : align_bytes
+        logic [15:0] offset;
+
         low_ptr_d       = low_ptr_q;
         valid_d         = '0;
         data_d          = '0;
@@ -101,44 +107,44 @@ module trdb_stream_align8
             valid_d     = '1;
             low_ptr_d   = high_ptr;
 
-            if((high_ptr >> 3) == packet_bytes_len) begin
+            if((high_ptr >> 3) == packet_bytes) begin
                 // offset_d = offset_d;
                 // residual_d = residual_d;
                 valid_d   = '1;
                 low_ptr_d = '0;
                 grant_o   = '1;
 
-            end else if((high_ptr >> 3) > packet_bytes_len) begin
-                offset_d = ((packet_bytes_len % 4) + offset_q);
+            end else if((high_ptr >> 3) > packet_bytes) begin
+                offset = ((packet_bytes % 4) + offset_q);
 
                 // figure out if we can still produce a whole word or we should
                 // wait for more data by saving it into residual_d
-                if(offset_d == 4) begin
+                if(offset == 4) begin
                     residual_d = '0;
                     valid_d = '1;
-                end else if(offset_d > 4) begin
-                    if((offset_d % 4) == 1) begin
+                end else if(offset > 4) begin
+                    if((offset % 4) == 1) begin
                         residual_d = residual_d & 32'hff;
-                    end else if ((offset_d % 4) == 2) begin
+                    end else if ((offset % 4) == 2) begin
                         residual_d = residual_d & 32'hffff;
-                    end else if ((offset_d % 4) == 3) begin
+                    end else if ((offset % 4) == 3) begin
                         residual_d = residual_d & 32'hffffff;
                     end else
                         residual_d = residual_d;
                     valid_d        = '1;
                 end else begin
-                    if(offset_d == 1)
+                    if(offset == 1)
                         residual_d = data_d & 32'hff;
-                    else if (offset_d == 2)
+                    else if (offset == 2)
                         residual_d = data_d & 32'hffff;
-                    else if (offset_d == 3)
+                    else if (offset == 3)
                         residual_d = data_d & 32'hffffff;
                     else
                         residual_d     = data_d; //TODO: need to mask this
                     valid_d        = '0;
                 end
 
-                offset_d   = offset_d % 4;
+                offset_d   = offset % 4;
                 //we are done with the current packet
                 low_ptr_d  = '0;
                 // request the next packet
