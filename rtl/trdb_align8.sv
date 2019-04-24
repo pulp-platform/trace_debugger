@@ -1,4 +1,5 @@
 // Copyright 2018 Robert Balas
+// Copyright 2019 ETH Zurich and University of Bologna.9 Robert Balas
 // Copyright and related rights are licensed under the Solderpad Hardware
 // License, Version 0.51 (the "License"); you may not use this file except in
 // compliance with the License.  You may obtain a copy of the License at
@@ -8,14 +9,14 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 //
-// Author: Robert Balas (balasr@student.ethz.ch)
+// Author: Robert Balas (balasr@iis.ee.ethz.ch)
 // Description: Take packets and funnel them through a DATA_WIDTH bit interface
 
 import trdb_pkg::*;
 
 // TODO: doesn't do alignment yet, just zero fill empty words
 // TODO: inserting double WORD header not done yet
-module trdb_stream_align8
+module trdb_align8
     #(parameter ID = 1)
     (input logic                          clk_i,
      input logic                          rst_ni,
@@ -189,4 +190,4 @@ module trdb_stream_align8
         end
     end
 
-endmodule // trdb_stream_align8
+endmodule // trdb_align8

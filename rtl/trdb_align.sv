@@ -15,7 +15,7 @@ import trdb_pkg::*;
 
 // TODO: doesn't do alignment yet, just zero fill empty words
 // TODO: inserting double WORD header not done yet
-module trdb_stream_align
+module trdb_align
     #(parameter ID = 1)
     (input logic                          clk_i,
      input logic                          rst_ni,
@@ -119,4 +119,4 @@ module trdb_stream_align
         end
     end
 
-endmodule // trdb_stream_align
+endmodule // trdb_align

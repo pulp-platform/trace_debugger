@@ -479,7 +479,7 @@ module trace_debugger import trdb_pkg::*;
             else $error("[TRDB]   @%t: Packet FIFO is overflowing.", $time);
 `endif
 
-    trdb_stream_align8 i_trdb_stream_align
+    trdb_align8 i_trdb_align8
         (.clk_i(clk_gated),
          .rst_ni(rst_ni),
          .payload_bits_i(packet_fifo_bits),
