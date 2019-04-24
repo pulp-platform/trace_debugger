@@ -98,14 +98,14 @@ class Monitor;
     endtask
 
     task acquire_bytewise(ref logic tb_eos);
-        logic [31:0] packet_word;
-        logic [7:0]  packet_byte;
-        int          packet_byte_len;
-        int          effective_bits;
-        int          packet_byte_off;
-        int          packet_ptr;
-        automatic trdb_packet packet;
-        Response response;
+        logic [BUS_DATA_WIDTH-1:0] packet_word;
+        logic [7:0]                packet_byte;
+        int                        packet_byte_len;
+        int                        effective_bits;
+        int                        packet_byte_off;
+        int                        packet_ptr;
+        automatic trdb_packet      packet;
+        Response                   response;
 
         forever begin: acquire
             @(posedge this.duv_if.clk_i);
@@ -123,7 +123,7 @@ class Monitor;
                 if($test$plusargs("debug"))
                     $display("[Monitor]@%t: slurping %h", $time, packet_word);
 
-                for(int i = 0; i < 4; i++) begin
+                for(int i = 0; i < BUS_DATA_WIDTH/8; i++) begin
                     packet_byte        = packet_word[i*8+:8];
 
                     // begin of a new packet

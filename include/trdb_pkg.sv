@@ -29,8 +29,12 @@ package trdb_pkg;
 
 `ifdef TRDB_ARCH64
     localparam PACKET_LEN = 104;
+    localparam BUS_ADDR_WIDTH = XLEN;
+    localparam BUS_DATA_WIDTH = 64;
 `else
     localparam PACKET_LEN = 72;
+    localparam BUS_ADDR_WIDTH = XLEN;
+    localparam BUS_DATA_WIDTH = 32;
 `endif
     localparam PACKET_BYTE_HEADER_LEN = 4;
     localparam PACKET_TOTAL = PACKET_LEN + PACKET_BYTE_HEADER_LEN;
@@ -39,8 +43,6 @@ package trdb_pkg;
 
     localparam TIMER_WIDTH = 40;
 
-    localparam STREAM_ADDR_WIDTH = 32;
-    localparam STREAM_DATA_WIDTH = 32;
 
 // available packet types
 typedef enum logic[1:0] {

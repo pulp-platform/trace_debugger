@@ -9,7 +9,7 @@
 // specific language governing permissions and limitations under the License.
 //
 // Author: Robert Balas (balasr@student.ethz.ch)
-// Description: Take packets and funnel them through a 32 bit interface
+// Description: Take packets and funnel them through a DATA_WIDTH bit interface
 
 import trdb_pkg::*;
 
@@ -28,14 +28,16 @@ module trdb_stream_align8
      input logic                          flush_stream_i,
      output logic                         flush_confirm_o,
 
-     output logic [31:0]                  data_o,
+     output logic [BUS_DATA_WIDTH-1:0]    data_o,
      output logic                         valid_o);
 
     localparam PACKET_MAX_BYTES = PACKET_TOTAL/8 + (PACKET_TOTAL % 8 != 0);
-    localparam DATA_OFFSET_LEN = STREAM_DATA_WIDTH/8 + 1;
+    localparam DATA_WIDTH       = BUS_DATA_WIDTH;
+    localparam DATA_OFFSET_LEN  = BUS_DATA_WIDTH/8 + 1;
+    localparam DATA_BYTES       = BUS_DATA_WIDTH/8;
 
-    logic [32+PACKET_TOTAL-1:0]           padded_packet_bits;
-    logic [$clog2(32+PACKET_TOTAL):0]     low_ptr_d, low_ptr_q, high_ptr;
+    logic [DATA_WIDTH+PACKET_TOTAL-1:0]       padded_packet_bits;
+    logic [$clog2(DATA_WIDTH+PACKET_TOTAL):0] low_ptr_d, low_ptr_q, high_ptr;
 
     // TODO: change hardcoding, use $clog
     // TODO: remove PACKER_HEADER_LEN, move upwards to packet emitter
@@ -50,7 +52,7 @@ module trdb_stream_align8
     // same as above, but in terms of bit position
     logic [$clog2(DATA_OFFSET_LEN)-1+3:0] offset_shifted, offset_inv_shifted;
     // TODO: change residual size
-    logic [31:0]                          data_q, data_d, residual_q, residual_d;
+    logic [DATA_WIDTH-1:0]                data_q, data_d, residual_q, residual_d;
     logic                                 valid_d, valid_q;
 
     // TODO: this is not used for now, meant for multi core tracing
@@ -66,13 +68,13 @@ module trdb_stream_align8
     assign payload_bytes = (packet_len_no_header >> 3)
         + (packet_len_no_header[2:0] != 2'h0);
 
-    assign padded_packet_bits = {32'b0,
+    assign padded_packet_bits = {{DATA_WIDTH{1'b0}},
                                  payload_bits_i,
                                  payload_bytes};
 
     // TODO: halfword, byte, nibble, bit alignment
     assign offset_shifted = offset_q << 3;
-    assign offset_inv = 4 - offset_q;
+    assign offset_inv = DATA_BYTES - offset_q;
     assign offset_inv_shifted = offset_inv << 3;
 
     // packet length with header TODO: should rename other to payload
@@ -97,12 +99,12 @@ module trdb_stream_align8
         flush_confirm_o = '0;
 
         if(valid_i) begin
-            high_ptr    = low_ptr_q + 32;
-            // check if we can still output 32 bit words for the current
+            high_ptr    = low_ptr_q + DATA_WIDTH;
+            // check if we can still output DATA_WIDTH bit words for the current
             // packet combine "carry" and current data, and save residual
             // for next word
-            data_d      = (padded_packet_bits[low_ptr_q +: 32] << offset_shifted) | residual_q;
-            residual_d  = (padded_packet_bits[low_ptr_q +: 32] >> offset_inv_shifted);
+            data_d      = (padded_packet_bits[low_ptr_q +: DATA_WIDTH] << offset_shifted) | residual_q;
+            residual_d  = (padded_packet_bits[low_ptr_q +: DATA_WIDTH] >> offset_inv_shifted);
 
             valid_d     = '1;
             low_ptr_d   = high_ptr;
@@ -115,36 +117,44 @@ module trdb_stream_align8
                 grant_o   = '1;
 
             end else if((high_ptr >> 3) > packet_bytes) begin
-                offset = ((packet_bytes % 4) + offset_q);
+                offset = ((packet_bytes % DATA_BYTES) + offset_q);
 
                 // figure out if we can still produce a whole word or we should
                 // wait for more data by saving it into residual_d
-                if(offset == 4) begin
+                if(offset == DATA_BYTES) begin
                     residual_d = '0;
                     valid_d = '1;
-                end else if(offset > 4) begin
-                    if((offset % 4) == 1) begin
-                        residual_d = residual_d & 32'hff;
-                    end else if ((offset % 4) == 2) begin
-                        residual_d = residual_d & 32'hffff;
-                    end else if ((offset % 4) == 3) begin
-                        residual_d = residual_d & 32'hffffff;
-                    end else
-                        residual_d = residual_d;
-                    valid_d        = '1;
+                end else if(offset > DATA_BYTES) begin
+                    unique case (offset % DATA_BYTES)
+                        0: residual_d = residual_d;
+                        1: residual_d = residual_d & {1{8'hff}};
+                        2: residual_d = residual_d & {2{8'hff}};
+                        3: residual_d = residual_d & {3{8'hff}};
+`ifdef TRDB_ARCH64
+                        4: residual_d = residual_d & {4{8'hff}};
+                        5: residual_d = residual_d & {5{8'hff}};
+                        6: residual_d = residual_d & {6{8'hff}};
+                        7: residual_d = residual_d & {7{8'hff}};
+`endif
+                    endcase
+                    valid_d = '1;
                 end else begin
-                    if(offset == 1)
-                        residual_d = data_d & 32'hff;
-                    else if (offset == 2)
-                        residual_d = data_d & 32'hffff;
-                    else if (offset == 3)
-                        residual_d = data_d & 32'hffffff;
-                    else
-                        residual_d     = data_d; //TODO: need to mask this
-                    valid_d        = '0;
+                    unique case (offset)
+                        0: residual_d = data_d; //TODO: need to mask this
+                        1: residual_d = data_d & {1{8'hff}};
+                        2: residual_d = data_d & {2{8'hff}};
+                        3: residual_d = data_d & {3{8'hff}};
+`ifdef TRDB_ARCH64
+                        4: residual_d = data_d & {4{8'hff}};
+                        5: residual_d = data_d & {5{8'hff}};
+                        6: residual_d = data_d & {6{8'hff}};
+                        7: residual_d = data_d & {7{8'hff}};
+`endif
+                    endcase
+                    valid_d = '0;
                 end
 
-                offset_d   = offset % 4;
+                offset_d   = offset % DATA_BYTES;
                 //we are done with the current packet
                 low_ptr_d  = '0;
                 // request the next packet
