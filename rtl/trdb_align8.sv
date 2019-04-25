@@ -12,25 +12,29 @@
 // Author: Robert Balas (balasr@iis.ee.ethz.ch)
 // Description: Take packets and funnel them through a DATA_WIDTH bit interface
 
-import trdb_pkg::*;
+
 
 // TODO: doesn't do alignment yet, just zero fill empty words
 // TODO: inserting double WORD header not done yet
-module trdb_align8
-    #(parameter ID = 1)
-    (input logic                          clk_i,
-     input logic                          rst_ni,
+module trdb_align8 import trdb_pkg::*; #(
+    parameter ID = 1
+) (
+    input logic                          clk_i,
+    input logic                          rst_ni,
 
-     input logic [PACKET_LEN-1:0]         payload_bits_i,
-     input logic [$clog2(PACKET_LEN)-1:0] payload_len_i,
-     input logic                          valid_i,
-     output logic                         grant_o,
+    input logic [PACKET_LEN-1:0]         payload_bits_i,
+    input logic [$clog2(PACKET_LEN)-1:0] payload_len_i,
+    input logic                          valid_i,
+    output logic                         grant_o,
 
-     input logic                          flush_stream_i,
-     output logic                         flush_confirm_o,
+    input logic                          flush_stream_i,
+    output logic                         flush_confirm_o,
 
-     output logic [BUS_DATA_WIDTH-1:0]    data_o,
-     output logic                         valid_o);
+
+    output logic [BUS_DATA_WIDTH-1:0]    data_o,
+    input logic                          grant_i,
+    output logic                         valid_o
+);
 
     localparam PACKET_MAX_BYTES = PACKET_TOTAL/8 + (PACKET_TOTAL % 8 != 0);
     localparam DATA_WIDTH       = BUS_DATA_WIDTH;
@@ -56,15 +60,21 @@ module trdb_align8
     logic [DATA_WIDTH-1:0]                data_q, data_d, residual_q, residual_d;
     logic                                 valid_d, valid_q;
 
-    enum logic [2:0] {Idle, stream, full, overfull} state_q, state_d;
+    logic                                 update;
+
+    enum logic [2:0] {Idle, Waitgrant, Stream, Full, Overfull} state_q, state_d;
 
     // TODO: this is not used for now, meant for multi core tracing
     logic [4:0]                          instance_id;
 
     assign instance_id = ID;
 
-    assign valid_o = valid_q;
+   // assign valid_o = valid_q;
     assign data_o = data_q;
+
+    //outgoing handshake
+    assign update = valid_o && grant_i;
+
 
     // strip off 4 custom bits
     assign packet_len_no_header = payload_len_i - 4;
@@ -86,11 +96,13 @@ module trdb_align8
     assign packet_bytes = (effective_packet_len >> 3)
         + (effective_packet_len[2:0] != 2'h0);
 
+
     always_comb begin : align_bytes
         logic [15:0] offset;
 
         low_ptr_d       = low_ptr_q;
         valid_d         = '0;
+        valid_o         = '0;
         data_d          = '0;
         grant_o         = '0;
 
@@ -101,85 +113,102 @@ module trdb_align8
 
         flush_confirm_o = '0;
 
-        //handshake
-        update          = valid_o && grant_i;
-
         state_d         = state_q;
 
         if(valid_i) begin
             low_ptr_d  = low_ptr_q;
             high_ptr   = low_ptr_q + DATA_BYTES;
 
-            low_ptr_d   = high_ptr;
             // check if we can still output DATA_WIDTH bit words for the current
             // packet combine "carry" and current data, and save residual
             // for next word
             data_d     = (padded_packet_bits[low_ptr_q*8 +: DATA_WIDTH] << offset_shifted) | residual_q;
-            residual_d = (padded_packet_bits[low_ptr_q*8 +: DATA_WIDTH] >> offset_inv_shifted);
+            if (update)
+                residual_d = (padded_packet_bits[low_ptr_q*8 +: DATA_WIDTH] >> offset_inv_shifted);
 
-            valid_d     = '1;
-            low_ptr_d   = high_ptr;
-
-            // unique case (state_q)
-            // Idle: begin
-            // end
-            // Full: begin
-            // end
-            // Overfull: begin
-            // end
-            // endcase // unique case (state_q)
-
-            if(high_ptr == packet_bytes) begin
-                // offset_d = offset_d;
-                // residual_d = residual_d;
-                valid_d   = '1;
-                low_ptr_d = '0;
-                grant_o   = '1;
-
-            end else if(high_ptr > packet_bytes) begin
+            unique case (state_q)
+            Idle: begin
+                if (high_ptr < packet_bytes) begin
+                    state_d = Stream;
+                end else if (high_ptr == packet_bytes) begin
+                    state_d = Full;
+                end else if (high_ptr > packet_bytes) begin
+                    state_d = Overfull;
+                end
+            end
+            Stream: begin
+                valid_o = '1;
+                if (update) begin
+                    state_d   = Idle;
+                    low_ptr_d = high_ptr;
+                end
+            end
+            Full: begin
+                valid_o   = '1;
+                if (update) begin
+                    state_d   = Idle;
+                    low_ptr_d = '0;
+                    grant_o   = '1;
+                end
+            end
+            Overfull: begin
                 offset = ((packet_bytes % DATA_BYTES) + offset_q);
 
-                // figure out if we can still produce a whole word or we should
-                // wait for more data by saving it into residual_d
-                if(offset == DATA_BYTES) begin
-                    residual_d = '0;
-                    valid_d = '1;
-                end else if(offset > DATA_BYTES) begin
-                    unique case (offset % DATA_BYTES)
-                        0: residual_d = residual_d;
-                        1: residual_d = residual_d & {1{8'hff}};
-                        2: residual_d = residual_d & {2{8'hff}};
-                        3: residual_d = residual_d & {3{8'hff}};
+                if (offset == DATA_BYTES) begin
+                    valid_o    = '1;
+                    if (update)
+                        residual_d = '0;
+
+                end else if (offset > DATA_BYTES) begin
+                    valid_o = '1;
+                    if (update) begin
+                        unique case (offset % DATA_BYTES)
+                            0: residual_d = residual_d;
+                            1: residual_d = residual_d & {1{8'hff}};
+                            2: residual_d = residual_d & {2{8'hff}};
+                            3: residual_d = residual_d & {3{8'hff}};
 `ifdef TRDB_ARCH64
-                        4: residual_d = residual_d & {4{8'hff}};
-                        5: residual_d = residual_d & {5{8'hff}};
-                        6: residual_d = residual_d & {6{8'hff}};
-                        7: residual_d = residual_d & {7{8'hff}};
+                            4: residual_d = residual_d & {4{8'hff}};
+                            5: residual_d = residual_d & {5{8'hff}};
+                            6: residual_d = residual_d & {6{8'hff}};
+                            7: residual_d = residual_d & {7{8'hff}};
 `endif
-                    endcase
-                    valid_d = '1;
-                end else begin
+                        endcase
+                    end
+
+                end else if (offset < DATA_BYTES) begin
+                    valid_o = '0;
                     unique case (offset)
-                        0: residual_d = data_d; //TODO: need to mask this
-                        1: residual_d = data_d & {1{8'hff}};
-                        2: residual_d = data_d & {2{8'hff}};
-                        3: residual_d = data_d & {3{8'hff}};
+                        0: residual_d = data_q; //TODO: need to mask this
+                        1: residual_d = data_q & {1{8'hff}};
+                        2: residual_d = data_q & {2{8'hff}};
+                        3: residual_d = data_q & {3{8'hff}};
 `ifdef TRDB_ARCH64
-                        4: residual_d = data_d & {4{8'hff}};
-                        5: residual_d = data_d & {5{8'hff}};
-                        6: residual_d = data_d & {6{8'hff}};
-                        7: residual_d = data_d & {7{8'hff}};
+                        4: residual_d = data_q & {4{8'hff}};
+                        5: residual_d = data_q & {5{8'hff}};
+                        6: residual_d = data_q & {6{8'hff}};
+                        7: residual_d = data_q & {7{8'hff}};
 `endif
                     endcase
-                    valid_d = '0;
+                    state_d   = Idle;
+                    offset_d  = offset % DATA_BYTES;
+                    //we are done with the current packet
+                    low_ptr_d = '0;
+                    // request the next packet
+                    grant_o   = '1;
                 end
 
-                    offset_d   = offset % DATA_BYTES;
+                if (update) begin
+                    state_d   = Idle;
+                    offset_d  = offset % DATA_BYTES;
                     //we are done with the current packet
-                    low_ptr_d  = '0;
+                    low_ptr_d = '0;
                     // request the next packet
-                    grant_o    = '1;
+                    grant_o   = '1;
+                end
+
             end
+            endcase // unique case (state_q)
 
         end else if(flush_stream_i) begin
             // check if we actually have something to flush from residual_d
@@ -191,7 +220,6 @@ module trdb_align8
             // TODO: after flush user has to clear
         end
     end
-
 
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin

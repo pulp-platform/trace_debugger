@@ -240,6 +240,8 @@ class Driver;
         // send to scoreboard
         mail.put(stimuli);
 
+        this.duv_if.stall = 1'b1;
+
         //TODO: fix this hack
         apply_zero();
 
@@ -256,6 +258,10 @@ class Driver;
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
 
             @(posedge this.duv_if.clk_i);
+
+            // tb starts accepting transactions
+            this.duv_if.stall = ~this.duv_if.packet_word_valid;
+
             #STIM_APPLICATION_DEL;
 
             // apply stimuli pop_back()

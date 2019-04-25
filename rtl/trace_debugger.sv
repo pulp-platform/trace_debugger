@@ -489,6 +489,7 @@ module trace_debugger import trdb_pkg::*;
          .flush_stream_i(flush_stream),
          .flush_confirm_o(flush_confirm),
          .data_o(packet_word),
+         .grant_i(~stall_i),
          .valid_o(packet_word_valid));
 
     assign packet_word_o = packet_word;
