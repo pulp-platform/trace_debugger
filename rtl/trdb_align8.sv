@@ -56,6 +56,8 @@ module trdb_align8
     logic [DATA_WIDTH-1:0]                data_q, data_d, residual_q, residual_d;
     logic                                 valid_d, valid_q;
 
+    enum logic [2:0] {Idle, stream, full, overfull} state_q, state_d;
+
     // TODO: this is not used for now, meant for multi core tracing
     logic [4:0]                          instance_id;
 
@@ -99,25 +101,42 @@ module trdb_align8
 
         flush_confirm_o = '0;
 
+        //handshake
+        update          = valid_o && grant_i;
+
+        state_d         = state_q;
+
         if(valid_i) begin
-            high_ptr    = low_ptr_q + DATA_WIDTH;
+            low_ptr_d  = low_ptr_q;
+            high_ptr   = low_ptr_q + DATA_BYTES;
+
+            low_ptr_d   = high_ptr;
             // check if we can still output DATA_WIDTH bit words for the current
             // packet combine "carry" and current data, and save residual
             // for next word
-            data_d      = (padded_packet_bits[low_ptr_q +: DATA_WIDTH] << offset_shifted) | residual_q;
-            residual_d  = (padded_packet_bits[low_ptr_q +: DATA_WIDTH] >> offset_inv_shifted);
+            data_d     = (padded_packet_bits[low_ptr_q*8 +: DATA_WIDTH] << offset_shifted) | residual_q;
+            residual_d = (padded_packet_bits[low_ptr_q*8 +: DATA_WIDTH] >> offset_inv_shifted);
 
             valid_d     = '1;
             low_ptr_d   = high_ptr;
 
-            if((high_ptr >> 3) == packet_bytes) begin
+            // unique case (state_q)
+            // Idle: begin
+            // end
+            // Full: begin
+            // end
+            // Overfull: begin
+            // end
+            // endcase // unique case (state_q)
+
+            if(high_ptr == packet_bytes) begin
                 // offset_d = offset_d;
                 // residual_d = residual_d;
                 valid_d   = '1;
                 low_ptr_d = '0;
                 grant_o   = '1;
 
-            end else if((high_ptr >> 3) > packet_bytes) begin
+            end else if(high_ptr > packet_bytes) begin
                 offset = ((packet_bytes % DATA_BYTES) + offset_q);
 
                 // figure out if we can still produce a whole word or we should
@@ -155,11 +174,11 @@ module trdb_align8
                     valid_d = '0;
                 end
 
-                offset_d   = offset % DATA_BYTES;
-                //we are done with the current packet
-                low_ptr_d  = '0;
-                // request the next packet
-                grant_o    = '1;
+                    offset_d   = offset % DATA_BYTES;
+                    //we are done with the current packet
+                    low_ptr_d  = '0;
+                    // request the next packet
+                    grant_o    = '1;
             end
 
         end else if(flush_stream_i) begin
@@ -176,17 +195,19 @@ module trdb_align8
 
     always_ff @(posedge clk_i, negedge rst_ni) begin
         if(~rst_ni) begin
-            offset_q        <= '0;
-            low_ptr_q       <= '0;
-            residual_q      <= '0;
-            valid_q         <= '0;
-            data_q          <= '0;
+            offset_q   <= '0;
+            low_ptr_q  <= '0;
+            residual_q <= '0;
+            valid_q    <= '0;
+            data_q     <= '0;
+            state_q    <= Idle;
         end else begin
-            offset_q        <= offset_d;
-            low_ptr_q       <= low_ptr_d;
-            residual_q      <= residual_d;
-            valid_q         <= valid_d;
-            data_q          <= data_d;
+            offset_q   <= offset_d;
+            low_ptr_q  <= low_ptr_d;
+            residual_q <= residual_d;
+            valid_q    <= valid_d;
+            data_q     <= data_d;
+            state_q    <= state_d;
         end
     end
 
