@@ -33,7 +33,7 @@ module trace_debugger import trdb_pkg::*;
      // generated packets, which go the the udma (or somewhere else)
      output logic [XLEN-1:0]    packet_word_o,
      output logic               packet_word_valid_o,
-     input logic                stall_i);
+     input logic                grant_i);
 
 
     // general control of this module
@@ -489,7 +489,7 @@ module trace_debugger import trdb_pkg::*;
          .flush_stream_i(flush_stream),
          .flush_confirm_o(flush_confirm),
          .data_o(packet_word),
-         .grant_i(~stall_i),
+         .grant_i(grant_i),
          .valid_o(packet_word_valid));
 
     assign packet_word_o = packet_word;
@@ -609,7 +609,7 @@ module trace_debugger import trdb_pkg::*;
          .trace_priv_match_i(trace_priv_match),
          .trace_range_match_i(trace_range_match),
          .trace_fifo_overflow_i(fifo_overflow),
-         .external_fifo_overflow_i(stall_i), //external stall is a fifo overflow
+         .external_fifo_overflow_i(~grant_i), //external stall is a fifo overflow
          .sw_word_o(sw_word),
          .sw_valid_o(sw_valid),
          .sw_grant_i(sw_grant),

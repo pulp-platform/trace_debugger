@@ -30,7 +30,7 @@ interface trace_debugger_if
     logic [ILEN-1:0]     instr;
     logic                compressed;
 
-    logic                stall;
+    logic                grant;
 
     // outputs
     logic [XLEN-1:0]     packet_word;

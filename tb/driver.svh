@@ -240,8 +240,6 @@ class Driver;
         // send to scoreboard
         mail.put(stimuli);
 
-        this.duv_if.stall = 1'b1;
-
         //TODO: fix this hack
         apply_zero();
 
@@ -259,8 +257,8 @@ class Driver;
 
             @(posedge this.duv_if.clk_i);
 
-            // tb starts accepting transactions
-            this.duv_if.stall = ~this.duv_if.packet_word_valid;
+            // // tb starts accepting transactions
+            // this.duv_if.stall = ~this.duv_if.packet_word_valid;
 
             #STIM_APPLICATION_DEL;
 
@@ -299,9 +297,9 @@ class Driver;
         #STIM_APPLICATION_DEL;
         apply_zero();
 
-        @(posedge this.duv_if.clk_i);
-        #STIM_APPLICATION_DEL;
-        apply_zero();
+        repeat (10) begin
+            @(posedge this.duv_if.clk_i);
+        end
 
         tb_eos = 1'b1;
 

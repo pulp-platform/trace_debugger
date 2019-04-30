@@ -14,7 +14,10 @@
 // TODO: inspect this value
 `timescale 1ns/1ns
 
-module trdb_tb_top;
+module trdb_tb_top #(
+    parameter NumRegs = 3
+);
+
     import trdb_tb_pkg::*;
 
     // testbench signals to dut
@@ -23,12 +26,19 @@ module trdb_tb_top;
     logic      eos_s = 'b0; //end of simulation
     logic      test_mode;
 
+
     assign test_mode = '0;
 
     trace_debugger_if duv_if(clk, rst_n, test_mode);
 
     //instantiate duv
     trace_debugger_wrapper i_trace_debugger_wrapper(.duv_if(duv_if));
+
+    // randomized handshake
+    always_ff @(posedge clk) begin
+        //duv_if.grant = repeat (NumRegs) @(posedge clk) duv_if.packet_word_valid;
+        duv_if.grant = $urandom_range(0, 1);
+    end
 
     //instantiate testbench
     trdb_tb i_trdb_tb(.tb_if(duv_if));

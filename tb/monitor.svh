@@ -46,7 +46,7 @@ class Monitor;
                 break;
             end
 
-            if(this.duv_if.packet_word_valid == 1'b1) begin
+            if(this.duv_if.packet_word_valid && this.duv_if.grant) begin
                 if(off == 0) begin
                     //we are dealing with a new packet
                     packet.bits = '0;
@@ -118,7 +118,7 @@ class Monitor;
                 break;
             end
 
-            if(this.duv_if.packet_word_valid == 1'b1) begin
+            if(this.duv_if.packet_word_valid && this.duv_if.grant) begin
                 packet_word = this.duv_if.packet_word;
                 if($test$plusargs("debug"))
                     $display("[Monitor]@%t: slurping %h", $time, packet_word);
