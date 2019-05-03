@@ -18,10 +18,13 @@ class Driver;
 
     virtual trace_debugger_if duv_if;
     mailbox #(Stimuli) mail;
+    event   tb_eos;
 
-    function new(virtual trace_debugger_if duv_if, mailbox #(Stimuli) mail);
+    function new(virtual trace_debugger_if duv_if, mailbox #(Stimuli) mail,
+                event tb_eos);
         this.duv_if = duv_if;
         this.mail   = mail;
+        this.tb_eos = tb_eos;
     endfunction
 
 
@@ -206,10 +209,9 @@ class Driver;
     endtask
 
 
-    task run(ref logic tb_eos);
+    task run();
         Stimuli stimuli;
         int full_address, implicit_ret;
-        tb_eos = 1'b0;
 
         full_address = ($test$plusargs("fulladdr") != 0);
         implicit_ret = ($test$plusargs("implicitret") != 0);
@@ -275,8 +277,14 @@ class Driver;
             // take response in monitor.svh
         end
 
+        // wait for the tracer fifo to empty (TODO: poll fifo or something)
+        repeat (30) @(this.duv_if.cb);
+
         $display("[DRIVER] @%t: Testing software writes", $time);
         test_sw_dump();
+
+        // wait for the tracer fifo to empty (TODO: poll fifo or something)
+        repeat (30) @(this.duv_if.cb);
 
         $display("[DRIVER] @%t: Flushing buffers.", $time);
         // write flush command to register
@@ -285,19 +293,12 @@ class Driver;
 
         $display("[DRIVER] @%t: Driver finished.", $time);
 
-        @(this.duv_if.cb);
-        #STIM_APPLICATION_DEL;
-        apply_zero();
-
-        @(this.duv_if.cb);
-        #STIM_APPLICATION_DEL;
-        apply_zero();
-
-        repeat (10) begin
+        repeat (100) begin
             @(this.duv_if.cb);
+            apply_zero();
         end
 
-        tb_eos = 1'b1;
+        -> tb_eos;
 
     endtask;
 

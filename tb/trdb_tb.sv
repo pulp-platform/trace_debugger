@@ -21,10 +21,10 @@ module trdb_tb
 
 program automatic tb_run;
     Driver driver;
-    Monitor monitor;
+    Reader reader;
     Scoreboard scoreboard;
 
-    logic tb_eos;
+    event tb_eos;
 
     mailbox #(Stimuli) stimuli;
     mailbox #(Response) gm_scoreboard;
@@ -35,15 +35,20 @@ program automatic tb_run;
         gm_scoreboard  = new();
         duv_scoreboard = new();
 
-        driver         = new(tb_if, stimuli);
-        monitor        = new(tb_if, duv_scoreboard);
-        scoreboard     = new(stimuli, duv_scoreboard);
+        driver         = new(tb_if, stimuli, tb_eos);
+        reader         = new(tb_if, duv_scoreboard);
+        scoreboard     = new(stimuli, duv_scoreboard, tb_eos);
 
         fork
-            driver.run(tb_eos);
-            monitor.run(tb_eos);
-            scoreboard.run(tb_eos);
-        join
+            driver.run();
+            reader.run();
+            scoreboard.run();
+        join_any
+
+        wait (tb_eos.triggered) begin
+            $display("[TB]  @%t: Signaled end of stimulation.", $time);
+            scoreboard.print_stats();
+        end
     end
 
 endprogram

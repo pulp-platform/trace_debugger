@@ -67,7 +67,7 @@ package trdb_tb_pkg;
 `include "../tb/stimuli.svh"
 `include "../tb/response.svh"
 `include "../tb/driver.svh"
-`include "../tb/monitor.svh"
+`include "../tb/reader.svh"
 `include "../tb/scoreboard.svh"
 
 endpackage // trdb_tb_pkg

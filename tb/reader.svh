@@ -12,7 +12,7 @@
 // Description: Acquisition of output
 
 
-class Monitor;
+class Reader;
 
     virtual trace_debugger_if duv_if;
     mailbox #(Response) outbox_duv;
@@ -25,7 +25,7 @@ class Monitor;
 
     // old function that assumes that packets are packed in two words frames and
     // are always zero extended to fit into whole words
-    task acquire_word2(ref logic tb_eos);
+    task acquire_word2();
         // helper variables to parse packet
         automatic int pbits;
         automatic int totalbits;
@@ -38,11 +38,6 @@ class Monitor;
 
         forever begin: acquire
             @(this.duv_if.cb);
-
-            if(tb_eos == 1'b1) begin
-                $display("[MONITOR]@%t: Signaled end of simulation.", $time);
-                break;
-            end
 
             if(this.duv_if.cb.packet_word_valid && this.duv_if.cb.grant) begin
                 if(off == 0) begin
@@ -95,7 +90,7 @@ class Monitor;
 
     endtask
 
-    task acquire_bytewise(ref logic tb_eos);
+    task acquire_bytewise();
         logic [BUS_DATA_WIDTH-1:0] packet_word;
         logic [7:0]                packet_byte;
         int                        packet_byte_len;
@@ -105,19 +100,15 @@ class Monitor;
         automatic trdb_packet      packet;
         Response                   response;
 
+        int                        tmp = 1;
+
         forever begin: acquire
             @(this.duv_if.cb);
-
-            if(tb_eos == 1'b1) begin
-                $display("[MONITOR]@%t: Signaled end of simulation.", $time);
-                $finish;
-                break;
-            end
 
             if(this.duv_if.cb.packet_word_valid && this.duv_if.cb.grant) begin
                 packet_word = this.duv_if.cb.packet_word;
                 if($test$plusargs("debug"))
-                    $display("[Monitor]@%t: slurping %h", $time, packet_word);
+                    $display("[READER]@%t: slurping %h", $time, packet_word);
 
                 for(int i = 0; i < BUS_DATA_WIDTH/8; i++) begin
                     packet_byte        = packet_word[i*8+:8];
@@ -156,13 +147,13 @@ class Monitor;
         end
     endtask
 
-    task run(ref logic tb_eos);
-        // acquire_word2(tb_eos);
-        acquire_bytewise(tb_eos);
+    task run();
+        // acquire_word2();
+        acquire_bytewise();
 
         repeat(10)
             @(this.duv_if.cb);
 
     endtask
 
-endclass // Monitor
+endclass // Reader

@@ -18,6 +18,7 @@ class Scoreboard;
     mailbox #(Response) gm_box;
     mailbox #(Stimuli) inbox;
 
+    event   tb_eos;
 
     class Statistics;
         longint total_packets;
@@ -42,10 +43,14 @@ class Scoreboard;
         endfunction;
 
     endclass // Statistics
+    Statistics stats;
 
-    function new(mailbox #(Stimuli) inbox, mailbox #(Response) duv_box);
+
+    function new(mailbox #(Stimuli) inbox, mailbox #(Response) duv_box,
+                 event tb_eos);
         this.duv_box = duv_box;
-        this.inbox = inbox;
+        this.inbox   = inbox;
+        this.tb_eos  = tb_eos;
     endfunction
 
 
@@ -138,15 +143,16 @@ class Scoreboard;
 
     endtask;
 
-    task run(ref logic tb_eos);
+    task run();
         automatic int packetcnt;
         automatic int packet_bytes;
-        Statistics stats;
         Response gm_response;
         Response duv_response;
         trdb_packet gm_packet;
         trdb_packet duv_packet;
         trdb_marker_e msgtype;
+        int tmp = 1;
+
 
         gm_box = new();
         // generate responses
@@ -156,16 +162,9 @@ class Scoreboard;
         stats     = new();
         packetcnt = 0;
 
-        // since we pre-generated all responses we can just iterate on it to
-        // finish
-        while (gm_box.num() > 0) begin
-            if(tb_eos == 1'b1) begin
-                $display("[SCORE]  @%t: Signaled end of stimulation.", $time);
-                $finish;
-            end
-
-            gm_box.get(gm_response);
+        forever begin
             duv_box.get(duv_response);
+            gm_box.get(gm_response);
             gm_packet  = gm_response.packet;
             duv_packet = duv_response.packet;
             stats.total_packets = packetcnt++;
@@ -174,26 +173,35 @@ class Scoreboard;
                 msgtype = trdb_marker_e'{duv_packet.bits[5:4]};
                 packet_bytes = duv_packet.bits[3:0] + 1;
                 $display("[SCORE]: Packet with msgtype %s, length %0d,",
-                          msgtype.name, packet_bytes,
+                         msgtype.name, packet_bytes,
                          "payload %h and number %0d ok",
-                          duv_packet.bits, packetcnt);
+                         duv_packet.bits, packetcnt);
             end else begin
                 $error("[SCORE]: ERROR - Packet mismatch for number %0d\n",
-                         packetcnt,
-                         "Expected: %h\n", gm_packet.bits,
-                         "Received: %h", duv_packet.bits);
+                       packetcnt,
+                       "Expected: %h\n", gm_packet.bits,
+                       "Received: %h", duv_packet.bits);
                 stats.packet_bad++;
             end
         end
 
-        if(gm_box.num() > 0)
-            $display ("[SCORE]  @%t: GM has %0d pending packets.", $time,
+    endtask
+
+    task print_stats();
+        Response gm_response;
+        Response duv_response;
+        trdb_packet gm_packet;
+        trdb_packet duv_packet;
+        trdb_marker_e msgtype;
+
+        if (gm_box.num() > 0)
+            $warning("[SCORE]  @%t: GM has %0d pending packets.", $time,
                       gm_box.num());
-        if(duv_box.num() > 0) begin
-            $display ("[SCORE]  @%t: DUV has %0d pending packets.",
+        if (duv_box.num() > 0) begin
+            $warning("[SCORE]  @%t: DUV has %0d pending packets.",
                       $time, duv_box.num());
-            while(duv_box.num > 0) begin
-                duv_box.get(duv_response);
+            while(duv_box.num() > 0) begin
+                duv_box.try_get(duv_response);
                 duv_packet = duv_response.packet;
                 msgtype    = trdb_marker_e'{duv_packet.bits[5:4]};
                 $display("[SCORE]  @%t: Remaning: %h", $time, duv_packet.bits);
@@ -204,6 +212,6 @@ class Scoreboard;
 
         stats.print();
 
-    endtask
+   endtask
 
 endclass // Scoreboard
