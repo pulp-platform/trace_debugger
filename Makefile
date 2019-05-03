@@ -1,4 +1,5 @@
 # Copyright 2018 Robert Balas
+# Copyright 2019 ETH Zurich and University of Bologna
 # Copyright and related rights are licensed under the Solderpad Hardware
 # License, Version 0.51 (the "License"); you may not use this file except in
 # compliance with the License.  You may obtain a copy of the License at
@@ -8,7 +9,7 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the
 # specific language governing permissions and limitations under the License.
 
-# Author: Robert Balas (balasr@student.ethz.ch)
+# Author: Robert Balas (balasr@iis.ee.ethz.ch)
 # Description: All in one
 
 VERILATOR		= verilator
@@ -34,11 +35,12 @@ VSIM_FLAGS		=
 ALL_VSIM_FLAGS          = $(VSIM_FLAGS) -64
 VSIM_SCRIPT             = tb/scripts/vsim.tcl
 
-RTLSRC_TB_PKG		:= $(wildcard include/trdb_tb*.sv)
-RTLSRC_TB_TOP		:= $(wildcard tb/*_top.sv)
+RTLSRC_TB_PKG		:= include/trdb_tb_pkg.sv
+RTLSRC_TB_TOP		:= tb/trdb_tb_top.sv
 RTLSRC_TB		:= $(wildcard tb/*.sv) \
 				$(wildcard tb/dummy/*.sv)
-RTLSRC_PKG		:= $(wildcard include/trdb_pkg.sv)
+RTLSRC_PKG		:= include/trdb_pkg.sv rtl/axi/src/axi_pkg.sv \
+				include/ariane_axi_pkg.sv
 RTLSRC			:= $(wildcard rtl/*.sv) \
 				$(wildcard rtl/tech_cells_generic/*.sv) \
 				$(wildcard rtl/common_cells/*.sv)
@@ -137,7 +139,7 @@ c-docs:
 
 vlib: .lib-rtl
 vlog: .build-rtl
-tb-all: .opt-rtl
+tb-all: .opt-rtl c-sv-lib
 
 .PHONY: dpiheader
 dpiheader: tb-all
