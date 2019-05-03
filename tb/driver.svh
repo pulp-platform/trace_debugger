@@ -165,35 +165,35 @@ class Driver;
     function void apply_zero();
         if($test$plusargs("debug"))
             $display("[DRIVER] @%t: Applying zero stimuli.", $time);
-        this.duv_if.ivalid     = 1'b0;
-        this.duv_if.iexception = 1'b0;
-        this.duv_if.interrupt  = 1'b0;
-        this.duv_if.cause      = 5'b0;
-        this.duv_if.tval       = '0;
-        this.duv_if.priv       = 3'h7; // PRIVLEN'h7;
-        this.duv_if.iaddr      = '0;
-        this.duv_if.instr      = '0;
-        this.duv_if.compressed = 1'b0;
+        this.duv_if.cb.ivalid     <= 1'b0;
+        this.duv_if.cb.iexception <= 1'b0;
+        this.duv_if.cb.interrupt  <= 1'b0;
+        this.duv_if.cb.cause      <= 5'b0;
+        this.duv_if.cb.tval       <= '0;
+        this.duv_if.cb.priv       <= 3'h7; // PRIVLEN'h7;
+        this.duv_if.cb.iaddr      <= '0;
+        this.duv_if.cb.instr      <= '0;
+        this.duv_if.cb.compressed <= 1'b0;
     endfunction
 
 
     task write_apb(input logic [3:0] waddr, input logic [31:0] wdata);
         // write request
-        @(posedge this.duv_if.clk_i);
-        this.duv_if.apb_bus.paddr  = waddr;
-        this.duv_if.apb_bus.pwrite = 1'b1;
-        this.duv_if.apb_bus.psel   = 1'b1;
-        this.duv_if.apb_bus.pwdata = wdata;
+        @(this.duv_if.cb);
+        this.duv_if.cb.paddr  <= waddr;
+        this.duv_if.cb.pwrite <= 1'b1;
+        this.duv_if.cb.psel   <= 1'b1;
+        this.duv_if.cb.pwdata <= wdata;
 
-        @(posedge this.duv_if.clk_i);
+        @(this.duv_if.cb);
         // we are now the access state of the apb
-        this.duv_if.apb_bus.penable     = 1'b1;
+        this.duv_if.cb.penable     <= 1'b1;
 
         // wait until request consumed
-        @(posedge this.duv_if.clk_i);
-        wait(this.duv_if.apb_bus.pready == 1);
-        this.duv_if.apb_bus.penable     = 1'b0;
-        this.duv_if.apb_bus.psel   = 1'b0;
+        @(this.duv_if.cb);
+        wait(this.duv_if.cb.pready == 1);
+        this.duv_if.cb.penable     <= 1'b0;
+        this.duv_if.cb.psel   <= 1'b0;
     endtask
 
 
@@ -243,7 +243,7 @@ class Driver;
         //TODO: fix this hack
         apply_zero();
 
-        @(posedge this.duv_if.clk_i);
+        @(this.duv_if.cb);
         apply_zero();
 
         // enable trace debugger
@@ -255,27 +255,23 @@ class Driver;
         // apply stimuli according to Top-Down Digital VLSI Design (Kaeslin)
         for(int i = stimuli.ivalid.size() - 1; i >= 0; i--) begin
 
-            @(posedge this.duv_if.clk_i);
+            @(this.duv_if.cb);
 
-            // // tb starts accepting transactions
-            // this.duv_if.stall = ~this.duv_if.packet_word_valid;
+            // #STIM_APPLICATION_DEL;
 
-            #STIM_APPLICATION_DEL;
+            this.duv_if.cb.ivalid     <= stimuli.ivalid[i];
+            this.duv_if.cb.iexception <= stimuli.iexception[i];
+            this.duv_if.cb.interrupt  <= stimuli.interrupt[i];
+            this.duv_if.cb.cause      <= stimuli.cause[i];
+            this.duv_if.cb.tval       <= stimuli.tval[i];
+            this.duv_if.cb.priv       <= stimuli.priv[i];
+            this.duv_if.cb.priv[2]    <= 1'b1; // we force debug mode, stimuli from
+                                               // spike traces don't know that bit
+            this.duv_if.cb.iaddr      <= stimuli.iaddr[i];
+            this.duv_if.cb.instr      <= stimuli.instr[i];
+            this.duv_if.cb.compressed <= stimuli.compressed[i];
 
-            // apply stimuli pop_back()
-            this.duv_if.ivalid     = stimuli.ivalid[i];
-            this.duv_if.iexception = stimuli.iexception[i];
-            this.duv_if.interrupt  = stimuli.interrupt[i];
-            this.duv_if.cause      = stimuli.cause[i];
-            this.duv_if.tval       = stimuli.tval[i];
-            this.duv_if.priv       = stimuli.priv[i];
-            this.duv_if.priv[2]    = 1'b1; // we force debug mode, stimuli from
-                                           // spike traces don't know that bit
-            this.duv_if.iaddr      = stimuli.iaddr[i];
-            this.duv_if.instr      = stimuli.instr[i];
-            this.duv_if.compressed = stimuli.compressed[i];
-
-            #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
+            // #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             // take response in monitor.svh
         end
 
@@ -289,16 +285,16 @@ class Driver;
 
         $display("[DRIVER] @%t: Driver finished.", $time);
 
-        @(posedge this.duv_if.clk_i);
+        @(this.duv_if.cb);
         #STIM_APPLICATION_DEL;
         apply_zero();
 
-        @(posedge this.duv_if.clk_i);
+        @(this.duv_if.cb);
         #STIM_APPLICATION_DEL;
         apply_zero();
 
         repeat (10) begin
-            @(posedge this.duv_if.clk_i);
+            @(this.duv_if.cb);
         end
 
         tb_eos = 1'b1;

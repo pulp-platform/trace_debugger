@@ -37,22 +37,20 @@ class Monitor;
         Response response;
 
         forever begin: acquire
-            @(posedge this.duv_if.clk_i);
-            #STIM_APPLICATION_DEL;
+            @(this.duv_if.cb);
 
-            #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             if(tb_eos == 1'b1) begin
                 $display("[MONITOR]@%t: Signaled end of simulation.", $time);
                 break;
             end
 
-            if(this.duv_if.packet_word_valid && this.duv_if.grant) begin
+            if(this.duv_if.cb.packet_word_valid && this.duv_if.cb.grant) begin
                 if(off == 0) begin
                     //we are dealing with a new packet
                     packet.bits = '0;
                     pbits = (wordmod == 0 ?
-                             this.duv_if.packet_word[$clog2(PACKET_LEN)-1+7:7]:
-                             this.duv_if.packet_word[$clog2(PACKET_LEN)-1:0]);
+                             this.duv_if.cb.packet_word[$clog2(PACKET_LEN)-1+7:7]:
+                             this.duv_if.cb.packet_word[$clog2(PACKET_LEN)-1:0]);
 
                     // every other words (wordmod == 0) has an additional 7 bits
                     totalbits = pbits + (pbits/(32+32-7)) * 7
@@ -62,20 +60,20 @@ class Monitor;
                     max_reads = (totalbits + 32 - 1) / 32;
 
                     if(wordmod == 0)  begin
-                        packet.bits[packet_ptr+:32-7] = this.duv_if.packet_word[31:7];
+                        packet.bits[packet_ptr+:32-7] = this.duv_if.cb.packet_word[31:7];
                         packet_ptr += 32-7;
                     end else begin
-                        packet.bits[packet_ptr+:32] = this.duv_if.packet_word;
+                        packet.bits[packet_ptr+:32] = this.duv_if.cb.packet_word;
                         packet_ptr += 32;
                     end
                     off++;
 
                 end else begin
                     if(wordmod == 0)  begin
-                        packet.bits[packet_ptr+:32-7] = this.duv_if.packet_word[31:7];
+                        packet.bits[packet_ptr+:32-7] = this.duv_if.cb.packet_word[31:7];
                         packet_ptr += 32-7;
                     end else begin
-                        packet.bits[packet_ptr+:32] = this.duv_if.packet_word;
+                        packet.bits[packet_ptr+:32] = this.duv_if.cb.packet_word;
                         packet_ptr += 32;
                     end
                     off++;
@@ -108,18 +106,16 @@ class Monitor;
         Response                   response;
 
         forever begin: acquire
-            @(posedge this.duv_if.clk_i);
-            #STIM_APPLICATION_DEL;
+            @(this.duv_if.cb);
 
-            #(RESP_ACQUISITION_DEL - STIM_APPLICATION_DEL);
             if(tb_eos == 1'b1) begin
                 $display("[MONITOR]@%t: Signaled end of simulation.", $time);
                 $finish;
                 break;
             end
 
-            if(this.duv_if.packet_word_valid && this.duv_if.grant) begin
-                packet_word = this.duv_if.packet_word;
+            if(this.duv_if.cb.packet_word_valid && this.duv_if.cb.grant) begin
+                packet_word = this.duv_if.cb.packet_word;
                 if($test$plusargs("debug"))
                     $display("[Monitor]@%t: slurping %h", $time, packet_word);
 
@@ -165,7 +161,7 @@ class Monitor;
         acquire_bytewise(tb_eos);
 
         repeat(10)
-            @(posedge this.duv_if.clk_i);
+            @(this.duv_if.cb);
 
     endtask
 

@@ -35,9 +35,9 @@ module trdb_tb_top #(
     trace_debugger_wrapper i_trace_debugger_wrapper(.duv_if(duv_if));
 
     // randomized handshake
-    always_ff @(posedge clk) begin
+    always_ff @(duv_if.cb) begin
         //duv_if.grant = repeat (NumRegs) @(posedge clk) duv_if.packet_word_valid;
-        duv_if.grant = $urandom_range(0, 1);
+        duv_if.cb.grant <= $urandom_range(0, 1);
     end
 
     //instantiate testbench
