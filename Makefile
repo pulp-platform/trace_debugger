@@ -11,6 +11,7 @@
 # Author: Robert Balas (balasr@student.ethz.ch)
 # Description: All in one
 
+SHELL			= /bin/bash
 VERILATOR		= verilator
 
 LINTER			= $(VERILATOR) --lint-only
@@ -48,10 +49,10 @@ RTLSRC_VOPT_TB_TOP	:= $(addsuffix _vopt, $(RTLSRC_VLOG_TB_TOP))
 
 DPINAME			= trdb/dpi/autogen_trdb_sv.h
 DPISRC			= $(RTLSRC_TB_PKG)
-SV_LIB			= trdb/libtrdbsv
+SV_LIB			= trdb/.libs/libtrdb
 CFLAGS                  = -Wall -Wextra -Wno-missing-field-initializers \
 				-Wno-unused-function -Wno-missing-braces \
-				-O2 -g -march=native \
+				-O2 -g -fpic \
 				-DENABLE_LOGGING -DNDEBUG
 
 
@@ -96,21 +97,15 @@ CFLAGS+=-DTRDB_ARCH64
 endif
 
 # c model and decompression tools
-.PHONY: c-all
-c-all:
-	$(MAKE) -C trdb all
+$(SV_LIB).so:
+	cd trdb; \
+	autoconf -i; \
+	./configure; \
+	$(MAKE) all CFLAGS="$(CFLAGS)";
 
-.PHONY: c-lib
-c-lib:
-	$(MAKE) -C trdb lib
+c-all: $(SV_LIB).so
 
-.PHONY: c-sv-lib
-c-sv-lib:
-	$(MAKE) -C trdb sv-lib CFLAGS="$(CFLAGS)"
-
-.PHONY: c-run
-c-run:
-	$(MAKE) -C trdb run
+c-sv-lib: $(SV_LIB).so
 
 .PHONY: c-clean
 c-clean:
@@ -118,7 +113,7 @@ c-clean:
 
 .PHONY: c-docs
 c-docs:
-	$(MAKE) -C trdb docs
+	$(MAKE) -C trdb doxygen-doc
 
 # testbench compilation and optimization
 .lib-rtl:
